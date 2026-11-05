@@ -1,7 +1,7 @@
 import React from 'react';
 import { Share, StyleSheet, View } from 'react-native';
 import { Share2 } from 'lucide-react-native';
-import { color, space } from '../theme/tokens';
+import { color, icon, motion, space } from '../theme/tokens';
 import { Button, HearIt, Panel, Rise, T, money } from '../components/ui';
 import { CurvedHeader, Screen } from '../components/shell';
 import { StatusMark } from '../components/money';
@@ -28,7 +28,7 @@ export function Receipt({ id }: { id: string }) {
   return (
     <Screen
       head={<CurvedHeader back bell={false} title={t.receipt} />}
-      footer={<Button kind="soft" label={t.shareReceipt} icon={<Share2 size={20} color={color.text} strokeWidth={1.8} />} onPress={share} />}
+      footer={<Button kind="soft" label={t.shareReceipt} icon={<Share2 size={icon.md} color={color.text} strokeWidth={1.8} />} onPress={share} />}
     >
       <Rise>
         <Panel style={r.top}>
@@ -37,7 +37,7 @@ export function Receipt({ id }: { id: string }) {
           <T v="heading">{word}</T>
         </Panel>
       </Rise>
-      <Rise delay={100}>
+      <Rise delay={motion.stagger * 2}>
         <Panel>
           <Line label={e.dir === 'in' ? t.from : t.to} value={e.who} />
           <Line label={t.date} value={e.when} />
@@ -52,7 +52,7 @@ export function Receipt({ id }: { id: string }) {
 
 const r = StyleSheet.create({
   top: { alignItems: 'center', gap: space.xs, paddingVertical: space.xl },
-  line: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg, paddingVertical: 2 },
+  line: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg, paddingVertical: space.hair },
   value: { flexShrink: 1, textAlign: 'right' },
   mono: { fontVariant: ['tabular-nums'] },
 });

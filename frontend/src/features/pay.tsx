@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { color, radius, space } from '../theme/tokens';
+import { Animated, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { color, icon, motion, radius, space } from '../theme/tokens';
 import { Keypad } from '../components/keypad';
 import { Button, Card, HearIt, Panel, Rise, T, money, naira, native, useCardW, useReduceMotion } from '../components/ui';
 import { Avatar, CurvedHeader, Screen } from '../components/shell';
@@ -66,8 +66,8 @@ export function Scan({ kind, amount }: { kind: 'request' | 'voucher' | 'receipt'
   useEffect(() => {
     if (reduce) return;
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(a, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.quad), useNativeDriver: native }),
-      Animated.timing(a, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.quad), useNativeDriver: native }),
+      Animated.timing(a, { toValue: 1, duration: motion.sweep, easing: motion.ease.inOut, useNativeDriver: native }),
+      Animated.timing(a, { toValue: 0, duration: motion.sweep, easing: motion.ease.inOut, useNativeDriver: native }),
     ]));
     loop.start();
     return () => loop.stop();
@@ -126,7 +126,7 @@ export function Review({ amount }: { amount: number }) {
           <HearIt say={say} />
         </Panel>
       </Rise>
-      <Rise delay={100}>
+      <Rise delay={motion.stagger * 2}>
         <Panel>
           <T v="section" accessibilityRole="header">{t.paymentSummary}</T>
           <View style={p.row}>
@@ -135,7 +135,7 @@ export function Review({ amount }: { amount: number }) {
               <T v="heading" numberOfLines={2}>{seller}</T>
               <T v="small" c={color.muted}>{t.verified}</T>
             </View>
-            <CheckDisc size={24} c={color.green} />
+            <CheckDisc size={icon.md} c={color.green} />
           </View>
           <Row label={t.fromWallet} value={t.walletOffline} />
           <Row label={t.amountUsd} value={`$${usd}`} />
@@ -152,7 +152,7 @@ function Stop({ say, children, footer }: { say: string; children: React.ReactNod
   const x = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduce) return;
-    Animated.sequence([-7, 6, -4, 0].map(toValue => Animated.timing(x, { toValue, duration: 60, useNativeDriver: native }))).start();
+    Animated.sequence([-7, 6, -4, 0].map(toValue => Animated.timing(x, { toValue, duration: motion.shake, useNativeDriver: native }))).start();
   }, []);
   return (
     <Screen head={<CurvedHeader back bell={false} title={t.checkPay} />} footer={footer}>
@@ -173,8 +173,8 @@ export function Refused({ amount }: { amount: number }) {
         <T v="body" c={color.muted}>{t.nothingMoved}</T>
       </Panel>
       <Duo items={[
-        { label: t.sellerAskedShort, value: money(amount), fill: color.amber, icon: <NairaDisc size={23} c={color.ink} /> },
-        { label: t.haveShort, value: money(left), fill: color.green, icon: <WalletDisc size={23} c={color.ink} /> },
+        { label: t.sellerAskedShort, value: money(amount), fill: color.amber, icon: <NairaDisc size={icon.md} c={color.ink} /> },
+        { label: t.haveShort, value: money(left), fill: color.green, icon: <WalletDisc size={icon.md} c={color.ink} /> },
       ]} />
     </Stop>
   );
@@ -247,7 +247,7 @@ export const p = StyleSheet.create({
   center2: { alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   stop: { gap: space.xs, paddingVertical: space.xl },
-  amount: { gap: 2, paddingVertical: space.lg },
+  amount: { gap: space.hair, paddingVertical: space.lg },
   chips: { flexDirection: 'row', gap: space.sm },
   chip: { flex: 1, minHeight: 48, borderRadius: radius.md, backgroundColor: color.panel, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' },
   chipOn: { backgroundColor: color.panelHigh, borderColor: color.blue },
@@ -259,6 +259,6 @@ export const p = StyleSheet.create({
   tr: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: radius.md },
   bl: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: radius.md },
   br: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: radius.md },
-  sweep: { position: 'absolute', top: 16, left: 8, right: 8, height: 3, borderRadius: 2, backgroundColor: color.blue },
+  sweep: { position: 'absolute', top: 16, left: 8, right: 8, height: 3, borderRadius: radius.pill, backgroundColor: color.blue },
   state: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm },
 });

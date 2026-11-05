@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ArrowDown, ArrowUp } from 'lucide-react-native';
-import { color, space } from '../theme/tokens';
+import { color, icon, motion, space } from '../theme/tokens';
 import { Button, HearIt, Panel, Rise, RollingMoney, T, money } from '../components/ui';
 import { CurvedHeader, Screen, Section } from '../components/shell';
 import { ActivityRows, Duo, WeekBars } from '../components/rows';
@@ -10,8 +10,8 @@ import { useNav } from '../nav';
 import { DEMO_RATE, SPENT, useStore } from '../demo/store';
 import { t } from '../i18n/en';
 
-const up = <ArrowUp size={20} color={color.ink} strokeWidth={2} />;
-const down = <ArrowDown size={20} color={color.ink} strokeWidth={2} />;
+const up = <ArrowUp size={icon.md} color={color.ink} strokeWidth={2} />;
+const down = <ArrowDown size={icon.md} color={color.ink} strokeWidth={2} />;
 const usd = (n: number) => `$${(n / DEMO_RATE).toFixed(2)}`;
 
 function Line({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
@@ -33,7 +33,7 @@ export function VaultScreen() {
         <RollingMoney value={left} v="moneyL" />
         <T v="small" c={color.muted}>{t.spendBy}</T>
       </Rise>
-      <Rise delay={100}>
+      <Rise delay={motion.stagger * 2}>
         <WeekBars title={t.spendDays} days={[
           { day: 'Thu', amount: 1000 }, { day: 'Fri', amount: 1500 }, { day: 'Sat', amount: 2000 },
           { day: 'Sun', amount: 3300, note: t.today }, { day: 'Mon', amount: 0, note: t.lastDay },
@@ -56,9 +56,10 @@ export function VaultScreen() {
 export function VaultReview({ amount, hours }: { amount: number; hours: number }) {
   const nav = useNav();
   const { lock } = useStore();
-  const go = () => { lock(amount); nav.reset({ name: 'vaultActive', amount, hours }); };
+  const [busy, setBusy] = React.useState(false);
+  const go = async () => { setBusy(true); await lock(amount); nav.reset({ name: 'vaultActive', amount, hours }); };
   return (
-    <Screen head={<CurvedHeader back bell={false} title={t.checkVault} />} footer={<Button label={t.toPayPal} onPress={go} />}>
+    <Screen head={<CurvedHeader back bell={false} title={t.checkVault} />} footer={<Button label={t.toPayPal} loading={busy} onPress={go} />}>
       <Rise>
         <Panel style={v.big}>
           <T v="body" c={color.muted}>{t.amountLock}</T>
@@ -66,7 +67,7 @@ export function VaultReview({ amount, hours }: { amount: number; hours: number }
           <T v="label">{`${t.paypalHolds} ${usd(amount)}`}</T>
         </Panel>
       </Rise>
-      <Rise delay={100}>
+      <Rise delay={motion.stagger * 2}>
         <Panel>
           <Line label={t.demoRate} value={`₦${DEMO_RATE.toLocaleString('en-US')}.00 ${t.ngnPerUsd}`} />
           <Line label={t.spendWithin} value={`${hours} ${t.hours}`} />
@@ -84,7 +85,7 @@ export function VaultActive({ amount, hours }: { amount: number; hours: number }
     <Screen head={<CurvedHeader bell={false} title={t.vaultLocked} />} footer={<Button label={t.done} onPress={() => nav.reset({ name: 'home' })} />}>
       <Rise>
         <Panel style={v.big}>
-          <StatusMark status="paid" size={48} big />
+          <StatusMark status="paid" size={44} big />
           <T v="moneyL">{money(amount)}</T>
           <T v="label">{`${usd(amount)} ${t.heldByPayPal}`}</T>
           <T v="small" c={color.muted}>{`${t.spendWithin} ${hours} ${t.hours}`}</T>
@@ -101,7 +102,8 @@ export function Melt() {
   const nav = useNav();
   const { left, pending, melt, blocking } = useStore();
   const [done, setDone] = React.useState<null | { back: number; held: number; ref?: string }>(null);
-  const close = () => { setDone({ back: left, held: pending, ref: blocking?.ref }); melt(); };
+  const [busy, setBusy] = React.useState(false);
+  const close = async () => { setBusy(true); const after = { back: left, held: pending, ref: blocking?.ref }; await melt(); setDone(after); };
   if (done) {
     return (
       <Screen head={<CurvedHeader bell={false} title={t.vaultClosed} />} footer={<Button label={t.done} onPress={() => nav.reset({ name: 'home' })} />}>
@@ -113,7 +115,7 @@ export function Melt() {
           </Panel>
         </Rise>
         {done.held > 0 && (
-          <Rise delay={100}>
+          <Rise delay={motion.stagger * 2}>
             <Panel>
               <Line label={t.stillHeld} value={money(done.held)} />
               <Line label={t.releaseBy} value={t.settleByDate} />
@@ -125,7 +127,7 @@ export function Melt() {
     );
   }
   return (
-    <Screen head={<CurvedHeader back bell={false} title={t.closeVault} />} footer={<Button label={t.closeVault} onPress={close} />}>
+    <Screen head={<CurvedHeader back bell={false} title={t.closeVault} />} footer={<Button label={t.closeVault} loading={busy} onPress={close} />}>
       <T v="hello">{t.stopSpending}</T>
       <Panel>
         <Line label={t.unspent} value={money(left)} strong />
@@ -137,7 +139,7 @@ export function Melt() {
 }
 
 const v = StyleSheet.create({
-  total: { alignItems: 'center', paddingVertical: space.xs, gap: 2 },
+  total: { alignItems: 'center', paddingVertical: space.xs, gap: space.hair },
   big: { alignItems: 'center', gap: space.xs, paddingVertical: space.xl },
   center: { textAlign: 'center' },
   line: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg },

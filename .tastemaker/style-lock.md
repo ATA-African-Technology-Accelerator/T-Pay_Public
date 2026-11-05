@@ -27,3 +27,11 @@ Press 0.96 over 150ms, entrances 12px over 300ms with 100ms stagger, tabular num
 - Hear it stays on every confirmation.
 - Processing never shows a paid tick. The word on screen is Processing, never Pending. Only the backend sets paid.
 - Names on a payment screen wrap and money never truncates.
+
+## Design system rules
+Every value comes from frontend/src/theme/tokens.ts. If a value is missing, add a token, never a literal.
+Spacing: 2, 4, 8, 12, 16, 20, 24, 36. Radius: 12, 16, 24, plus pill for anything fully round. Icons: 18, 22, 26, 46.
+Type: use a type token by name, never a font size in a component.
+Motion: durations, stagger and cubic-bezier curves from the motion token. Every animation must explain a change and respect reduced motion.
+Async: every async action shows progress on its button, and lists show a skeleton while loading.
+Copy: no em dashes, no vague slogans, no invented testimonials or stock names.

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useWindowDimensions, View } from 'react-native';
-import { color } from '../theme/tokens';
+import { color, motion } from '../theme/tokens';
 import { Button, HearIt, Panel, Rise, T, money } from '../components/ui';
 import { CurvedHeader, Screen } from '../components/shell';
 import { SampleCode, StatusMark, Steps } from '../components/money';
@@ -36,14 +36,14 @@ export function Credit({ amount, again }: { amount: number; again?: boolean }) {
       <Steps at={3} />
       <Rise>
         <Panel style={p.row}>
-          <StatusMark status="pending" size={40} />
+          <StatusMark status="pending" size={44} />
           <View style={{ flex: 1 }}>
             <T v="money" numberOfLines={1}>{money(amount)}</T>
             <T v="small" c={color.amber}>{t.status.pending}</T>
           </View>
         </Panel>
       </Rise>
-      <Rise delay={100}><Panel style={p.center2}><SampleCode size={size} seed={5} /><T v="label">{t.customerScans}</T></Panel></Rise>
+      <Rise delay={motion.stagger * 2}><Panel style={p.center2}><SampleCode size={size} seed={5} /><T v="label">{t.customerScans}</T></Panel></Rise>
       <T v="body" c={color.muted} style={p.center}>{t.pendingPaid}</T>
       <HearIt say={`${t.gotMoney}. ${amount} naira. ${t.pendingPaid}`} />
     </Screen>

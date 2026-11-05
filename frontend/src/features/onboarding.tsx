@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Check, ShieldCheck, Volume2 } from 'lucide-react-native';
-import { color, font, glass, motion, radius, space, touch, type } from '../theme/tokens';
+import { color, glass, icon, motion, radius, space, touch, type } from '../theme/tokens';
 import { Aurora } from '../components/aurora';
 import { Button, Panel, Rise, T, native, speak, useReduceMotion } from '../components/ui';
 import { BagIcon } from '../components/icons';
@@ -36,21 +36,21 @@ export function Language() {
   const [picked, setPicked] = useState<string | null>(null);
   return (
     <Screen head={<CurvedHeader bell={false} title={t.chooseLanguage} />}>
-      <View style={{ gap: space.sm + 2 }}>
+      <View style={{ gap: space.sm }}>
         {languages.map((name, i) => {
           const on = picked === name;
           return (
-            <Rise key={name} delay={i * 60} style={o.langRow}>
+            <Rise key={name} delay={i * motion.stagger} style={o.langRow}>
               <Pressable
                 accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={name}
                 onPress={() => { setPicked(name); setTimeout(() => nav.go({ name: 'details' }), 180); }}
                 style={[o.lang, on && { backgroundColor: color.panelHigh }]}
               >
                 <T v="heading">{name}</T>
-                {on && <Check size={22} color={color.blue} strokeWidth={2.4} />}
+                {on && <Check size={icon.md} color={color.blue} strokeWidth={2.4} />}
               </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel={`Hear ${name}`} onPress={() => speak(name)} style={o.ear}>
-                <Volume2 size={21} color={color.text} strokeWidth={1.8} />
+                <Volume2 size={icon.md} color={color.text} strokeWidth={1.8} />
               </Pressable>
             </Rise>
           );
@@ -80,7 +80,7 @@ export function Details() {
         <T v="small" c={color.muted}>{t.payoutHint}</T>
       </View>
       <Panel style={o.note}>
-        <ShieldCheck size={21} color={color.green} strokeWidth={1.7} />
+        <ShieldCheck size={icon.md} color={color.green} strokeWidth={1.7} />
         <View style={{ flex: 1 }}>
           <T v="label">{t.tierB}</T>
           <T v="small" c={color.muted}>{t.needsInternetOnce}</T>
@@ -93,12 +93,12 @@ export function Details() {
 const o = StyleSheet.create({
   splash: { flex: 1, backgroundColor: color.page, alignItems: 'center', justifyContent: 'center' },
   mark: { alignItems: 'center', gap: space.xs },
-  logo: { width: 88, height: 88, borderRadius: 44, borderWidth: 1, borderColor: glass.line, backgroundColor: glass.fill, alignItems: 'center', justifyContent: 'center', marginBottom: space.md },
-  brand: { fontFamily: font.headStrong, fontSize: 40, lineHeight: 48, color: color.white },
+  logo: { width: 88, height: 88, borderRadius: radius.pill, borderWidth: 1, borderColor: glass.line, backgroundColor: glass.fill, alignItems: 'center', justifyContent: 'center', marginBottom: space.md },
+  brand: { ...type.moneyL, color: color.white },
   langRow: { flexDirection: 'row', gap: space.sm },
-  lang: { flex: 1, minHeight: touch.button + 6, paddingHorizontal: space.xl + 2, borderRadius: radius.md, backgroundColor: color.panel, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  ear: { width: touch.button + 6, height: touch.button + 6, borderRadius: radius.md, backgroundColor: color.panel, alignItems: 'center', justifyContent: 'center' },
+  lang: { flex: 1, minHeight: touch.row, paddingHorizontal: space.xl, borderRadius: radius.md, backgroundColor: color.panel, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  ear: { width: touch.row, height: touch.row, borderRadius: radius.md, backgroundColor: color.panel, alignItems: 'center', justifyContent: 'center' },
   field: { gap: space.xs },
-  input: { ...type.heading, color: color.text, height: touch.button + 4, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.md },
+  input: { ...type.heading, color: color.text, height: touch.field, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.md },
   note: { flexDirection: 'row', alignItems: 'center' },
 });

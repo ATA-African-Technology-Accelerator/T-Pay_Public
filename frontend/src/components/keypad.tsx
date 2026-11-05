@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Delete } from 'lucide-react-native';
-import { color, font, radius, space } from '../theme/tokens';
+import { color, icon, radius, space, touch } from '../theme/tokens';
 import { Press, T } from './ui';
 import { t } from '../i18n/en';
 
@@ -16,7 +16,7 @@ export function Keypad({ onKey, kind = 'money' }: { onKey(k: string): void; kind
         <View key={`${key}${i}`} style={k.cell}>
           {key === '' ? <View style={k.blank} /> : (
             <Press accessibilityRole="button" accessibilityLabel={key === 'del' ? t.deleteDigit : key} onPress={() => onKey(key)} style={k.key}>
-              {key === 'del' ? <Delete size={24} color={color.text} strokeWidth={1.8} /> : <T style={k.text}>{key}</T>}
+              {key === 'del' ? <Delete size={icon.md} color={color.text} strokeWidth={1.8} /> : <T v="key" style={k.text}>{key}</T>}
             </Press>
           )}
         </View>
@@ -28,7 +28,7 @@ export function Keypad({ onKey, kind = 'money' }: { onKey(k: string): void; kind
 const k = StyleSheet.create({
   keys: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   cell: { flexBasis: '31%', flexGrow: 1 },
-  blank: { height: 62 },
-  key: { height: 62, borderRadius: radius.md, backgroundColor: color.panel, alignItems: 'center', justifyContent: 'center' },
-  text: { fontFamily: font.medium, fontSize: 24, lineHeight: 30, fontVariant: ['tabular-nums'] },
+  blank: { height: touch.row },
+  key: { height: touch.row, borderRadius: radius.md, backgroundColor: color.panel, alignItems: 'center', justifyContent: 'center' },
+  text: { fontVariant: ['tabular-nums'] },
 });
