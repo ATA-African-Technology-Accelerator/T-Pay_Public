@@ -55,7 +55,7 @@ function Page({ page, width, shown }: { page: WalletPage; width: number; shown: 
 export function Hero({ name, pages, wallet, onWallet }: { name: string; pages: WalletPage[]; wallet: Wallet; onWallet(w: Wallet): void }) {
   const nav = useNav();
   const width = Math.min(useWindowDimensions().width, 390);
-  const scroller = useRef<ScrollView>(null);
+  const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const index = pages.findIndex(p => p.key === wallet);
   const current = pages[index];
   const shown = useRef(0);

@@ -148,7 +148,7 @@ const l = StyleSheet.create({
   // The mic sits above the bar on real glass, so the list is seen blurred behind it.
   micGap: { height: 23 },
   mic: { position: 'absolute', top: -30, alignSelf: 'center', width: 64, height: 64, borderRadius: radius.pill, overflow: 'hidden', borderWidth: 1, borderColor: glass.lineStrong, alignItems: 'center', justifyContent: 'center' },
-  micBlur: { ...StyleSheet.absoluteFillObject, borderRadius: radius.pill, overflow: 'hidden' },
-  micGlass: { ...StyleSheet.absoluteFillObject, borderRadius: radius.pill, backgroundColor: glass.tint },
+  micBlur: { ...StyleSheet.absoluteFill, borderRadius: radius.pill, overflow: 'hidden' },
+  micGlass: { ...StyleSheet.absoluteFill, borderRadius: radius.pill, backgroundColor: glass.tint },
   micIcon: { zIndex: 1 },
 });
