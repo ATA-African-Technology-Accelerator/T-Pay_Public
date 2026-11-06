@@ -172,8 +172,7 @@ For hackathon judges evaluating T-Pay:
 ## 📈 6. Commercial Strategy: Ecosystem to Open B2B Protocol
 
 - **Phase 1 (Hackathon Launch)**: Closed-loop ecosystem launch for PayPal wallet holders. Gives T-Pay users exclusive access to the Secure Offline Budget Vault.
-- **Phase 2 (Africa Scale)**: Package T-Pay's Dual-App Trust & Opportunistic Settlement into an open B2B Infrastructure API licensed to Tier-1 African fintechs (**Moniepoint, OPay, PalmPay**) to eradicate hardware POS terminal bloat forever.
-
+- **
 ---
 
 ## 📄 License
