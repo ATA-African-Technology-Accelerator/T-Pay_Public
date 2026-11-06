@@ -107,6 +107,7 @@ export const t = {
   hideBalance: 'Hide balance', showBalance: 'Show balance', balanceHidden: 'Balance hidden',
   recentTx: 'Recent transactions',
   help: 'Help',
+  openMenu: 'Open menu', closeMenu: 'Close menu',
   enterPin: 'Enter your PIN',
   useFingerprint: 'Use fingerprint',
   receipt: 'Receipt', shareReceipt: 'Share receipt',

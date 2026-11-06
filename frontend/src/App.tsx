@@ -21,6 +21,7 @@ import { Lock } from './features/lock';
 import { Receive, SendDone, SendReview, SendTo } from './features/send';
 import { Help } from './features/help';
 import { Receipt } from './features/receipt';
+import { SideMenu } from './components/menu';
 
 function render(r: Route) {
   switch (r.name) {
@@ -71,19 +72,22 @@ function Page({ route, dir }: { route: Route; dir: number }) {
 export default function App() {
   const [loaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
   const [stack, setStack] = useState<{ r: Route; id: number; dir: number }[]>([{ r: { name: 'splash' }, id: 0, dir: 0 }]);
+  const [menu, setMenu] = useState(false);
   const ids = useRef(1);
   const nav = useMemo<Nav>(() => ({
     go: r => setStack(s => [...s, { r, id: ids.current++, dir: 1 }]),
     reset: r => setStack([{ r, id: ids.current++, dir: 0 }]),
     back: () => setStack(s => (s.length > 1 ? [...s.slice(0, -1).slice(0, -1), { ...s[s.length - 2], id: ids.current++, dir: -1 }] : s)),
+    openMenu: () => setMenu(true),
   }), []);
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (menu) { setMenu(false); return true; }
       if (stack.length > 1) { nav.back(); return true; }
       return false;
     });
     return () => sub.remove();
-  }, [stack.length]);
+  }, [stack.length, menu]);
   if (!loaded) return <View style={{ flex: 1, backgroundColor: color.page }} />;
   const top = stack[stack.length - 1];
   return (
@@ -93,6 +97,7 @@ export default function App() {
           <View style={st.phone}>
             <StatusBar style="light" />
             <Page key={top.id} route={top.r} dir={top.dir} />
+            <SideMenu open={menu} current={top.r.name} onClose={() => setMenu(false)} />
             {web && <DeviceChrome />}
           </View>
         </View>

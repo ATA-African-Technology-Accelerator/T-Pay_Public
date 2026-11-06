@@ -3,7 +3,7 @@ import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSh
 import { color, glass, icon, radius, space, touch } from '../theme/tokens';
 import { Press, RollingMoney, T, speak } from './ui';
 import { Aurora } from './aurora';
-import { Eye, EyeOff, HelpCircle, Volume2 } from 'lucide-react-native';
+import { Eye, EyeOff, HelpCircle, Menu, Volume2 } from 'lucide-react-native';
 import { BellButton, inset } from './shell';
 import { useNav } from '../nav';
 import { Wallet, useStore } from '../demo/store';
@@ -83,6 +83,9 @@ export function Hero({ name, pages, wallet, onWallet }: { name: string; pages: W
     <View style={h.hero}>
       <Aurora />
       <View style={h.top}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t.openMenu} onPress={nav.openMenu} style={h.round}>
+          <Menu size={icon.md} color={color.white} strokeWidth={1.8} />
+        </Pressable>
         <View style={{ flex: 1 }}>
           <T v="heading" c={color.white} accessibilityRole="header" numberOfLines={1}>{`${greeting()}, ${name}`}</T>
           <T v="small" c={color.white} numberOfLines={2}>{current.status}</T>
