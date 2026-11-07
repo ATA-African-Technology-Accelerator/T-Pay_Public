@@ -307,7 +307,7 @@ Priorities decide what survives the deadline. **P0** must work in the demo. **P1
 
 | ID | Requirement | Acceptance criterion | Closes |
 | :--- | :--- | :--- | :--- |
-| FR-36 | Registration issues a backend-signed device certificate binding key identifier, public key, display name, role and expiry. Both phones verify the peer's certificate against a T-Pay public key pinned in the app. | With networking off, a certificate signed by any other key, or an expired one, is refused and the screen says why. | W-25, G-F14 |
+| FR-36 | Registration issues a backend-signed device certificate binding key identifier, public key, display name and expiry. Both phones verify the peer's certificate against a T-Pay public key pinned in the app. | With networking off, a certificate signed by any other key, or an expired one, is refused and the screen says why. | W-25, G-F14 |
 | FR-37 | Locking a vault issues a backend-signed vault certificate binding vault, device key, authorised amount, FX rate, spend-by time and settle-by time. | With networking off, a merchant phone rejects a voucher with no certificate, with a certificate for another device, past its spend-by time, or above the certificate amount. | W-25, G-F14 |
 | FR-38 | Payment is a three-step exchange: the merchant presents a payment request, the customer returns a signed voucher, and the merchant returns a signed receipt. Delivery retries resend the same bytes and never re-sign. | A completed exchange gives both phones the same voucher; a tampered voucher is rejected; if the receipt is missed, the customer sees sent but unconfirmed and the amount stays reserved. | W-15, G-F09 |
 | FR-39 | The merchant phone records every vault and sequence it accepts and refuses a repeat. | Presenting the same voucher twice to one offline merchant produces one pending credit and a visible duplicate warning. | W-10, G-F03 |
@@ -391,7 +391,7 @@ An exact duplicate is not a state change. The backend returns the stored outcome
 
 ### 3.7 Minimum interface surface
 
-Only what the Android app needs. Every mutating client endpoint is authenticated by device token and idempotent.
+Only what the Android app needs. Every mutating client endpoint is authenticated by device token and idempotent. The API contract in `docs/T-Pay-API-Contract.md` is the binding detail for payloads, errors and the activity that calls each endpoint.
 
 | Method and path | Purpose | Idempotency |
 | :--- | :--- | :--- |

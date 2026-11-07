@@ -1,26 +1,18 @@
-interface ValueObjectProps {
-  [index: string]: any;
-}
-
-/**
- * Value Objects are immutable domain objects without distinct identity.
- * Equality is determined by comparing structural properties.
- */
-export abstract class ValueObject<T extends ValueObjectProps> {
+export abstract class ValueObject<T extends object> {
   public readonly props: Readonly<T>;
 
-  constructor(props: T) {
+  
+  protected constructor(props: T) {
     this.props = Object.freeze({ ...props });
   }
 
-  public equals(vo?: ValueObject<T>): boolean {
-    if (vo === null || vo === undefined) {
+
+  public equals(other?: ValueObject<T>): boolean {
+    if (!other) {
       return false;
     }
-    if (vo.props === undefined) {
-      return false;
-    }
-    return JSON.stringify(this.props) === JSON.stringify(vo.props);
+    const keys = Object.keys(this.props) as (keyof T)[];
+    const sameSize = keys.length === Object.keys(other.props).length;
+    return sameSize && keys.every((key) => this.props[key] === other.props[key]);
   }
 }
-
