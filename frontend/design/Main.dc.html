@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>T-Pay foundations</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&amp;family=Noto+Sans+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; padding: 56px; background: #F2F3EE; color: #14172B; font-family: 'Noto Sans', sans-serif; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px">
+
+  <div style="display: flex; flex-direction: column; gap: 32px">
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <div style="font-size: 44px; font-weight: 800; letter-spacing: -1px; color: #2A2F8F">T-Pay</div>
+      <div style="font-size: 18px; font-weight: 500; color: #4A4F66">Adire ledger: indigo ink on market paper</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 15px; font-weight: 700">Colour</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <div style="display: flex; gap: 10px; align-items: center"><div style="width: 44px; height: 44px; border-radius: 10px; background: #2A2F8F"></div><div><div style="font-size: 14px; font-weight: 700">Indigo</div><div style="font-size: 13px; color: #4A4F66">#2A2F8F action</div></div></div>
+        <div style="display: flex; gap: 10px; align-items: center"><div style="width: 44px; height: 44px; border-radius: 10px; background: #14172B"></div><div><div style="font-size: 14px; font-weight: 700">Ink</div><div style="font-size: 13px; color: #4A4F66">#14172B text</div></div></div>
+        <div style="display: flex; gap: 10px; align-items: center"><div style="width: 44px; height: 44px; border-radius: 10px; background: #FFC53D"></div><div><div style="font-size: 14px; font-weight: 700">Marigold</div><div style="font-size: 13px; color: #4A4F66">#FFC53D pending</div></div></div>
+        <div style="display: flex; gap: 10px; align-items: center"><div style="width: 44px; height: 44px; border-radius: 10px; background: #0A6B5B"></div><div><div style="font-size: 14px; font-weight: 700">Teal</div><div style="font-size: 13px; color: #4A4F66">#0A6B5B paid</div></div></div>
+        <div style="display: flex; gap: 10px; align-items: center"><div style="width: 44px; height: 44px; border-radius: 10px; background: #B42318"></div><div><div style="font-size: 14px; font-weight: 700">Brick</div><div style="font-size: 13px; color: #4A4F66">#B42318 refused</div></div></div>
+        <div style="display: flex; gap: 10px; align-items: center"><div style="width: 44px; height: 44px; border-radius: 10px; background: #4A4F66"></div><div><div style="font-size: 14px; font-weight: 700">Slate</div><div style="font-size: 13px; color: #4A4F66">#4A4F66 quiet text</div></div></div>
+        <div style="display: flex; gap: 10px; align-items: center"><div style="width: 44px; height: 44px; border-radius: 10px; background: #F2F3EE; border: 1px solid #C9CBC2; box-sizing: border-box"></div><div><div style="font-size: 14px; font-weight: 700">Paper</div><div style="font-size: 13px; color: #4A4F66">#F2F3EE ground</div></div></div>
+        <div style="display: flex; gap: 10px; align-items: center"><div style="width: 44px; height: 44px; border-radius: 10px; background: #FFFFFF; border: 1px solid #C9CBC2; box-sizing: border-box"></div><div><div style="font-size: 14px; font-weight: 700">White</div><div style="font-size: 13px; color: #4A4F66">#FFFFFF card, QR</div></div></div>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="font-size: 15px; font-weight: 700">Type: Noto Sans, Noto Sans Mono</div>
+      <div style="font-size: 56px; font-weight: 800; line-height: 1; letter-spacing: -1px">₦2,000</div>
+      <div style="font-size: 13px; color: #4A4F66">Amount 56 / 800</div>
+      <div style="font-size: 28px; font-weight: 700; line-height: 1.2">Confirm payment</div>
+      <div style="font-size: 18px; font-weight: 500">Body 18. Never below 15 on a payment screen.</div>
+      <div style="font-size: 22px; font-weight: 600">ẹ ọ ṣ ị ụ ṅ ɓ ɗ ƙ ƴ ₦</div>
+      <div style="font-family: 'Noto Sans Mono', monospace; font-size: 14px; font-weight: 500; color: #4A4F66">SANDBOX-CAPTURE · vch_456</div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 14px">
+    <div style="font-size: 15px; font-weight: 700">Money states: icon, word and shape together</div>
+    <div style="background: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; gap: 14px; align-items: center">
+      <div style="width: 44px; height: 44px; flex: none; border-radius: 22px; border: 3px dashed #4A4F66; box-sizing: border-box"></div>
+      <div><div style="font-size: 18px; font-weight: 700">Sent</div><div style="font-size: 14px; color: #4A4F66">SIGNED, DELIVERED. Reserved on the customer phone.</div></div>
+    </div>
+    <div style="background: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; gap: 14px; align-items: center">
+      <div style="width: 44px; height: 44px; flex: none; border-radius: 22px; background: #FFC53D; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#14172B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></div>
+      <div><div style="font-size: 18px; font-weight: 700">Pending</div><div style="font-size: 14px; color: #4A4F66">ACKNOWLEDGED, SETTLING, RETRYABLE_FAILURE. Pending debit or pending credit.</div></div>
+    </div>
+    <div style="background: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; gap: 14px; align-items: center">
+      <div style="width: 44px; height: 44px; flex: none; border-radius: 22px; background: #0A6B5B; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div>
+      <div><div style="font-size: 18px; font-weight: 700">Paid</div><div style="font-size: 14px; color: #4A4F66">SETTLED. Only a backend response may show this.</div></div>
+    </div>
+    <div style="background: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; gap: 14px; align-items: center">
+      <div style="width: 44px; height: 44px; flex: none; border-radius: 8px; border: 3px solid #B42318; box-sizing: border-box; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B42318" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"></path></svg></div>
+      <div><div style="font-size: 18px; font-weight: 700">Blocked</div><div style="font-size: 14px; color: #4A4F66">SETTLEMENT_BLOCKED. Named cause, shown to both phones.</div></div>
+    </div>
+    <div style="background: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; gap: 14px; align-items: center">
+      <div style="width: 44px; height: 44px; flex: none; border-radius: 8px; background: #B42318; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></div>
+      <div><div style="font-size: 18px; font-weight: 700">Refused</div><div style="font-size: 14px; color: #4A4F66">REJECTED_CONFLICT, REJECTED_OVERSPEND. Vault blocked.</div></div>
+    </div>
+    <div style="font-size: 15px; font-weight: 700; margin-top: 12px">Network: a fact, never an error</div>
+    <div style="display: flex; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: #E1E2DA; font-size: 14px; font-weight: 600">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 12.6a10 10 0 0 1 5-2.7M19 12.6a10 10 0 0 0-2-1.4M12 20h.01"></path></svg>
+        Offline
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: #D8F0EA; color: #07493E; font-size: 14px; font-weight: 600">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M8.5 16.5a5 5 0 0 1 7 0M5 12.6a10 10 0 0 1 14 0M2 8.8a15 15 0 0 1 20 0M12 20h.01"></path></svg>
+        Online
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <div style="font-size: 15px; font-weight: 700">The ticket: every signed thing looks like one</div>
+    <div style="position: relative; background: #FFFFFF; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 15px; font-weight: 600; color: #4A4F66">Mama Nkechi Provisions</div>
+      <div style="font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px">₦2,000</div>
+      <div style="position: relative; height: 0; border-top: 2px dashed #C9CBC2; margin: 6px -4px">
+        <div style="position: absolute; left: -26px; top: -12px; width: 22px; height: 22px; border-radius: 11px; background: #F2F3EE"></div>
+        <div style="position: absolute; right: -26px; top: -12px; width: 22px; height: 22px; border-radius: 11px; background: #F2F3EE"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 14px; color: #4A4F66"><span>$1.33 at ₦1,500.00 demo rate</span><span>No. 1</span></div>
+    </div>
+    <div style="font-size: 15px; font-weight: 700; margin-top: 8px">Actions: 56 tall, 48 minimum</div>
+    <button style="height: 56px; border: 0; border-radius: 12px; background: #2A2F8F; color: #FFFFFF; font-family: inherit; font-size: 18px; font-weight: 700">Confirm and sign</button>
+    <button style="height: 56px; border: 2px solid #2A2F8F; border-radius: 12px; background: transparent; color: #2A2F8F; font-family: inherit; font-size: 18px; font-weight: 700">Copy code instead</button>
+    <button style="height: 48px; align-self: flex-start; display: flex; align-items: center; gap: 8px; padding: 0 16px; border: 0; border-radius: 24px; background: #E7E8F7; color: #2A2F8F; font-family: inherit; font-size: 16px; font-weight: 700">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"></path></svg>
+      Hear it
+    </button>
+    <div style="font-size: 15px; font-weight: 700; margin-top: 8px">Honest labels, always visible</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px">
+      <div style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1.5px solid #4A4F66; font-size: 14px; font-weight: 600">Tier B: software-protected key</div>
+      <div style="display: flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 8px; border: 1.5px solid #4A4F66; font-size: 14px; font-weight: 600">PayPal sandbox</div>
+      <div style="display: flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 8px; border: 1.5px solid #4A4F66; font-size: 14px; font-weight: 600">Fixed demo rate</div>
+      <div style="display: flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 8px; border: 1.5px solid #4A4F66; font-size: 14px; font-weight: 600">Offline assistance</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

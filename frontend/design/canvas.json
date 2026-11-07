@@ -1,0 +1,70 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-04T17:30:00Z"},
+  "title": "T-Pay App Design",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 900, "title": "Foundations"},
+    "Errors.dc.html": {"x": 1520, "y": 0, "w": 1040, "h": 900, "title": "Contract error copy"},
+    "QR.dc.html": {"x": 2640, "y": 0, "w": 326, "h": 326, "title": "QR sample (component)"},
+
+    "Splash.dc.html": {"x": 0, "y": 1300, "w": 390, "h": 844, "title": "ACT-01 Splash", "is_interactive": true},
+    "Language.dc.html": {"x": 470, "y": 1300, "w": 390, "h": 844, "title": "ACT-02 Language", "is_interactive": true},
+    "Role.dc.html": {"x": 940, "y": 1300, "w": 390, "h": 844, "title": "ACT-02 Role", "is_interactive": true},
+    "Details.dc.html": {"x": 1410, "y": 1300, "w": 390, "h": 844, "title": "ACT-02 Details (merchant)", "is_interactive": true},
+    "HomeEmpty.dc.html": {"x": 1880, "y": 1300, "w": 390, "h": 844, "title": "ACT-03 Customer home, no vault", "is_interactive": true},
+    "HomeCustomer.dc.html": {"x": 2350, "y": 1300, "w": 390, "h": 844, "title": "ACT-03 Customer home, offline", "is_interactive": true},
+    "HomeMerchant.dc.html": {"x": 2820, "y": 1300, "w": 390, "h": 844, "title": "ACT-03 Merchant home, offline", "is_interactive": true},
+
+    "VaultAmount.dc.html": {"x": 0, "y": 2450, "w": 390, "h": 844, "title": "ACT-04 Amount and duration", "is_interactive": true},
+    "VaultReview.dc.html": {"x": 470, "y": 2450, "w": 390, "h": 844, "title": "ACT-04 Review before PayPal", "is_interactive": true},
+    "VaultActive.dc.html": {"x": 940, "y": 2450, "w": 390, "h": 844, "title": "ACT-05 Vault active", "is_interactive": true},
+
+    "MAmount.dc.html": {"x": 0, "y": 3600, "w": 390, "h": 844, "title": "ACT-06 Merchant enters amount", "is_interactive": true},
+    "MRequest.dc.html": {"x": 470, "y": 3600, "w": 390, "h": 844, "title": "ACT-06 Merchant shows request", "is_interactive": true},
+    "MScan.dc.html": {"x": 1410, "y": 3600, "w": 390, "h": 844, "title": "ACT-08 Merchant scans voucher", "is_interactive": true},
+    "MCredit.dc.html": {"x": 1880, "y": 3600, "w": 390, "h": 844, "title": "ACT-08 Pending credit and receipt", "is_interactive": true},
+
+    "CScan.dc.html": {"x": 470, "y": 4750, "w": 390, "h": 844, "title": "ACT-07 Customer scans request", "is_interactive": true},
+    "CReview.dc.html": {"x": 940, "y": 4750, "w": 390, "h": 844, "title": "ACT-07 Review and confirm", "is_interactive": true},
+    "CVoucher.dc.html": {"x": 1410, "y": 4750, "w": 390, "h": 844, "title": "ACT-07 Show voucher", "is_interactive": true},
+    "CReceipt.dc.html": {"x": 1880, "y": 4750, "w": 390, "h": 844, "title": "ACT-09 Customer scans receipt", "is_interactive": true},
+    "CDelivered.dc.html": {"x": 2350, "y": 4750, "w": 390, "h": 844, "title": "ACT-09 Delivered", "is_interactive": true},
+
+    "RefusedLimit.dc.html": {"x": 0, "y": 5900, "w": 390, "h": 844, "title": "ACT-07 Refused, over limit", "is_interactive": true},
+    "RefusedTampered.dc.html": {"x": 470, "y": 5900, "w": 390, "h": 844, "title": "ACT-08 Refused, tampered voucher", "is_interactive": true},
+    "RefusedDuplicate.dc.html": {"x": 940, "y": 5900, "w": 390, "h": 844, "title": "ACT-08 Duplicate warning", "is_interactive": true},
+
+    "Activity.dc.html": {"x": 0, "y": 7050, "w": 390, "h": 844, "title": "ACT-11 Activity list", "is_interactive": true},
+    "Detail.dc.html": {"x": 470, "y": 7050, "w": 390, "h": 844, "title": "ACT-11 Detail, settled", "is_interactive": true},
+    "Melt.dc.html": {"x": 940, "y": 7050, "w": 390, "h": 844, "title": "ACT-12 Melt, scheduled release", "is_interactive": true},
+    "Ledger.dc.html": {"x": 1410, "y": 7050, "w": 390, "h": 844, "title": "ACT-13 Merchant ledger", "is_interactive": true},
+
+    "Speak.dc.html": {"x": 0, "y": 8200, "w": 390, "h": 844, "title": "ACT-15 Listening", "is_interactive": true},
+    "Proposal.dc.html": {"x": 470, "y": 8200, "w": 390, "h": 844, "title": "ACT-15 Confirm proposal", "is_interactive": true},
+    "OfflineAssist.dc.html": {"x": 940, "y": 8200, "w": 390, "h": 844, "title": "ACT-15 Offline assistance", "is_interactive": true},
+    "Settings.dc.html": {"x": 1410, "y": 8200, "w": 390, "h": 844, "title": "ACT-16 Settings", "is_interactive": true}
+  },
+  "order": [
+    "Main.dc.html", "Errors.dc.html", "QR.dc.html",
+    "Splash.dc.html", "Language.dc.html", "Role.dc.html", "Details.dc.html", "HomeEmpty.dc.html", "HomeCustomer.dc.html", "HomeMerchant.dc.html",
+    "VaultAmount.dc.html", "VaultReview.dc.html", "VaultActive.dc.html",
+    "MAmount.dc.html", "MRequest.dc.html", "MScan.dc.html", "MCredit.dc.html",
+    "CScan.dc.html", "CReview.dc.html", "CVoucher.dc.html", "CReceipt.dc.html", "CDelivered.dc.html",
+    "RefusedLimit.dc.html", "RefusedTampered.dc.html", "RefusedDuplicate.dc.html",
+    "Activity.dc.html", "Detail.dc.html", "Melt.dc.html", "Ledger.dc.html",
+    "Speak.dc.html", "Proposal.dc.html", "OfflineAssist.dc.html", "Settings.dc.html"
+  ],
+  "notes": {
+    "t0": {"x": 0, "y": -240, "text": "Foundations", "kind": "title1", "maxW": 2560},
+    "t1": {"x": 0, "y": 1060, "text": "Setup and home", "kind": "title1", "maxW": 3200},
+    "t2": {"x": 0, "y": 2210, "text": "Lock a vault (online)", "kind": "title1", "maxW": 1330},
+    "t3": {"x": 0, "y": 3360, "text": "Offline payment: merchant phone", "kind": "title1", "maxW": 2270},
+    "t4": {"x": 0, "y": 4510, "text": "Offline payment: customer phone", "kind": "title1", "maxW": 2740},
+    "t5": {"x": 0, "y": 5660, "text": "Refusals", "kind": "title1", "maxW": 1330},
+    "t6": {"x": 0, "y": 6810, "text": "Records and funds", "kind": "title1", "maxW": 1800},
+    "t7": {"x": 0, "y": 7960, "text": "Voice and settings", "kind": "title1", "maxW": 1800}
+  },
+  "designSystems": []
+}

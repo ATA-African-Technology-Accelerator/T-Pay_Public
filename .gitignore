@@ -9,9 +9,5 @@ backend/.postman/
 .env*
 !.env.example
 
-
-**/.env
-**/.env.*
-
-# Explicitly allow .env.example files to be tracked and pushed
-!**/.env.example
+# Expo local state
+.expo/
