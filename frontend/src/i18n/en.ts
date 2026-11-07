@@ -118,6 +118,12 @@ export const t = {
   lockApp: 'Lock the app',
   phoneSecurity: 'Phone security',
   tierB: 'Tier B: software-protected key',
+  tierBHardware: 'Tier B: your key is locked inside this phone',
+  settingUp: 'Setting up your phone',
+  setupNoInternet: "We couldn't reach T-Pay. Check your internet and try again.",
+  setupCheckDetails: 'Check your name and PayPal email, then try again.',
+  setupBusy: 'T-Pay is busy right now. Wait a minute and try again.',
+  setupFailed: 'Something went wrong on our side. Please try again.',
   buildNote: 'This build uses PayPal sandbox. No real money moves.',
   faqs: [
     { q: 'What does Processing mean?', a: 'The payment is made and saved on both phones. It finishes by itself when either phone has network.' },
@@ -138,3 +144,5 @@ export const t = {
 } as const;
 
 export const languages = ['English', 'Pidgin', 'Yorùbá', 'Igbo', 'Hausa'];
+/** Contract codes, in the same order as `languages`. */
+export const languageCodes = ['en', 'pcm', 'yo', 'ig', 'ha'] as const;
