@@ -1,6 +1,8 @@
 // Sample data so the design can be walked through. No real money, signing or sync happens here.
 // The real rules stay in shared/ and replace this file when the screens are wired up.
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import type { Language } from '@tpay/shared/contracts/statuses';
+import { config } from '../config';
 
 export type Status = 'paid' | 'locked' | 'pending' | 'sent' | 'refused' | 'blocked';
 export type Dir = 'in' | 'out' | 'lock';
@@ -17,6 +19,7 @@ const settle = () => new Promise<void>(r => setTimeout(r, 900));
 
 type Store = {
   name: string; number: string; contacts: Contact[]; setName(n: string): void; payout: string; setPayout(e: string): void; seller: string;
+  language: Language; setLanguage(l: Language): void;
   wallet: Wallet; setWallet(w: Wallet): void; hidden: boolean; toggleHidden(): void;
   ready: boolean; active: number; locked: number; left: number; pending: number; incoming: number; paidIn: number; closing: boolean;
   history: Entry[]; blocking?: Entry;
@@ -30,8 +33,10 @@ const CONTACTS: Contact[] = [
 const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [name, setName] = useState('Ada');
-  const [payout, setPayout] = useState('ada-sandbox@example.com');
+  // Real registrations start empty so sample details never reach the backend.
+  const [name, setName] = useState(config.sampleOnly ? 'Ada' : '');
+  const [payout, setPayout] = useState(config.sampleOnly ? 'ada-sandbox@example.com' : '');
+  const [language, setLanguage] = useState<Language>('en');
   const [wallet, setWallet] = useState<Wallet>('offline');
   const [hidden, setHidden] = useState(false);
   const [base, setBase] = useState(30000);
@@ -56,7 +61,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const incoming = sum(e => e.dir === 'in' && e.status === 'pending');
     const paidIn = sum(e => e.dir === 'in' && e.status === 'paid');
     return {
-      name, number: '8012345678', contacts: CONTACTS, setName, payout, setPayout, seller: SELLER,
+      name, number: '8012345678', contacts: CONTACTS, setName, payout, setPayout, seller: SELLER, language, setLanguage,
       wallet, setWallet, hidden, toggleHidden: () => setHidden(x => !x),
       ready, active: base + paidIn, locked, left: Math.max(0, locked - pending), pending, incoming, paidIn, closing,
       history, blocking: history.find(e => e.dir === 'out' && e.status === 'pending'),
@@ -78,7 +83,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // Unspent money returns now. Money reserved for vouchers stays held until they settle.
       melt: async () => { await settle(); setBase(b => b + Math.max(0, locked - pending)); setLocked(pending); setClosing(pending > 0); },
     };
-  }, [name, payout, wallet, hidden, base, locked, closing, ready, history]);
+  }, [name, payout, language, wallet, hidden, base, locked, closing, ready, history]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

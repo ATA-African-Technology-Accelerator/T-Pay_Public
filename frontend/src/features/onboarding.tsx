@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { Check, ShieldCheck, Volume2 } from 'lucide-react-native';
+import { AlertCircle, Check, ShieldCheck, Volume2 } from 'lucide-react-native';
 import { color, glass, icon, motion, radius, space, touch, type } from '../theme/tokens';
 import { Aurora } from '../components/aurora';
 import { Button, Panel, Rise, T, native, speak, useReduceMotion } from '../components/ui';
@@ -8,7 +8,12 @@ import { BagIcon } from '../components/icons';
 import { CurvedHeader, Screen } from '../components/shell';
 import { useNav } from '../nav';
 import { useStore } from '../demo/store';
-import { languages, t } from '../i18n/en';
+import { languageCodes, languages, t } from '../i18n/en';
+import { ApiRequestError } from '../adapters/api/httpApi';
+import { softwareOnly } from '../adapters/crypto/deviceSigner';
+import { api, keyStore, signer } from '../composition';
+import { config } from '../config';
+import { registerDevice } from '../session/registerDevice';
 
 export function Splash() {
   const nav = useNav();
@@ -33,6 +38,7 @@ export function Splash() {
 
 export function Language() {
   const nav = useNav();
+  const { setLanguage } = useStore();
   const [picked, setPicked] = useState<string | null>(null);
   return (
     <Screen head={<CurvedHeader bell={false} title={t.chooseLanguage} />}>
@@ -43,7 +49,7 @@ export function Language() {
             <Rise key={name} delay={i * motion.stagger} style={o.langRow}>
               <Pressable
                 accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={name}
-                onPress={() => { setPicked(name); setTimeout(() => nav.go({ name: 'details' }), 180); }}
+                onPress={() => { setPicked(name); setLanguage(languageCodes[i]); setTimeout(() => nav.go({ name: 'details' }), 180); }}
                 style={[o.lang, on && { backgroundColor: color.panelHigh }]}
               >
                 <T v="heading">{name}</T>
@@ -63,31 +69,59 @@ export function Language() {
 /** One account for everyone: your name for customers, and where received money goes. */
 export function Details() {
   const nav = useNav();
-  const { name, setName, payout, setPayout } = useStore();
+  const { name, setName, payout, setPayout, language } = useStore();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const finish = async () => {
+    if (config.sampleOnly) { nav.reset({ name: 'lock' }); return; }
+    setBusy(true); setProblem(null);
+    try {
+      await registerDevice({ displayName: name, language, payoutEmail: payout }, { api, signer, keyStore, rootPublicKey: config.rootPublicKey });
+      nav.reset({ name: 'lock' });
+    } catch (e) {
+      setProblem(setupMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Screen
       head={<CurvedHeader back bell={false} title={t.yourDetails} />}
-      footer={<Button label={t.finish} disabled={!name.trim() || !payout.trim()} onPress={() => nav.reset({ name: 'lock' })} />}
+      footer={<Button label={busy ? t.settingUp : t.finish} loading={busy} disabled={!name.trim() || !payout.trim()} onPress={finish} />}
     >
       <View style={o.field}>
         <T v="label">{t.yourName}</T>
-        <TextInput accessibilityLabel={t.yourName} value={name} onChangeText={setName} style={o.input} />
+        <TextInput accessibilityLabel={t.yourName} value={name} onChangeText={setName} editable={!busy} maxLength={80} style={o.input} />
         <T v="small" c={color.muted}>{t.nameHint}</T>
       </View>
       <View style={o.field}>
         <T v="label">{t.payoutEmail}</T>
-        <TextInput accessibilityLabel={t.payoutEmail} value={payout} onChangeText={setPayout} autoCapitalize="none" keyboardType="email-address" style={o.input} />
+        <TextInput accessibilityLabel={t.payoutEmail} value={payout} onChangeText={setPayout} editable={!busy} autoCapitalize="none" keyboardType="email-address" style={o.input} />
         <T v="small" c={color.muted}>{t.payoutHint}</T>
       </View>
+      {problem && (
+        <Panel style={o.note}>
+          <AlertCircle size={icon.md} color={color.coral} strokeWidth={1.8} />
+          <T v="body" style={{ flex: 1 }} accessibilityLiveRegion="assertive" accessibilityRole="alert">{problem}</T>
+        </Panel>
+      )}
       <Panel style={o.note}>
         <ShieldCheck size={icon.md} color={color.green} strokeWidth={1.7} />
         <View style={{ flex: 1 }}>
-          <T v="label">{t.tierB}</T>
+          <T v="label">{softwareOnly ? t.tierB : t.tierBHardware}</T>
           <T v="small" c={color.muted}>{t.needsInternetOnce}</T>
         </View>
       </Panel>
     </Screen>
   );
+}
+
+function setupMessage(e: unknown): string {
+  const code = e instanceof ApiRequestError ? e.code : null;
+  if (code === 'NETWORK' || code === 'PAYPAL_UNAVAILABLE') return t.setupNoInternet;
+  if (code === 'VALIDATION_FAILED') return t.setupCheckDetails;
+  if (code === 'RATE_LIMITED') return t.setupBusy;
+  return t.setupFailed;
 }
 
 const o = StyleSheet.create({
