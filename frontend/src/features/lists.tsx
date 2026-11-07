@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { ChevronRight, Globe, HelpCircle, Lock, Mic, ShieldCheck, UserRound } from 'lucide-react-native';
-import { color, radius, space, touch, type } from '../theme/tokens';
+import { color, icon, motion, radius, space, touch, type } from '../theme/tokens';
 import { Button, HearIt, Panel, Press, T, money, native, useReduceMotion } from '../components/ui';
 import { Avatar, CurvedHeader, Screen, Section } from '../components/shell';
 import { ActivityRows, Segment } from '../components/rows';
@@ -54,7 +54,7 @@ export function Speak() {
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!listening) return;
-    const loop = reduce ? null : Animated.loop(Animated.timing(pulse, { toValue: 1, duration: 1300, easing: Easing.out(Easing.quad), useNativeDriver: native }));
+    const loop = reduce ? null : Animated.loop(Animated.timing(pulse, { toValue: 1, duration: motion.pulse, easing: motion.ease.out, useNativeDriver: native }));
     loop?.start();
     const id = setTimeout(() => { setListening(false); nav.go({ name: 'proposal', amount: 1000 }); }, 2000);
     return () => { loop?.stop(); pulse.setValue(0); clearTimeout(id); };
@@ -62,12 +62,12 @@ export function Speak() {
   return (
     <Screen tabsFor="speak" head={<CurvedHeader home title={t.speak} />}>
       <View style={a.speak}>
-        <T v="title" style={{ textAlign: 'center', fontSize: 24, lineHeight: 32 }}>{listening ? t.listening : t.tapToTalk}</T>
+        <T v="hello" style={{ textAlign: 'center' }}>{listening ? t.listening : t.tapToTalk}</T>
         <T v="body" c={color.muted} style={{ textAlign: 'center' }}>{t.saySomething}</T>
         <View style={a.micWrap}>
           <Animated.View style={[a.ring, { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 0] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }] }]} />
           <Pressable accessibilityRole="button" accessibilityLabel={t.tapToTalk} onPress={() => setListening(true)} style={a.mic}>
-            <Mic size={46} color={color.ink} strokeWidth={1.7} />
+            <Mic size={icon.xl} color={color.ink} strokeWidth={1.7} />
           </Pressable>
         </View>
         <Button kind="quiet" label={t.typeInstead} onPress={() => nav.go({ name: 'assist' })} />
@@ -126,7 +126,7 @@ function Tap({ label, onPress }: { label: string; onPress(): void }) {
   return (
     <Press accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={a.setting}>
       <T v="label" style={{ flex: 1 }}>{label}</T>
-      <ChevronRight size={21} color={color.muted} strokeWidth={1.8} />
+      <ChevronRight size={icon.md} color={color.muted} strokeWidth={1.8} />
     </Press>
   );
 }
@@ -136,9 +136,9 @@ export function SettingsScreen() {
   const { name } = useStore();
   const Row = ({ label, Icon, onPress }: { label: string; Icon: typeof Globe; onPress(): void }) => (
     <Press accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={a.setting}>
-      <View style={a.rowIcon}><Icon size={21} color={color.text} strokeWidth={1.7} /></View>
+      <View style={a.rowIcon}><Icon size={icon.md} color={color.text} strokeWidth={1.7} /></View>
       <T v="label" style={{ flex: 1 }}>{label}</T>
-      <ChevronRight size={21} color={color.muted} strokeWidth={1.8} />
+      <ChevronRight size={icon.md} color={color.muted} strokeWidth={1.8} />
     </Press>
   );
   return (
@@ -159,7 +159,7 @@ export function SettingsScreen() {
         <T v="smallStrong" c={color.muted}>{t.security}</T>
         <Row label={t.lockApp} Icon={Lock} onPress={() => nav.reset({ name: 'lock' })} />
         <View style={a.setting} accessible accessibilityLabel={`${t.phoneSecurity}, ${t.tierB}`}>
-          <View style={a.rowIcon}><ShieldCheck size={21} color={color.green} strokeWidth={1.7} /></View>
+          <View style={a.rowIcon}><ShieldCheck size={icon.md} color={color.green} strokeWidth={1.7} /></View>
           <View style={{ flex: 1 }}>
             <T v="label">{t.phoneSecurity}</T>
             <T v="small" c={color.muted}>{t.tierB}</T>
@@ -177,15 +177,15 @@ export function SettingsScreen() {
 
 const a = StyleSheet.create({
   speak: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.xl },
-  micWrap: { width: 176, height: 176, alignItems: 'center', justifyContent: 'center', borderRadius: 88, backgroundColor: color.panel },
-  ring: { position: 'absolute', width: 176, height: 176, borderRadius: 88, borderWidth: 2, borderColor: color.blue },
-  mic: { width: 124, height: 124, borderRadius: 62, backgroundColor: color.text, alignItems: 'center', justifyContent: 'center' },
+  micWrap: { width: 176, height: 176, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: color.panel },
+  ring: { position: 'absolute', width: 176, height: 176, borderRadius: radius.pill, borderWidth: 2, borderColor: color.blue },
+  mic: { width: 124, height: 124, borderRadius: radius.pill, backgroundColor: color.text, alignItems: 'center', justifyContent: 'center' },
   me: { flexDirection: 'row', alignItems: 'center' },
   group: { gap: space.sm },
   big: { alignItems: 'center', gap: space.xs, paddingVertical: space.xl },
   line: { flexDirection: 'row', justifyContent: 'space-between' },
   yesNo: { flexDirection: 'row', gap: space.sm },
-  input: { ...type.heading, color: color.text, height: touch.button + 4, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.md },
-  setting: { minHeight: touch.button + 10, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.lg },
-  rowIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: color.panelHigh, alignItems: 'center', justifyContent: 'center' },
+  input: { ...type.heading, color: color.text, height: touch.field, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.md },
+  setting: { minHeight: touch.row, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.lg },
+  rowIcon: { width: 42, height: 42, borderRadius: radius.pill, backgroundColor: color.panelHigh, alignItems: 'center', justifyContent: 'center' },
 });

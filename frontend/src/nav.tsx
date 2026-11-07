@@ -16,7 +16,7 @@ export type Route =
   | { name: 'tampered'; amount: number } | { name: 'duplicate'; amount: number }
   | { name: 'proposal'; amount: number; offline?: boolean } | { name: 'assist' };
 
-export type Nav = { go(r: Route): void; reset(r: Route): void; back(): void };
+export type Nav = { go(r: Route): void; reset(r: Route): void; back(): void; openMenu(): void };
 export const NavCtx = createContext<Nav | null>(null);
 export const useNav = () => {
   const n = useContext(NavCtx);

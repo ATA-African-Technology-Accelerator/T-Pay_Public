@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Fingerprint } from 'lucide-react-native';
-import { color, glass, radius, space } from '../theme/tokens';
+import { color, glass, icon, radius, space, touch } from '../theme/tokens';
 import { Press, T, money } from '../components/ui';
 import { Aurora } from '../components/aurora';
 import { Keypad } from '../components/keypad';
@@ -34,7 +34,7 @@ export function Lock() {
         </View>
         <Keypad kind="pin" onKey={press} />
         <Press accessibilityRole="button" accessibilityLabel={t.useFingerprint} onPress={open} style={l.finger}>
-          <Fingerprint size={22} color={color.blue} strokeWidth={1.8} />
+          <Fingerprint size={icon.md} color={color.blue} strokeWidth={1.8} />
           <T v="label">{t.useFingerprint}</T>
         </Press>
       </View>
@@ -48,7 +48,7 @@ const l = StyleSheet.create({
   body: { flex: 1, padding: space.md, gap: space.lg, justifyContent: 'center' },
   center: { textAlign: 'center' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: space.lg },
-  dot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: color.muted },
+  dot: { width: 14, height: 14, borderRadius: radius.sm, borderWidth: 1.5, borderColor: color.muted },
   dotOn: { backgroundColor: color.text, borderColor: color.text },
-  finger: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, borderRadius: radius.md, borderWidth: 1, borderColor: glass.line },
+  finger: { minHeight: touch.min, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, borderRadius: radius.md, borderWidth: 1, borderColor: glass.line },
 });

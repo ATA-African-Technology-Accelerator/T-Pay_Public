@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Share, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Share, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Check, Copy, Share2 } from 'lucide-react-native';
-import { color, radius, space, touch, type } from '../theme/tokens';
+import { color, icon, motion, radius, space, touch, type } from '../theme/tokens';
 import { Button, HearIt, Panel, Press, Rise, T, money } from '../components/ui';
 import { Avatar, CurvedHeader, Screen, Section } from '../components/shell';
 import { HoldToConfirm, SampleCode, StatusMark } from '../components/money';
@@ -28,10 +28,18 @@ function Person({ who, onPress }: { who: Contact; onPress(): void }) {
 /** Send starts with who. Their name is shown before any amount, so money never goes to a mistyped number. */
 export function SendTo() {
   const nav = useNav();
-  const { contacts } = useStore();
+  const { contacts, find } = useStore();
   const [number, setNumber] = useState('');
   const digits = number.replace(/\D/g, '').slice(0, 10);
-  const found = contacts.find(c => c.number === digits);
+  const [lookup, setLookup] = useState<{ checking: boolean; found?: Contact }>({ checking: false });
+  useEffect(() => {
+    if (digits.length !== 10) { setLookup({ checking: false }); return; }
+    let live = true;
+    setLookup({ checking: true });
+    find(digits).then(found => { if (live) setLookup({ checking: false, found }); });
+    return () => { live = false; };
+  }, [digits]);
+  const { checking, found } = lookup;
   const next = (to: Contact) => nav.go({ name: 'amount', mode: 'send', to });
   return (
     <Screen head={<CurvedHeader back bell={false} title={t.sendMoney} />}>
@@ -45,7 +53,7 @@ export function SendTo() {
       {found && (
         <Rise>
           <Panel style={s.found}>
-            <CheckDisc size={24} c={color.green} />
+            <CheckDisc size={icon.md} c={color.green} />
             <View style={{ flex: 1 }}>
               <T v="heading" numberOfLines={2}>{found.name}</T>
               <T v="small" c={color.muted}>{t.verified}</T>
@@ -53,8 +61,9 @@ export function SendTo() {
           </Panel>
         </Rise>
       )}
-      {digits.length === 10 && !found && <T v="body" c={color.coral}>{t.numberNotFound}</T>}
-      {found
+      {checking && <View style={s.checking} accessibilityLiveRegion="polite"><ActivityIndicator size="small" color={color.blue} /><T v="body" c={color.muted}>{t.checkingName}</T></View>}
+      {digits.length === 10 && !checking && !found && <T v="body" c={color.coral}>{t.numberNotFound}</T>}
+      {checking ? null : found
         ? <Button label={t.continue} onPress={() => next(found)} />
         : (
           <Panel>
@@ -78,11 +87,13 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 export function SendReview({ amount, to }: { amount: number; to: Contact }) {
   const nav = useNav();
   const { active, send } = useStore();
+  const [busy, setBusy] = useState(false);
+  const go = async () => { setBusy(true); const id = await send(amount, to); nav.reset({ name: 'sendDone', amount, to, id }); };
   const say = `Send ${amount} naira to ${to.name}`;
   return (
     <Screen
       head={<CurvedHeader back bell={false} title={t.checkSend} />}
-      footer={<HoldToConfirm label={t.holdToSend} say={say} onDone={() => nav.reset({ name: 'sendDone', amount, to, id: send(amount, to) })} />}
+      footer={<HoldToConfirm label={t.holdToSend} say={say} busy={busy} onDone={go} />}
     >
       <Rise>
         <Panel style={s.big}>
@@ -91,7 +102,7 @@ export function SendReview({ amount, to }: { amount: number; to: Contact }) {
           <HearIt say={say} />
         </Panel>
       </Rise>
-      <Rise delay={100}>
+      <Rise delay={motion.stagger * 2}>
         <Panel>
           <T v="section" accessibilityRole="header">{t.paymentSummary}</T>
           <Row label={t.to} value={to.name} />
@@ -117,7 +128,7 @@ export function SendDone({ amount, to, id }: { amount: number; to: Contact; id: 
     >
       <Rise>
         <Panel style={s.big}>
-          <StatusMark status="paid" size={48} big />
+          <StatusMark status="paid" size={44} big />
           <T v="moneyL">{money(amount)}</T>
           <T v="label">{`${t.sentTo} ${to.name}`}</T>
         </Panel>
@@ -148,8 +159,8 @@ export function Receive() {
       </Rise>
       <View style={s.two}>
         <Button style={{ flex: 1 }} kind="soft" label={copied ? t.copied : t.copyNumber}
-          icon={copied ? <Check size={20} color={color.green} strokeWidth={2} /> : <Copy size={20} color={color.text} strokeWidth={1.8} />} onPress={copy} />
-        <Button style={{ flex: 1 }} kind="soft" label={t.shareDetails} icon={<Share2 size={20} color={color.text} strokeWidth={1.8} />} onPress={share} />
+          icon={copied ? <Check size={icon.md} color={color.green} strokeWidth={2} /> : <Copy size={icon.md} color={color.text} strokeWidth={1.8} />} onPress={copy} />
+        <Button style={{ flex: 1 }} kind="soft" label={t.shareDetails} icon={<Share2 size={icon.md} color={color.text} strokeWidth={1.8} />} onPress={share} />
       </View>
       <Button label={t.askExact} onPress={() => nav.go({ name: 'amount', mode: 'collect' })} />
       <T v="small" c={color.muted} style={s.center}>{t.receiveNote}</T>
@@ -158,8 +169,9 @@ export function Receive() {
 }
 
 const s = StyleSheet.create({
-  input: { ...type.heading, color: color.text, height: touch.button + 4, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.md, fontVariant: ['tabular-nums'] },
+  input: { ...type.heading, color: color.text, height: touch.field, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.md, fontVariant: ['tabular-nums'] },
   found: { flexDirection: 'row', alignItems: 'center' },
+  checking: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   person: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.xs },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg },
   value: { flexShrink: 1, textAlign: 'right' },

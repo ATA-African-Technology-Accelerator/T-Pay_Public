@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { color, glass, radius, space } from '../theme/tokens';
+import { color, glass, icon, radius, space, touch } from '../theme/tokens';
 import { Press, RollingMoney, T, speak } from './ui';
 import { Aurora } from './aurora';
-import { Eye, EyeOff, HelpCircle, Volume2 } from 'lucide-react-native';
+import { Eye, EyeOff, HelpCircle, Menu, Volume2 } from 'lucide-react-native';
 import { BellButton, inset } from './shell';
 import { useNav } from '../nav';
 import { Wallet, useStore } from '../demo/store';
@@ -26,10 +26,10 @@ function Page({ page, width, shown }: { page: WalletPage; width: number; shown: 
         <View style={h.labelRow}>
           <T v="small" c={color.white}>{page.label}</T>
           <Pressable accessibilityRole="button" accessibilityLabel={hidden ? t.showBalance : t.hideBalance} hitSlop={8} onPress={toggleHidden} style={h.mini}>
-            <Vis size={18} color={color.white} strokeWidth={1.8} />
+            <Vis size={icon.sm} color={color.white} strokeWidth={1.8} />
           </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={`${t.hearIt}: ${page.label}`} hitSlop={8} onPress={() => speak(`${page.label}. ${page.amount} naira`)} style={h.mini}>
-            <Volume2 size={18} color={color.white} strokeWidth={1.8} />
+            <Volume2 size={icon.sm} color={color.white} strokeWidth={1.8} />
           </Pressable>
         </View>
         {hidden
@@ -55,7 +55,7 @@ function Page({ page, width, shown }: { page: WalletPage; width: number; shown: 
 export function Hero({ name, pages, wallet, onWallet }: { name: string; pages: WalletPage[]; wallet: Wallet; onWallet(w: Wallet): void }) {
   const nav = useNav();
   const width = Math.min(useWindowDimensions().width, 390);
-  const scroller = useRef<ScrollView>(null);
+  const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const index = pages.findIndex(p => p.key === wallet);
   const current = pages[index];
   const shown = useRef(0);
@@ -83,12 +83,15 @@ export function Hero({ name, pages, wallet, onWallet }: { name: string; pages: W
     <View style={h.hero}>
       <Aurora />
       <View style={h.top}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t.openMenu} onPress={nav.openMenu} style={h.round}>
+          <Menu size={icon.md} color={color.white} strokeWidth={1.8} />
+        </Pressable>
         <View style={{ flex: 1 }}>
           <T v="heading" c={color.white} accessibilityRole="header" numberOfLines={1}>{`${greeting()}, ${name}`}</T>
           <T v="small" c={color.white} numberOfLines={2}>{current.status}</T>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={t.help} onPress={() => nav.go({ name: 'help' })} style={h.round}>
-          <HelpCircle size={21} color={color.white} strokeWidth={1.7} />
+          <HelpCircle size={icon.md} color={color.white} strokeWidth={1.7} />
         </Pressable>
         <BellButton />
       </View>
@@ -119,19 +122,19 @@ export function Hero({ name, pages, wallet, onWallet }: { name: string; pages: W
 const h = StyleSheet.create({
   hero: { paddingTop: inset.top + 2, paddingBottom: space.md, gap: space.md, overflow: 'hidden', borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
   top: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.xl },
-  switch: { flexDirection: 'row', padding: 4, gap: 4, marginHorizontal: space.xl, borderRadius: radius.md, backgroundColor: glass.well },
-  switchItem: { flex: 1, minHeight: 44, borderRadius: space.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' },
+  switch: { flexDirection: 'row', padding: space.xs, gap: space.xs, marginHorizontal: space.xl, borderRadius: radius.md, backgroundColor: glass.well },
+  switchItem: { flex: 1, minHeight: 44, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' },
   switchOn: { backgroundColor: glass.fill, borderColor: glass.line },
   pager: { flexGrow: 0 },
   page: { paddingHorizontal: space.xl, gap: space.lg, justifyContent: 'space-between' },
-  money: { gap: 2 },
+  money: { gap: space.hair },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 34 },
-  mini: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: glass.fill },
-  round: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: glass.line, backgroundColor: glass.fill, alignItems: 'center', justifyContent: 'center' },
+  mini: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: glass.fill },
+  round: { width: 46, height: 46, borderRadius: radius.pill, borderWidth: 1, borderColor: glass.line, backgroundColor: glass.fill, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: space.sm },
-  action: { alignItems: 'center', gap: 6 },
-  pill: { alignSelf: 'stretch', height: 48, borderRadius: 24, borderWidth: 1, borderColor: glass.line, backgroundColor: glass.fill, alignItems: 'center', justifyContent: 'center' },
-  dots: { flexDirection: 'row', alignSelf: 'center', gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: glass.line },
+  action: { alignItems: 'center', gap: space.sm },
+  pill: { alignSelf: 'stretch', height: touch.min, borderRadius: radius.pill, borderWidth: 1, borderColor: glass.line, backgroundColor: glass.fill, alignItems: 'center', justifyContent: 'center' },
+  dots: { flexDirection: 'row', alignSelf: 'center', gap: space.sm },
+  dot: { width: 6, height: 6, borderRadius: radius.pill, backgroundColor: glass.line },
   dotOn: { width: 18, backgroundColor: color.white },
 });

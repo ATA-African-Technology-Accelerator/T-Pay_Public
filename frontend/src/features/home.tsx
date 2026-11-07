@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ArrowDown, ArrowLeftRight, ArrowUp, Globe, Landmark, Lock, Plus, ReceiptText } from 'lucide-react-native';
-import { color, radius, space } from '../theme/tokens';
+import { color, icon, motion, radius, space } from '../theme/tokens';
 import { Panel, Press, Rise, T, money } from '../components/ui';
 import { Screen, Section } from '../components/shell';
 import { Hero, WalletPage } from '../components/hero';
@@ -10,8 +10,8 @@ import { useNav } from '../nav';
 import { useStore, Entry } from '../demo/store';
 import { t } from '../i18n/en';
 
-const ic = { size: 22, color: color.white, strokeWidth: 1.8 };
-const mark = { size: 20, color: color.amber, strokeWidth: 1.8 };
+const ic = { size: icon.md, color: color.white, strokeWidth: 1.8 };
+const mark = { size: icon.md, color: color.amber, strokeWidth: 1.8 };
 /** Recent transactions with See all, laid out as in Nigerian bank apps. */
 function Rows({ rows }: { rows: Entry[] }) {
   const nav = useNav();
@@ -77,7 +77,7 @@ export function HomeScreen() {
   return (
     <Screen tabsFor="home" hero={<Hero name={name} pages={pages} wallet={wallet} onWallet={setWallet} />}>
       <Rise key={wallet}>{notice}</Rise>
-      <Rise delay={100}><Rows key={wallet} rows={isActive ? history.filter(e => e.dir !== 'out' && e.status !== 'pending') : history} /></Rise>
+      <Rise delay={motion.stagger * 2}><Rows key={wallet} rows={isActive ? history.filter(e => e.dir !== 'out' && e.status !== 'pending') : history} /></Rise>
     </Screen>
   );
 }

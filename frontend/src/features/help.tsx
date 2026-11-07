@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import { color, radius, space } from '../theme/tokens';
+import { color, icon, motion, radius, space } from '../theme/tokens';
 import { HearIt, Press, Rise, T } from '../components/ui';
 import { CurvedHeader, Screen } from '../components/shell';
 import { t } from '../i18n/en';
@@ -15,11 +15,11 @@ export function Help() {
         const on = open === i;
         const Chevron = on ? ChevronUp : ChevronDown;
         return (
-          <Rise key={f.q} delay={i * 50}>
+          <Rise key={f.q} delay={i * motion.stagger}>
             <View style={h.item}>
               <Press accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={f.q} onPress={() => setOpen(on ? -1 : i)} style={h.q}>
                 <T v="label" style={{ flex: 1 }}>{f.q}</T>
-                <Chevron size={20} color={color.muted} strokeWidth={1.8} />
+                <Chevron size={icon.md} color={color.muted} strokeWidth={1.8} />
               </Press>
               {on && (
                 <View style={h.a}>

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
-import { color, radius, space } from '../theme/tokens';
-import { Card, Press, Rise, T, money, naira, useCardW, useReduceMotion } from './ui';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { color, icon, motion, radius, space } from '../theme/tokens';
+import { Card, Press, Rise, Skeleton, T, money, naira, useCardW, useReduceMotion } from './ui';
 import { BagIcon, CoinPlusIcon, HandCoinIcon } from './icons';
-import { Entry, Status } from '../demo/store';
+import { Entry, Status, useStore } from '../demo/store';
 import { useNav } from '../nav';
 import { t } from '../i18n/en';
 
@@ -21,23 +21,25 @@ const signed = (e: Entry) => (e.dir === 'lock' || e.status === 'refused' || e.st
 /** One row per entry: mark, who and when, then the amount with its status word. */
 export function ActivityRows({ rows }: { rows: Entry[] }) {
   const nav = useNav();
+  const { ready } = useStore();
+  if (!ready) return <Skeleton />;
   if (!rows.length) return <T v="body" c={color.muted} style={r.empty}>{t.nothingHere}</T>;
   return (
     <View style={r.list}>
       {rows.map((e, i) => {
         const k = tone[e.status];
         return (
-          <Rise key={e.id} delay={i * 60}>
+          <Rise key={e.id} delay={i * motion.stagger}>
             <Press
               accessibilityRole="button" accessibilityLabel={`${e.who}, ${e.amount} naira, ${t.status[e.status]}`} accessibilityHint={t.receipt}
               onPress={() => nav.go({ name: 'receipt', id: e.id })} style={r.row}
             >
-              <View style={r.mark}><k.Icon size={21} c={k.word} w={1.7} /></View>
+              <View style={r.mark}><k.Icon size={icon.md} c={k.word} w={1.7} /></View>
               <View style={{ flex: 1 }}>
                 <T v="label" numberOfLines={2}>{e.who}</T>
                 <T v="small" c={color.muted} numberOfLines={1}>{e.when}</T>
               </View>
-              <View style={{ alignItems: 'flex-end', gap: 1 }}>
+              <View style={{ alignItems: 'flex-end', gap: space.hair }}>
                 <T v="label" style={r.nums}>{signed(e)}</T>
                 <T v="small" c={k.word}>{t.status[e.status]}</T>
               </View>
@@ -54,7 +56,7 @@ export function Duo({ items }: { items: { label: string; value: string; fill: st
   return (
     <View style={r.duo}>
       {items.map((x, i) => (
-        <Rise key={x.label} delay={i * 60} style={{ flex: 1 }}>
+        <Rise key={x.label} delay={i * motion.stagger} style={{ flex: 1 }}>
           <View style={r.duoCard} accessible accessibilityLabel={`${x.label}, ${x.value}`}>
             <T v="small" c={color.muted} numberOfLines={1}>{x.label}</T>
             <T v="label" numberOfLines={1} adjustsFontSizeToFit style={r.nums}>{x.value}</T>
@@ -69,7 +71,7 @@ function Bar({ h, on, delay }: { h: number; on: boolean; delay: number }) {
   const reduce = useReduceMotion();
   const a = useRef(new Animated.Value(reduce ? h : 8)).current;
   useEffect(() => {
-    Animated.timing(a, { toValue: h, duration: reduce ? 0 : 500, delay: reduce ? 0 : delay, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    Animated.timing(a, { toValue: h, duration: reduce ? 0 : motion.bar, delay: reduce ? 0 : delay, easing: motion.ease.out, useNativeDriver: false }).start();
   }, [h, reduce]);
   return <Animated.View style={[r.bar, { height: a, backgroundColor: on ? color.blue : color.panelHigh }]} />;
 }
@@ -94,7 +96,7 @@ export function WeekBars({ title, days }: { title: string; days: { day: string; 
               key={d.day} accessibilityRole="button" accessibilityState={{ selected: i === pick }} accessibilityLabel={`${d.day}, ${d.amount} naira`}
               onPress={() => setPick(i)} style={r.col}
             >
-              <Bar h={Math.max(10, (d.amount / top) * MAX)} on={i === pick} delay={i * 50} />
+              <Bar h={Math.max(10, (d.amount / top) * MAX)} on={i === pick} delay={i * motion.stagger} />
               <T v="tiny" c={i === pick ? color.white : color.onDark}>{d.day}</T>
             </Pressable>
           ))}
@@ -123,16 +125,16 @@ const r = StyleSheet.create({
   list: { gap: space.xs },
   empty: { textAlign: 'center', paddingVertical: space.xl },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm },
-  mark: { width: 44, height: 44, borderRadius: 22, backgroundColor: color.panelHigh, alignItems: 'center', justifyContent: 'center' },
+  mark: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: color.panelHigh, alignItems: 'center', justifyContent: 'center' },
   nums: { fontVariant: ['tabular-nums'] },
   duo: { flexDirection: 'row', gap: space.md },
-  duoCard: { gap: 2, padding: space.lg, borderRadius: radius.md, backgroundColor: color.panel },
+  duoCard: { gap: space.hair, padding: space.lg, borderRadius: radius.md, backgroundColor: color.panel },
   chart: { flex: 1, paddingHorizontal: space.xl, paddingTop: 66, paddingBottom: space.lg, justifyContent: 'flex-end', gap: space.sm },
   bubbleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, position: 'absolute', top: space.xl, left: space.xl },
-  bubble: { backgroundColor: color.panelHigh, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 4 },
+  bubble: { backgroundColor: color.panelHigh, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.xs },
   bars: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  col: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 6, minHeight: 166 },
-  bar: { width: 30, borderRadius: 10 },
+  col: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: space.sm, minHeight: 166 },
+  bar: { width: 30, borderRadius: radius.sm },
   seg: { flexDirection: 'row', borderRadius: radius.md, padding: 0 },
   segItem: { flex: 1, height: 46, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   segOn: { backgroundColor: color.panelHigh },
