@@ -29,7 +29,13 @@
           "backgroundColor": "#050608"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "T-Pay uses Face ID to open the app."
+        }
+      ]
     ],
     "extra": {
       "eas": {
