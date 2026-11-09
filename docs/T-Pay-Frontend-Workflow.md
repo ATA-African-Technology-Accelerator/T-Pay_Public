@@ -166,6 +166,77 @@ The backend side publishes these interfaces in `shared/`. You provide the Androi
 | `IPinStore` | `SecureStorePinStore` |
 | `IBiometricUnlock` | `ExpoBiometricUnlock` |
 
+### 6.1 Device keys and signing
+
+Each phone creates its own key pair on first launch. No key is written into the code, except the T-Pay root public key.
+
+| Key | Where it lives | Purpose |
+| :--- | :--- | :--- |
+| Device private key | Created on the phone, kept in `expo-secure-store`, never sent anywhere | Signs registration, vouchers, receipts, payment requests and spend statements |
+| Device public key | Sent once in `POST /devices/register` and stored by the backend | Lets the backend and other phones check this phone's signatures |
+| T-Pay root public key | Built into the app | Checks device and vault certificates offline |
+| T-Pay root private key | Backend `.env` only | Signs certificates. The app never sees it |
+
+If the app is reinstalled, the private key is lost. The phone creates a new key pair and registers again as a new identity.
+
+**Formats.** These must match the backend exactly, or every request fails with `INVALID_SIGNATURE`.
+
+| Item | Format |
+| :--- | :--- |
+| Curve and hash | ECDSA P-256 (prime256v1) with SHA-256 |
+| Private key | 32 raw bytes, base64url |
+| Public key | 65-byte uncompressed point starting with `0x04`, base64url |
+| Signature | 64 raw bytes `r‖s` with low S, base64url |
+| Hash, for `voucherHash` | SHA-256 of the canonical JSON, base64url |
+| Signed text | Domain prefix, a newline, then the canonical JSON of the payload |
+
+Build the signed text only with `signingInput` and `MESSAGE_PREFIX` from `shared/`. Never use `JSON.stringify`.
+
+| Message | Prefix |
+| :--- | :--- |
+| Registration proof | `TPAY-REGISTER-V1` |
+| Payment request | `TPAY-REQUEST-V1` |
+| Voucher | `TPAY-VOUCHER-V1` |
+| Receipt | `TPAY-RECEIPT-V1` |
+| Spend statement | `TPAY-STATEMENT-V1` |
+| Device certificate, checked only | `TPAY-DEVICE-CERT-V1` |
+| Vault certificate, checked only | `TPAY-VAULT-CERT-V1` |
+
+**`NobleP256Signer`.** The backend tests already prove that these `@noble/curves` calls work with the backend:
+
+```ts
+import { p256 } from '@noble/curves/nist.js';
+
+const secretKey = p256.utils.randomSecretKey();
+const publicKey = p256.getPublicKey(secretKey, false);
+const signature = p256.sign(new TextEncoder().encode(signingInput), secretKey);
+const valid = p256.verify(signature, new TextEncoder().encode(signingInput), publicKey);
+```
+
+`p256.sign` hashes with SHA-256, returns 64 raw bytes and uses low S by default. Pass `false` to `getPublicKey` to get the uncompressed key. Convert the bytes to and from base64url.
+
+**Registration proof.** The proof is a signature over the other four fields:
+
+```text
+TPAY-REGISTER-V1
+{"displayName":"Ada","language":"en","payoutEmail":"ada@example.com","publicKey":"BHk3..."}
+```
+
+```ts
+const payload = { publicKey, displayName, language, payoutEmail };
+const proof = await signer.sign(signingInput(MESSAGE_PREFIX.REGISTRATION, payload), privateKey);
+await api.registerDevice({ ...payload, proof });
+```
+
+The backend rebuilds the same text from the request and checks it with the `publicKey` sent. Changing any field after signing gives `INVALID_SIGNATURE`. Save `deviceToken` and `deviceCertificate` from the response in secure storage.
+
+**How public keys are found later.**
+
+- **Online:** the backend never trusts a key sent with a voucher. It loads the payer's key from the vault's owner and the payee's key by `payeeKeyId`.
+- **Offline:** each phone shares its device certificate, which contains its public key and is signed by T-Pay. The other phone checks the certificate with the built-in root public key, then uses the public key inside it.
+
+**Check your adapter.** Register through your `NobleP256Signer`. A `201` response means the key and signature formats match. To compare with a working example, run `npm run postman -- device ada` in `backend/`. It prints a valid registration body made with the same steps.
+
 ## 7. Tickets
 
 Each ticket needs a branch, a pull request, and the activity ID in its title.
