@@ -11,7 +11,7 @@ import { useStore } from '../demo/store';
 import { languageCodes, languages, t } from '../i18n/en';
 import { ApiRequestError } from '../adapters/api/httpApi';
 import { softwareOnly } from '../adapters/crypto/deviceSigner';
-import { api, keyStore, signer } from '../composition';
+import { api, appLock, keyStore, signer } from '../composition';
 import { config } from '../config';
 import { registerDevice } from '../session/registerDevice';
 
@@ -21,8 +21,13 @@ export function Splash() {
   const a = useRef(new Animated.Value(reduce ? 1 : 0)).current;
   useEffect(() => {
     Animated.timing(a, { toValue: 1, duration: motion.slow, useNativeDriver: native }).start();
-    const id = setTimeout(() => nav.reset({ name: 'language' }), 1500);
-    return () => clearTimeout(id);
+    let cancelled = false;
+    const hasPin = appLock.hasPin().catch(() => false);
+    const id = setTimeout(async () => {
+      const returning = await hasPin;
+      if (!cancelled) nav.reset({ name: returning ? 'lock' : 'language' });
+    }, 1500);
+    return () => { cancelled = true; clearTimeout(id); };
   }, []);
   return (
     <View style={o.splash}>
@@ -73,11 +78,11 @@ export function Details() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const finish = async () => {
-    if (config.sampleOnly) { nav.reset({ name: 'lock' }); return; }
+    if (config.sampleOnly) { nav.reset({ name: 'createPin' }); return; }
     setBusy(true); setProblem(null);
     try {
       await registerDevice({ displayName: name, language, payoutEmail: payout }, { api, signer, keyStore, rootPublicKey: config.rootPublicKey });
-      nav.reset({ name: 'lock' });
+      nav.reset({ name: 'createPin' });
     } catch (e) {
       setProblem(setupMessage(e));
     } finally {

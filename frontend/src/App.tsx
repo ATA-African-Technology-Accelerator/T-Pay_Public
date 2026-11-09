@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, BackHandler, Platform, StyleSheet, View } from 'react-native';
+import { Animated, AppState, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
@@ -17,17 +17,24 @@ import { Amount, Delivered, Duplicate, Refused, Review, Scan, Tampered, Voucher 
 import { Credit, Request } from './features/collect';
 import { Activity, Assist, Ledger, Proposal, SettingsScreen, Speak } from './features/lists';
 import { Melt, VaultActive, VaultReview, VaultScreen } from './features/vault';
-import { Lock } from './features/lock';
+import { CreatePin, Lock } from './features/lock';
 import { Receive, SendDone, SendReview, SendTo } from './features/send';
 import { Help } from './features/help';
 import { Receipt } from './features/receipt';
 import { SideMenu } from './components/menu';
+import { appLock } from './composition';
+
+// Like a bank app: away for longer than this and the PIN is needed again.
+const RELOCK_AFTER_MS = 60_000;
+// Screens that come before unlocking, so returning to them never re-locks.
+const OPEN_ROUTES: Route['name'][] = ['splash', 'language', 'details', 'createPin', 'lock'];
 
 function render(r: Route) {
   switch (r.name) {
     case 'splash': return <Splash />;
     case 'language': return <Language />;
     case 'details': return <Details />;
+    case 'createPin': return <CreatePin />;
     case 'lock': return <Lock />;
     case 'help': return <Help />;
     case 'receipt': return <Receipt id={r.id} />;
@@ -80,6 +87,19 @@ export default function App() {
     back: () => setStack(s => (s.length > 1 ? [...s.slice(0, -1).slice(0, -1), { ...s[s.length - 2], id: ids.current++, dir: -1 }] : s)),
     openMenu: () => setMenu(true),
   }), []);
+  const current = useRef<Route['name']>('splash');
+  useEffect(() => {
+    let leftAt: number | null = null;
+    const sub = AppState.addEventListener('change', async state => {
+      if (state === 'background') { leftAt = Date.now(); return; }
+      if (state !== 'active' || leftAt === null) return;
+      const away = Date.now() - leftAt;
+      leftAt = null;
+      if (away < RELOCK_AFTER_MS || OPEN_ROUTES.includes(current.current)) return;
+      if (await appLock.hasPin().catch(() => false)) { setMenu(false); nav.reset({ name: 'lock' }); }
+    });
+    return () => sub.remove();
+  }, []);
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (menu) { setMenu(false); return true; }
@@ -90,6 +110,7 @@ export default function App() {
   }, [stack.length, menu]);
   if (!loaded) return <View style={{ flex: 1, backgroundColor: color.page }} />;
   const top = stack[stack.length - 1];
+  current.current = top.r.name;
   return (
     <StoreProvider>
       <NavCtx.Provider value={nav}>
