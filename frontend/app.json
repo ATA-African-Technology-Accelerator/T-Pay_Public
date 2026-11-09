@@ -1,26 +1,39 @@
 {
   "expo": {
-    "name": "T-Pay Mobile",
+    "name": "T-Pay",
     "slug": "tpay-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "backgroundColor": "#020617"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tpay.mobile"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#020617"
+        "backgroundColor": "#050608"
       },
       "package": "com.tpay.mobile"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#050608"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e8ea861d-7af4-4540-8bf0-88a8a90e1459"
+      }
+    },
+    "owner": "olayiwola206"
   }
 }
