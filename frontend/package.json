@@ -7,7 +7,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+  "postinstall": "mkdir -p node_modules/expo-nearby-connections/android && touch node_modules/expo-nearby-connections/android/fix-prefab.gradle"
+
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
