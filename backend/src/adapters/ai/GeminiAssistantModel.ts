@@ -1,4 +1,4 @@
-import { GoogleGenAI, type Part } from '@google/genai';
+import { ApiError as GeminiApiError, GoogleGenAI, type GenerateContentParameters, type Part } from '@google/genai';
 import type { Language } from '@tpay/shared/contracts/statuses';
 import { ApiError } from '../../services/ApiError';
 import type { AssistantModelRequest, IAssistantModel } from '../../services/ports';
@@ -8,7 +8,13 @@ import { ASSISTANT_INTENTS } from '../../validation/schemas';
 
 
 const REQUEST_TIMEOUT_MS = 15_000;
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+// Gemini often answers 503 "high demand" for a moment. One quick retry inside
+// the same deadline usually succeeds, so the person isn't sent offline for a blip.
+const OVERLOADED_STATUS = 503;
+const RETRY_DELAY_MS = 750;
+// Checked on 10 November 2026: answers in 1 to 5 seconds. gemini-2.5-flash is
+// closed to new keys, and gemini-3.8-flash was answering 503 most of the time.
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 
 const LANGUAGE_NAMES: Record<Language, string> = {
   en: 'English',
@@ -81,28 +87,49 @@ export class GeminiAssistantModel implements IAssistantModel {
       ? { text: `Request: ${JSON.stringify(input.text)}` }
       : { inlineData: { data: input.audioBase64, mimeType: input.audioMimeType } };
 
-    let text: string | undefined;
-    try {
-      const response = await this.client.models.generateContent({
-        model: this.config.model,
-        contents: [{
-          role: 'user',
-          parts: [{ text: `Reply language: ${LANGUAGE_NAMES[language]}.` }, request],
-        }],
-        config: {
-          systemInstruction: INSTRUCTION,
-          responseMimeType: 'application/json',
-          responseJsonSchema: RESPONSE_SCHEMA,
-          temperature: 0,
-          abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        },
-      });
-      text = response.text;
-    } catch (error) {
-      throw unavailable(error instanceof Error ? error.message : 'unknown error');
-    }
-    return parseJson(text);
+    const params: GenerateContentParameters = {
+      model: this.config.model,
+      contents: [{
+        role: 'user',
+        parts: [{ text: `Reply language: ${LANGUAGE_NAMES[language]}.` }, request],
+      }],
+      config: {
+        systemInstruction: INSTRUCTION,
+        responseMimeType: 'application/json',
+        responseJsonSchema: RESPONSE_SCHEMA,
+        temperature: 0,
+        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      },
+    };
+    return parseJson(await this.generate(this.client, params));
   }
+
+
+  private async generate(client: GoogleGenAI, params: GenerateContentParameters): Promise<string | undefined> {
+    try {
+      return (await client.models.generateContent(params)).text;
+    } catch (first) {
+      if (!isOverloaded(first)) {
+        throw unavailable(describe(first));
+      }
+      try {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        return (await client.models.generateContent(params)).text;
+      } catch (second) {
+        throw unavailable(describe(second));
+      }
+    }
+  }
+}
+
+
+function isOverloaded(error: unknown): boolean {
+  return error instanceof GeminiApiError && error.status === OVERLOADED_STATUS;
+}
+
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown error';
 }
 
 

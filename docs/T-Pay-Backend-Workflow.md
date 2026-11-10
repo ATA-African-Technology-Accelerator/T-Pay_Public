@@ -192,7 +192,7 @@ A void notice for an authorisation that has already been replaced matches no vau
 | Port | `IAssistantModel` in `services/ports.ts`: words or audio, plus the language, in; raw output out |
 | Adapter | `adapters/ai/GeminiAssistantModel.ts`: JSON schema output, temperature 0, 15-second timeout |
 | Service | `services/InterpretRequest.ts`: validates against `modelProposalSchema`, converts naira to kobo, applies capacity, logs |
-| Settings | `GEMINI_API_KEY`, which is optional. Without it the endpoint returns `AI_UNAVAILABLE`. `GEMINI_MODEL` defaults to `gemini-2.5-flash`. |
+| Settings | `GEMINI_API_KEY`, which is optional. Without it the endpoint returns `AI_UNAVAILABLE`. `GEMINI_MODEL` defaults to `gemini-3.5-flash`, the fastest model that was reliably available on 10 November. A `503` from Gemini gets one quick retry inside the 15-second limit. A `429`, meaning the free-tier quota of 5 requests a minute is used up, doesn't. |
 
 The model returns whole naira, which is more reliable than kobo. The instruction lists number words for each language, and quotes the request so it can't pose as part of the prompt. The fixed refusal lines in `InterpretRequest.ts`, and the example phrases in the instruction, need a native speaker's review.
 

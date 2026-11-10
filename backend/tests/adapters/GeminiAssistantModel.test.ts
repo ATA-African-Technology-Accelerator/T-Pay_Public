@@ -9,6 +9,11 @@ const { generateContent, constructed } = vi.hoisted(() => ({
 }));
 
 vi.mock('@google/genai', () => ({
+  ApiError: class extends Error {
+    constructor(public readonly status: number) {
+      super(`HTTP ${status}`);
+    }
+  },
   GoogleGenAI: class {
     public readonly models = { generateContent };
     constructor(options: unknown) {
@@ -18,6 +23,9 @@ vi.mock('@google/genai', () => ({
 }));
 
 const { GeminiAssistantModel } = await import('../../src/adapters/ai/GeminiAssistantModel');
+const { ApiError: GeminiApiError } = await import('@google/genai') as unknown as {
+  ApiError: new (status: number) => Error;
+};
 
 
 describe('GeminiAssistantModel', () => {
@@ -93,6 +101,29 @@ describe('GeminiAssistantModel', () => {
     generateContent.mockResolvedValue({ text: undefined });
 
     expect(await model().interpret(textRequest)).toBeNull();
+  });
+
+  it('retries once when Gemini is briefly overloaded', async () => {
+    generateContent
+      .mockRejectedValueOnce(new GeminiApiError(503))
+      .mockResolvedValueOnce({ text: '{"intent":"CHECK_BALANCE"}' });
+
+    expect(await model().interpret(textRequest)).toEqual({ intent: 'CHECK_BALANCE' });
+    expect(generateContent).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after a second overloaded answer', async () => {
+    generateContent.mockRejectedValue(new GeminiApiError(503));
+
+    await expect(model().interpret(textRequest)).rejects.toMatchObject({ code: 'AI_UNAVAILABLE' });
+    expect(generateContent).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry when the free-tier quota is used up', async () => {
+    generateContent.mockRejectedValue(new GeminiApiError(429));
+
+    await expect(model().interpret(textRequest)).rejects.toMatchObject({ code: 'AI_UNAVAILABLE' });
+    expect(generateContent).toHaveBeenCalledTimes(1);
   });
 
   it('reports AI_UNAVAILABLE when Gemini fails or times out', async () => {
