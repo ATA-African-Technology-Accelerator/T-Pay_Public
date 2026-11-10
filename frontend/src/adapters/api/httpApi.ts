@@ -1,5 +1,5 @@
 import { randomUUID } from 'expo-crypto';
-import type { ITPayApi } from '@tpay/shared/application/ports/api';
+import type { ITPayApi, MutationOptions } from '@tpay/shared/application/ports/api';
 import type {
   ActiveWalletResponse, AuthorizeVaultResponse, CreateVaultRequest, CreateVaultResponse,
   CurrentVaultResponse, InterpretRequest, InterpretResponse, ListTransactionsResponse,
@@ -10,6 +10,7 @@ import type {
 import type { ApiErrorBody, ErrorCode } from '@tpay/shared/contracts/errors';
 
 const TIMEOUT_MS = 20_000;
+const ASSISTANT_TIMEOUT_MS = 40_000;
 
 /** A refusal from the backend, or `NETWORK` when it couldn't be reached. Screens switch on `code`. */
 export class ApiRequestError extends Error {
@@ -18,7 +19,9 @@ export class ApiRequestError extends Error {
   }
 }
 
-type Options = { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; auth?: boolean; idempotent?: boolean };
+// `idempotent` takes the caller's key, kept across retries of one action, or makes one
+// for a single attempt.
+type Options = { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; auth?: boolean; idempotent?: MutationOptions | true; timeoutMs?: number };
 
 /**
  * Talks to the T-Pay backend. Every response is `{ data }`; errors are `{ error: { code } }`.
@@ -32,30 +35,30 @@ export class HttpTPayApi implements ITPayApi {
   }
   getProfile() { return this.call<ProfileView>('/profile'); }
   updateProfile(request: UpdateProfileRequest) { return this.call<ProfileView>('/profile', { method: 'PATCH', body: request }); }
-  createVault(request: CreateVaultRequest) {
-    return this.call<CreateVaultResponse>('/vaults', { method: 'POST', body: request, idempotent: true });
+  createVault(request: CreateVaultRequest, options: MutationOptions = {}) {
+    return this.call<CreateVaultResponse>('/vaults', { method: 'POST', body: request, idempotent: options });
   }
-  authorizeVault(vaultId: string) {
-    return this.call<AuthorizeVaultResponse>(`/vaults/${encodeURIComponent(vaultId)}/authorize`, { method: 'POST', body: {}, idempotent: true });
+  authorizeVault(vaultId: string, options: MutationOptions = {}) {
+    return this.call<AuthorizeVaultResponse>(`/vaults/${encodeURIComponent(vaultId)}/authorize`, { method: 'POST', body: {}, idempotent: options });
   }
   getCurrentVault() { return this.call<CurrentVaultResponse>('/vaults/current'); }
-  meltVault(vaultId: string, request: MeltVaultRequest) {
-    return this.call<MeltVaultResponse>(`/vaults/${encodeURIComponent(vaultId)}/melt`, { method: 'POST', body: request, idempotent: true });
+  meltVault(vaultId: string, request: MeltVaultRequest, options: MutationOptions = {}) {
+    return this.call<MeltVaultResponse>(`/vaults/${encodeURIComponent(vaultId)}/melt`, { method: 'POST', body: request, idempotent: options });
   }
   submitVoucher(request: SubmitVoucherRequest) { return this.call<SubmitVoucherResponse>('/vouchers', { method: 'POST', body: request }); }
   listVouchers(since?: string) { return this.call<ListVouchersResponse>(`/vouchers${query({ since })}`); }
   getVoucher(voucherId: string) { return this.call<VoucherView>(`/vouchers/${encodeURIComponent(voucherId)}`); }
   listTransactions(since?: string) { return this.call<ListTransactionsResponse>(`/transactions${query({ since })}`); }
   getActiveWallet() { return this.call<ActiveWalletResponse>('/wallet'); }
-  withdraw(request: WithdrawRequest) {
-    return this.call<WithdrawResponse>('/wallet/withdrawals', { method: 'POST', body: request, idempotent: true });
+  withdraw(request: WithdrawRequest, options: MutationOptions = {}) {
+    return this.call<WithdrawResponse>('/wallet/withdrawals', { method: 'POST', body: request, idempotent: options });
   }
-  // The backend has no assistant route yet. Fail by name rather than pretend.
-  async interpret(_request: InterpretRequest): Promise<InterpretResponse> {
-    throw new ApiRequestError('AI_UNAVAILABLE', 'The assistant endpoint is not deployed yet');
+  // Changes nothing, so no Idempotency-Key. Speech can take Gemini a while.
+  interpret(request: InterpretRequest) {
+    return this.call<InterpretResponse>('/assistant/interpret', { method: 'POST', body: request, timeoutMs: ASSISTANT_TIMEOUT_MS });
   }
 
-  private async call<T>(path: string, { method = 'GET', body, auth = true, idempotent = false }: Options = {}): Promise<T> {
+  private async call<T>(path: string, { method = 'GET', body, auth = true, idempotent, timeoutMs = TIMEOUT_MS }: Options = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (auth) {
@@ -63,10 +66,10 @@ export class HttpTPayApi implements ITPayApi {
       if (!token) throw new ApiRequestError('UNAUTHENTICATED', 'This phone is not registered yet', 401);
       headers.Authorization = `Bearer ${token}`;
     }
-    if (idempotent) headers['Idempotency-Key'] = randomUUID();
+    if (idempotent) headers['Idempotency-Key'] = (idempotent !== true && idempotent.idempotencyKey) || randomUUID();
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     let response: Response;
     try {
       response = await fetch(`${this.baseUrl}/api${path}`, {

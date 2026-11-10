@@ -6,8 +6,8 @@ import { T, native, useReduceMotion } from './ui';
 import { Avatar, inset } from './shell';
 import { BagIcon, HomeIcon } from './icons';
 import { Route, useNav } from '../nav';
-import { useStore } from '../demo/store';
-import { t } from '../i18n/en';
+import { useApp } from '../state/appState';
+import { t } from '../i18n';
 
 type Item = { label: string; draw(c: string): React.ReactNode; to: Route; stack?: boolean };
 
@@ -29,7 +29,7 @@ const MORE: Item[] = [
 /** Slide-in menu opened from the three-line button on home. The cross, a tap outside or Android back all close it. */
 export function SideMenu({ open, current, onClose }: { open: boolean; current: Route['name']; onClose(): void }) {
   const nav = useNav();
-  const { name } = useStore();
+  const { name } = useApp();
   const width = Math.min(useWindowDimensions().width, 390);
   const reduce = useReduceMotion();
   const panel = Math.min(width - 56, 320);

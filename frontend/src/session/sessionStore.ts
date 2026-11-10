@@ -17,6 +17,9 @@ export const sessionStore = {
   async token(): Promise<string | null> {
     return (await sessionStore.load())?.deviceToken ?? null;
   },
+  async clear(): Promise<void> {
+    await Promise.all([secureValues.remove(SESSION), secureValues.remove(PUBLIC_KEY)]);
+  },
   loadPublicKey: () => secureValues.get(PUBLIC_KEY),
   savePublicKey: (key: string) => secureValues.set(PUBLIC_KEY, key),
 };

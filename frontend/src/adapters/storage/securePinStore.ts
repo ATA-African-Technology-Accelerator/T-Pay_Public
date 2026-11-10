@@ -12,4 +12,7 @@ export class SecurePinStore implements IPinStore {
   public save(pin: StoredPin): Promise<void> {
     return secureValues.set(PIN, JSON.stringify(pin));
   }
+  public clear(): Promise<void> {
+    return secureValues.remove(PIN);
+  }
 }

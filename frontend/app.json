@@ -39,6 +39,34 @@
         {
           "faceIDPermission": "T-Pay uses Face ID to open the app."
         }
+      ],
+      [
+        "expo-nearby-connections",
+        {
+          "bluetoothUsagePermissionText": "T-Pay uses Bluetooth to pass payments between phones with no network."
+        }
+      ],
+      "expo-sqlite",
+      "expo-web-browser",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "T-Pay listens when you tap Speak, so you can pay or collect by voice."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "T-Pay listens when you tap Speak, so you can pay or collect by voice.",
+          "speechRecognitionPermission": "T-Pay turns what you say into a payment for you to confirm."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "T-Pay uses the camera to scan payment codes.",
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "extra": {

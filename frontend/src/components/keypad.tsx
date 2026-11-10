@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Delete } from 'lucide-react-native';
 import { color, icon, radius, space, touch } from '../theme/tokens';
 import { Press, T } from './ui';
-import { t } from '../i18n/en';
+import { t } from '../i18n';
 
 const money = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0', 'del'];
 const pin = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import { color, icon, motion, radius, space } from '../theme/tokens';
-import { HearIt, Press, Rise, T } from '../components/ui';
-import { CurvedHeader, Screen } from '../components/shell';
-import { t } from '../i18n/en';
+import { color, icon, motion, radius, space } from '../../theme/tokens';
+import { HearIt, Press, Rise, T } from '../../components/ui';
+import { CurvedHeader, Screen } from '../../components/shell';
+import { t } from '../../i18n';
 
 /** Plain answers, one tap from home, so nobody has to dig through menus when a payment worries them. */
 export function Help() {

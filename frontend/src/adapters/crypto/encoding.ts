@@ -51,3 +51,10 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
   out.set(b, a.length);
   return out;
 }
+
+/** Standard base64 with padding, which the assistant endpoint requires for audio. */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}

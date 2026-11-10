@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Fingerprint } from 'lucide-react-native';
-import { color, glass, icon, radius, space, touch } from '../theme/tokens';
-import { Press, T } from '../components/ui';
-import { Aurora } from '../components/aurora';
-import { Keypad } from '../components/keypad';
-import { inset } from '../components/shell';
-import { useNav } from '../nav';
-import { useStore } from '../demo/store';
-import { appLock, biometrics } from '../composition';
-import { sessionStore } from '../session/sessionStore';
-import { t } from '../i18n/en';
+import { color, glass, icon, radius, space, touch } from '../../theme/tokens';
+import { Press, T } from '../../components/ui';
+import { Aurora } from '../../components/aurora';
+import { Keypad } from '../../components/keypad';
+import { inset } from '../../components/shell';
+import { useNav } from '../../nav';
+import { useApp } from '../../state/appState';
+import { appLock, biometrics } from '../../composition';
+import { sessionStore } from '../../session/sessionStore';
+import { t } from '../../i18n';
 
 const LENGTH = 4;
 const SECOND = 1000;
@@ -48,7 +48,7 @@ export function CreatePin() {
 /** Opens the app: fingerprint first if the phone has it, the PIN always works. */
 export function Lock() {
   const nav = useNav();
-  const store = useStore();
+  const store = useApp();
   const [name, setName] = useState(store.name);
   const [fingerprint, setFingerprint] = useState(false);
   const [note, setNote] = useState<string | null>(null);
