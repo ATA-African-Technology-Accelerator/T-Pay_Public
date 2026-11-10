@@ -44,17 +44,20 @@ P0 must work in the demo. P1 follows only after every P0 activity is verified.
 | ACT-12 | Melt vault | Customer | Online | `POST /vaults/{id}/melt` | FR-09, FR-39 | P0 |
 | ACT-13 | Active wallet | Both | Online | `GET /wallet` | FR-40 | P0 |
 | ACT-14 | Withdraw to PayPal | Both | Online | `POST /wallet/withdrawals` | FR-41 | P0 |
-| ACT-15 | Voice assistant | Both | Online, with offline fallback | `POST /assistant/interpret` | FR-31 to FR-34, FR-46 | P0 |
+| ACT-15 | Voice assistant | Both | Online, with offline fallback | `POST /assistant/interpret`, `POST /assistant/speak` | FR-31 to FR-34, FR-46 | P0 |
 | ACT-16 | Settings, profile and device trust | Both | Offline first | `GET /profile`, `PATCH /profile` when online | FR-04, FR-33 | P0 |
 | ACT-17 | Voice sale and stock | Merchant | Offline | None | FR-26, FR-27 | P1 |
+| ACT-18 | Add money to the Online wallet | Both | Online | `POST /wallet/deposits`, `POST /wallet/deposits/{id}/complete` | FR-40, FR-41 | P0 |
+| ACT-19 | Get paid by link | Both | Online | `GET /wallet/pay-link`, and the public `/pay/{token}` pages | FR-40 | P1 |
 
-Three endpoints have no screen, and they are the only exceptions:
+Four routes have no screen in the app, and they are the only exceptions:
 
 | Endpoint | Caller | Reason |
 | :--- | :--- | :--- |
 | `GET /paypal/return` | PayPal browser redirect | Returns the user to the app after ACT-05 approval. |
 | `POST /webhooks/paypal` | PayPal | Updates voucher and vault state. |
 | `GET /health` | Render and operators | Reports backend health. |
+| `/pay/{token}` pages | Anyone with a pay link | A public web page, so a person with no T-Pay can pay an account by PayPal (4.20). |
 
 ## 3. Conventions
 
@@ -285,7 +288,7 @@ Errors: `VOUCHER_NOT_FOUND`.
 
 ### 4.10 GET /wallet
 
-Called by ACT-13. Returns collected money. Vault funds and PayPal account balances aren't included. `pendingNgnMinor` is money still settling. `entries` holds the latest 50, newest first. `type` is `CREDIT`, `WITHDRAWAL`, `REVERSAL` or `WITHDRAWAL_RETURNED`. The balance can go below zero if a payment is reversed after the money was withdrawn.
+Called by ACT-13. Returns collected money. Vault funds and PayPal account balances aren't included. `pendingNgnMinor` is money still settling. `entries` holds the latest 50, newest first. `type` is `CREDIT` (a settled payment), `DEPOSIT` (money the person added), `PAYMENT_LINK` (paid through the pay link), `WITHDRAWAL`, `REVERSAL` or `WITHDRAWAL_RETURNED`. `fxRate` is the fixed demo rate, so the app can turn an amount in naira into dollars. The balance can go below zero if a payment is reversed after the money was withdrawn.
 
 ```json
 {
@@ -294,6 +297,7 @@ Called by ACT-13. Returns collected money. Vault funds and PayPal account balanc
     "balanceNgnMinor": 200000,
     "pendingNgnMinor": 0,
     "payoutEmail": "user-sandbox@example.com",
+    "fxRate": "1500.00",
     "entries": [
       {
         "entryId": "led_1",
@@ -314,8 +318,10 @@ Called by ACT-13. Returns collected money. Vault funds and PayPal account balanc
 Called by ACT-14. Sends collected money to the account's PayPal email. Send `Idempotency-Key`. The balance drops at once. A refused payout returns the money with a `WITHDRAWAL_RETURNED` entry.
 
 ```json
-{ "amountUsdMinor": 133 }
+{ "amountUsdMinor": 133, "recipientEmail": "chidi@example.com" }
 ```
+
+`recipientEmail` is optional. Left out, the money goes to the account's own `payoutEmail`. Any PayPal email works, so a person who is not on T-Pay can be paid; PayPal emails someone with no PayPal account a link to claim it. The email is checked and lower-cased, and the same `Idempotency-Key` with a different recipient is an `IDEMPOTENCY_CONFLICT`.
 
 Response `202`:
 
@@ -439,11 +445,91 @@ Called by ACT-11. Query: `since` is an optional cursor. Returns the permanent hi
 }
 ```
 
-Types are `VAULT_LOCKED`, `VAULT_RELEASED`, `VOUCHER_SUBMITTED`, `VOUCHER_SETTLED`, `VOUCHER_REJECTED`, `WITHDRAWAL_REQUESTED`, `WITHDRAWAL_COMPLETED` and `WITHDRAWAL_FAILED`.
+Types are `VAULT_LOCKED`, `VAULT_RELEASED`, `VOUCHER_SUBMITTED`, `VOUCHER_SETTLED`, `VOUCHER_REJECTED`, `WITHDRAWAL_REQUESTED`, `WITHDRAWAL_COMPLETED`, `WITHDRAWAL_FAILED`, `DEPOSIT_COMPLETED` and `PAYMENT_LINK_RECEIVED`.
 
 
 
 
+
+### 4.18 POST /wallet/deposits
+
+Called by ACT-18. Starts a PayPal checkout that is captured straight into the Online wallet, with no hold. Send `Idempotency-Key`.
+
+```json
+{ "amountNgnMinor": 1500000 }
+```
+
+Response `201`:
+
+```json
+{
+  "data": {
+    "depositId": "dep_123",
+    "amountNgnMinor": 1500000,
+    "amountUsdMinor": 1000,
+    "fxRate": "1500.00",
+    "approvalUrl": "https://www.sandbox.paypal.com/..."
+  }
+}
+```
+
+The smallest deposit is $1 and the largest is the vault maximum. The app opens `approvalUrl` in the in-app browser. PayPal sends the payer to `GET /paypal/return?depositId=…&outcome=…`, which redirects to `tpay://wallet/return?depositId=dep_123&outcome=approved`, or `cancelled`, which also cancels the deposit. Nothing is credited yet.
+
+Errors: `VALIDATION_FAILED`, `IDEMPOTENCY_CONFLICT`, `PAYPAL_UNAVAILABLE`.
+
+### 4.19 POST /wallet/deposits/{id}/complete
+
+Called by ACT-18 after the payer returns `approved`. Captures the order and credits the Online wallet. Send `Idempotency-Key`. The body is empty. Repeating it is safe: the wallet is credited once, enforced inside the wallet lock and by a database constraint.
+
+```json
+{
+  "data": {
+    "depositId": "dep_123",
+    "status": "COMPLETED",
+    "amountNgnMinor": 1500000,
+    "amountUsdMinor": 1000,
+    "paypalCaptureId": "SANDBOX-CAPTURE"
+  }
+}
+```
+
+`200` when `COMPLETED`. `202` with `PENDING` while PayPal is still confirming the capture, in which case nothing is credited yet and calling again reads the same capture. The transaction history gets `DEPOSIT_COMPLETED`.
+
+Errors: `VAULT_NOT_FOUND` (not this device's deposit), `ORDER_NOT_APPROVED` (not approved in PayPal yet, or cancelled), `IDEMPOTENCY_CONFLICT`, `PAYPAL_UNAVAILABLE`.
+
+### 4.20 GET /wallet/pay-link and the public pay pages
+
+Called by ACT-19. Returns this account's pay link. It is the same link every time, with an unguessable 22-character token.
+
+```json
+{ "data": { "url": "https://t-pay-public.onrender.com/pay/Xk3Jx9QmZaB7rT2pLw0cEa" } }
+```
+
+The link opens a public page, with no sign-in, on the backend itself:
+
+| Route | What it does |
+| :--- | :--- |
+| `GET /pay/{token}` | Shows who will be paid, by display name only (never the email), and asks for an amount in dollars, from $1 to $500 |
+| `POST /pay/{token}` | Makes a PayPal order and sends the payer to PayPal. Limited to 10 submits a minute per address. |
+| `GET /pay/{token}/return` | PayPal sends the payer back here. If PayPal's order token matches, the order is captured and the owner is credited, once. The payer sees a thank-you page. |
+
+The credit appears in the owner's wallet as `PAYMENT_LINK`, and in the history as `PAYMENT_LINK_RECEIVED`. Every page escapes names, loads nothing from elsewhere, and can't be shown inside another site, using a strict content security policy.
+
+### 4.21 POST /assistant/speak
+
+Reads a short reply aloud in a natural voice, so the assistant does not sound like a screen reader. It needs a device token. The app asks for it only for the assistant's own replies, and uses the phone's built-in voice when it is offline, when this is slow (more than 3 seconds) or when it fails.
+
+Request: `{ "text": "You wan collect one thousand naira?", "language": "pcm" }`
+
+Response: `{ "data": { "audioBase64": "UklGR...", "audioMimeType": "audio/wav" } }`
+
+| Field | Rule |
+|---|---|
+| `text` | 1 to 300 characters. A longer text is refused with `VALIDATION_FAILED` so one request cannot run up a large bill. |
+| `language` | `en`, `pcm`, `yo`, `ig` or `ha`. The voice is asked to speak that language. |
+| Audio | A mono, 16-bit, 24,000 Hz WAV file made by Gemini. The model comes from `GEMINI_TTS_MODEL` (default `gemini-3.8-flash-tts`). |
+
+Errors: `AI_UNAVAILABLE` (no Gemini key, the voice model is not available to the key, or Gemini failed or timed out), `VALIDATION_FAILED`.
 
 ## 5. Offline messages
 
