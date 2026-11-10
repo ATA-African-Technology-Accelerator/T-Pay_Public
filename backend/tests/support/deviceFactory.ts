@@ -45,6 +45,7 @@ export const vault = (name: string, deviceId: string, overrides: Partial<Vault> 
   paypalAuthorizationId: null,
   spendBy: null,
   settleBy: null,
+  honorEndsAt: null,
   declaredLastSequence: null,
   declaredTotalUsdMinor: null,
   releasedAt: null,

@@ -11,7 +11,22 @@ import type {
 import { toVaultView } from './vaultView';
 
 const HOUR_MS = 60 * 60 * 1000;
-const SETTLEMENT_GRACE_HOURS = 24;
+const DAY_MS = 24 * HOUR_MS;
+// PayPal holds an authorisation for 29 days and guarantees it for 3.
+export const PAYPAL_HOLD_MS = 29 * DAY_MS;
+export const HONOR_PERIOD_MS = 3 * DAY_MS;
+// Release a day before PayPal would expire the hold, so the release is ours, not a surprise.
+const HOLD_EXPIRY_MARGIN_MS = DAY_MS;
+
+
+// Settle-by is as late as PayPal allows, not a short grace period. Merchants who
+// stay offline for days can still be paid, and the hold is released earlier only
+// when the customer melts the vault in T-Pay and every declared voucher has settled.
+export function settleByFor(lockedAt: Date, authorization: PaymentAuthorization): Date {
+  const paypalLimit = lockedAt.getTime() + PAYPAL_HOLD_MS;
+  const expiresAt = Math.min(authorization.expiresAt?.getTime() ?? paypalLimit, paypalLimit);
+  return new Date(expiresAt - HOLD_EXPIRY_MARGIN_MS);
+}
 
 export interface AuthorizeVaultDependencies {
   vaults: IVaultRepository;
@@ -49,12 +64,11 @@ export class AuthorizeVault {
 
     const now = this.dependencies.clock.now();
     await transactions.append(this.lockedEvent(vault, authorization, now));
-    const spendBy = new Date(now.getTime() + vault.durationHours * HOUR_MS);
-    const settleBy = new Date(spendBy.getTime() + SETTLEMENT_GRACE_HOURS * HOUR_MS);
     const active = await vaults.activate(vault.id, {
       paypalAuthorizationId: authorization.authorizationId,
-      spendBy,
-      settleBy,
+      spendBy: new Date(now.getTime() + vault.durationHours * HOUR_MS),
+      settleBy: settleByFor(now, authorization),
+      honorEndsAt: new Date(now.getTime() + HONOR_PERIOD_MS),
     });
     return active ?? (await vaults.findById(vault.id) as Vault);
   }

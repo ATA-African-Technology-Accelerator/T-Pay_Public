@@ -20,13 +20,19 @@ const AUTHORIZE_INPUT = { requestId: 'vlt_1-authorize', orderId: 'ORDER-1' };
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
-const authorizedOrder = (status = 'CREATED') => ({
+const EXPIRES_AT = '2026-12-05T10:00:00Z';
+const authorizedOrder = (status = 'CREATED', expiration_time: string | null = EXPIRES_AT) => ({
   id: 'ORDER-1',
   status: 'COMPLETED',
   purchase_units: [
-    { payments: { authorizations: [{ id: 'AUTH-1', status, amount: { currency_code: 'USD', value: '6.67' } }] } },
+    {
+      payments: {
+        authorizations: [{ id: 'AUTH-1', status, amount: { currency_code: 'USD', value: '6.67' }, expiration_time }],
+      },
+    },
   ],
 });
+const AUTHORIZED = { authorizationId: 'AUTH-1', amountUsdMinor: 667, expiresAt: new Date(EXPIRES_AT) };
 const issue = (name: string) => json(422, { name: 'UNPROCESSABLE_ENTITY', details: [{ issue: name }] });
 
 describe('PayPalGateway', () => {
@@ -191,7 +197,13 @@ describe('PayPalGateway', () => {
       const { url, headers } = lastCall();
       expect(url).toBe(`${ORDER_URL}/ORDER-1/authorize`);
       expect(headers).toMatchObject({ 'PayPal-Request-Id': 'vlt_1-authorize', Prefer: 'return=representation' });
-      expect(result).toEqual({ authorizationId: 'AUTH-1', amountUsdMinor: 667 });
+      expect(result).toEqual(AUTHORIZED);
+    });
+
+    it('leaves the expiry empty when PayPal does not send one', async () => {
+      route = () => json(201, authorizedOrder('CREATED', null));
+
+      expect(await gateway.authorizeOrder(AUTHORIZE_INPUT)).toEqual({ ...AUTHORIZED, expiresAt: null });
     });
 
     it('returns null when the payer has not approved', async () => {
@@ -210,10 +222,7 @@ describe('PayPalGateway', () => {
         return json(200, authorizedOrder());
       };
 
-      expect(await gateway.authorizeOrder(AUTHORIZE_INPUT)).toEqual({
-        authorizationId: 'AUTH-1',
-        amountUsdMinor: 667,
-      });
+      expect(await gateway.authorizeOrder(AUTHORIZE_INPUT)).toEqual(AUTHORIZED);
     });
 
     it('never treats a denied authorization as locked funds', async () => {
@@ -226,6 +235,38 @@ describe('PayPalGateway', () => {
       route = () => issue('SOMETHING_ELSE');
 
       await expect(gateway.authorizeOrder(AUTHORIZE_INPUT)).rejects.toMatchObject({ code: 'PAYPAL_UNAVAILABLE' });
+    });
+  });
+
+  describe('reauthorize', () => {
+    const INPUT = { authorizationId: 'AUTH-1', requestId: 'AUTH-1-reauthorize', amountUsdMinor: 534 };
+
+    it('reauthorizes the uncaptured amount with a stable request id', async () => {
+      route = () => json(201, { id: 'AUTH-2', status: 'CREATED' });
+
+      const result = await gateway.reauthorize(INPUT);
+
+      const { url, init, headers } = lastCall();
+      expect(url).toBe(`${BASE_URL}/v2/payments/authorizations/AUTH-1/reauthorize`);
+      expect(headers).toMatchObject({ 'PayPal-Request-Id': 'AUTH-1-reauthorize' });
+      expect(JSON.parse(String(init.body))).toEqual({ amount: { currency_code: 'USD', value: '5.34' } });
+      expect(result).toEqual({ outcome: 'REAUTHORIZED', authorizationId: 'AUTH-2' });
+    });
+
+    it.each([
+      ['a rate limit', () => json(429, { name: 'RATE_LIMIT_REACHED' })],
+      ['a server error', () => json(503, { name: 'SERVICE_UNAVAILABLE' })],
+      ['a timeout', () => Promise.reject(new Error('timeout'))],
+    ])('asks to retry after %s', async (_label, reply) => {
+      route = reply;
+
+      expect(await gateway.reauthorize(INPUT)).toEqual({ outcome: 'RETRY' });
+    });
+
+    it('reports a refusal with its reason', async () => {
+      route = () => issue('REAUTHORIZATION_NOT_ALLOWED');
+
+      expect(await gateway.reauthorize(INPUT)).toEqual({ outcome: 'REFUSED', reason: 'REAUTHORIZATION_NOT_ALLOWED' });
     });
   });
 

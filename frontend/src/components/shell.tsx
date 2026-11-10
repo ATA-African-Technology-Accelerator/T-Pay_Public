@@ -7,16 +7,16 @@ import { color, font, glass, icon, radius, space } from '../theme/tokens';
 import { T } from './ui';
 import { BagIcon, HomeIcon } from './icons';
 import { Route, useNav } from '../nav';
-import { useStore } from '../demo/store';
-import { t } from '../i18n/en';
+import { useApp } from '../state/appState';
+import { t } from '../i18n';
 
 const web = Platform.OS === 'web';
 export const inset = { top: web ? 54 : (StatusBar.currentHeight ?? 24) + 8, bottom: web ? 26 : 12 };
 
 export function BellButton() {
   const nav = useNav();
-  const { history } = useStore();
-  const n = history.filter(e => e.status === 'pending').length;
+  const { history } = useApp();
+  const n = history.filter(e => e.status === 'pending' || e.status === 'sent').length;
   return (
     <Pressable
       accessibilityRole="button" accessibilityLabel={n ? `${t.alerts}, ${n} ${t.status.pending}` : t.alerts}

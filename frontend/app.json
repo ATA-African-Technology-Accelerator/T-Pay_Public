@@ -12,9 +12,11 @@
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/adaptive-icon.png",
         "backgroundColor": "#050608"
       },
-      "package": "com.tpay.mobile"
+      "package": "com.tpay.mobile",
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
@@ -26,7 +28,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#050608"
+          "backgroundColor": "#050608",
+          "image": "./assets/brand/splash-icon.png",
+          "imageWidth": 96
         }
       ],
       "expo-secure-store",
@@ -35,6 +39,41 @@
         {
           "faceIDPermission": "T-Pay uses Face ID to open the app."
         }
+      ],
+      [
+        "expo-nearby-connections",
+        {
+          "bluetoothUsagePermissionText": "T-Pay uses Bluetooth to pass payments between phones with no network."
+        }
+      ],
+      "expo-sqlite",
+      "expo-web-browser",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "T-Pay listens when you tap Speak, so you can pay or collect by voice."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "T-Pay listens when you tap Speak, so you can pay or collect by voice.",
+          "speechRecognitionPermission": "T-Pay turns what you say into a payment for you to confirm."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "T-Pay uses the camera to scan payment codes.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": false,
+          "enableOpenCLAndHexagon": false
+        }
       ]
     ],
     "extra": {
@@ -42,6 +81,7 @@
         "projectId": "e8ea861d-7af4-4540-8bf0-88a8a90e1459"
       }
     },
-    "owner": "olayiwola206"
+    "owner": "olayiwola206",
+    "icon": "./assets/brand/icon.png"
   }
 }

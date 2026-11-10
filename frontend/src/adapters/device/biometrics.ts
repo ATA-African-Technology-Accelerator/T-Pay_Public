@@ -1,6 +1,6 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import type { IBiometricUnlock } from '@tpay/shared/application/ports/device';
-import { t } from '../../i18n/en';
+import { t } from '../../i18n';
 
 /** Fingerprint or face unlock. Only counts when the phone has it and the person has set it up. */
 export class DeviceBiometrics implements IBiometricUnlock {

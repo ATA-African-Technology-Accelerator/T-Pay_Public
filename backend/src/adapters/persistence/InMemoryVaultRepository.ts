@@ -29,6 +29,13 @@ export class InMemoryVaultRepository implements IVaultRepository {
     );
   }
 
+  public async findDueForReauthorization(now: Date): Promise<Vault[]> {
+    return [...this.vaults.values()].filter(({ honorEndsAt, settleBy, status }) =>
+      (status === 'ACTIVE' || status === 'SPEND_CLOSED')
+      && honorEndsAt !== null && honorEndsAt <= now
+      && settleBy !== null && settleBy > now);
+  }
+
   public peek(id: string): Vault {
     return this.vaults.get(id) as Vault;
   }

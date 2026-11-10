@@ -2,8 +2,8 @@
 title: T-Pay
 subtitle: Activity and API Contract
 tagline: Every endpoint belongs to a screen activity, and every network call is listed here
-version: 1.0
-date: 4 November 2026
+version: 1.1
+date: 10 November 2026
 author: T-Pay engineering
 status: Binding for frontend and backend work. Derived from PRD v1.1.
 compact: true
@@ -38,7 +38,7 @@ P0 must work in the demo. P1 follows only after every P0 activity is verified.
 | ACT-06 | Merchant creates payment request | Merchant | Offline | None | FR-38 | P0 |
 | ACT-07 | Customer reviews, signs and presents voucher | Customer | Offline | None | FR-07, FR-11, FR-13, FR-38 | P0 |
 | ACT-08 | Merchant verifies voucher and presents receipt | Merchant | Offline | None | FR-36 to FR-39 | P0 |
-| ACT-09 | Customer scans receipt | Customer | Offline | None | FR-22, FR-38 | P0 |
+| ACT-09 | Customer receives receipt | Customer | Offline | None | FR-22, FR-38 | P0 |
 | ACT-10 | Background sync and settlement | Both | Reconnect | `POST /vouchers`, `GET /vouchers` | FR-15, FR-23, FR-24, FR-44 | P0 |
 | ACT-11 | Transaction list and detail | Both | Offline first | `GET /vouchers/{id}`, `GET /transactions` when online | FR-20, FR-22 | P0 |
 | ACT-12 | Melt vault | Customer | Online | `POST /vaults/{id}/melt` | FR-09, FR-39 | P0 |
@@ -93,12 +93,12 @@ Called by ACT-02, and again by ACT-01 when the device certificate is near expiry
   "publicKey": "base64url",
   "displayName": "Mama Nkechi Provisions",
   "language": "pcm",
-  "payoutEmail": " `payoutEmail` is required",
+  "payoutEmail": "merchant-sandbox@example.com",
   "proof": "base64url signature over the other fields"
 }
 ```
 
-`payoutEmail` is required for merchants. Response `201` for a new key, `200` for a known key:
+`payoutEmail` is required for every account, because one account can both pay and collect. Response `201` for a new key, `200` for a known key. Registering a known key again issues a new token and a fresh 7-day certificate, which is how ACT-01 renews:
 
 ```json
 {
@@ -179,7 +179,7 @@ Called by ACT-03. Response `200`, with `null` when the device has no locked vaul
       "settledUsdMinor": 0,
       "remainingUsdMinor": 534,
       "spendBy": "2026-11-09T10:00:00Z",
-      "settleBy": "2026-11-10T10:00:00Z",
+      "settleBy": "2026-12-06T10:00:00Z",
       "paypalAuthorizationId": "SANDBOX-ID"
     }
   }
@@ -187,6 +187,10 @@ Called by ACT-03. Response `200`, with `null` when the device has no locked vaul
 ```
 
 The backend sees only submitted vouchers. While offline vouchers exist, the phone's local reserved amount decides what can be signed.
+
+**Spend-by and settle-by.** `spendBy` is when the customer must stop signing, at most 24 hours after lock. `settleBy` is the last moment any voucher can settle. It is one day before PayPal's 29-day authorisation expires, so about 28 days after lock. Until then the hold stays in place, even if neither phone comes back online for a week. It is released earlier only when the customer melts the vault in T-Pay and every declared voucher has settled (4.6).
+
+PayPal guarantees an authorisation for three days. Each time that honor period ends, the backend reauthorises whatever hasn't been captured. That gives a new `paypalAuthorizationId`, so the app must always read the current ID from the backend and never keep the first one.
 
 ### 4.6 POST /vaults/{id}/melt
 
@@ -204,13 +208,15 @@ Response `200`:
     "vaultId": "vlt_123",
     "status": "SPEND_CLOSED",
     "releasedAt": null,
-    "releaseScheduledFor": "2026-11-10T10:00:00Z",
+    "releaseScheduledFor": "2026-12-06T10:00:00Z",
     "blockingVoucherIds": ["vch_456"]
   }
 }
 ```
 
 When nothing blocks release, `status` is `CLOSED`, `releasedAt` is set, and `releaseScheduledFor` is null. `blockingVoucherIds` lists only vouchers the backend has seen, so it can be empty while `status` is `SPEND_CLOSED` if a declared voucher has not arrived yet. Repeating melt is safe, and the first signed statement stands. A blocked vault stays `BLOCKED` until `settleBy`.
+
+Only this call can release a hold before `settleBy`, and only with the customer's signed spend statement. The customer opening PayPal, or simply going quiet, never releases it.
 
 Errors: `VAULT_NOT_FOUND`, `INVALID_SIGNATURE`, `IDEMPOTENCY_CONFLICT`, `PAYPAL_UNAVAILABLE`.
 
@@ -352,7 +358,21 @@ Response `200`:
 
 Allowed intents are `CREATE_PAYMENT_REQUEST`, `PAY_AMOUNT`, `RECORD_SALE`, `CHECK_BALANCE` and `UNKNOWN`. A proposal only pre-fills a screen. A person must confirm it, and only the normal signing activity can sign.
 
-Errors: `AI_UNAVAILABLE`, `VALIDATION_FAILED`.
+| Rule | Detail |
+| :--- | :--- |
+| Authentication | Device token required. No `Idempotency-Key`, because nothing changes. |
+| `text` | 1 to 500 characters |
+| `audioBase64` | Standard base64, at most 1,400,000 characters, which is about a minute of compressed speech. This route alone accepts a body up to 2 MB. |
+| `audioMimeType` | Required with audio, otherwise null: `audio/wav`, `audio/x-wav`, `audio/mp3`, `audio/mpeg`, `audio/aac`, `audio/mp4`, `audio/m4a`, `audio/x-m4a`, `audio/ogg`, `audio/webm`, `audio/flac`, `audio/aiff` or `audio/3gpp` |
+| What the model sees | Only the words or audio, and the language. Never `context`, tokens, keys or vault data. |
+| `amountNgnMinor` | In kobo. Null when no amount was said, so the screen asks for one. Always null for `CHECK_BALANCE` and `UNKNOWN`. |
+| Capacity | A `PAY_AMOUNT` above `context.remainingNgnMinor` is refused |
+
+**Refused answers.** If the model's answer breaks the schema, or proposes a payment above capacity, the response is still `200`, but the proposal is `{ "intent": "UNKNOWN", "amountNgnMinor": null, "itemName": null }`. In that case `spokenReply` is a fixed backend line in the request's language, never the model's words. It says either that the request wasn't understood or that the amount is more than the vault has left. The app treats it like any `UNKNOWN` proposal: it shows and speaks the reply and offers typed input.
+
+Every call is logged with its proposal and outcome: `ACCEPTED`, `REJECTED_INVALID` or `REJECTED_OVER_CAPACITY`. What the person said is not logged.
+
+Errors: `AI_UNAVAILABLE` (no Gemini key is set, or Gemini failed or timed out), `VALIDATION_FAILED`.
 
 ### 4.13 POST /webhooks/paypal
 
@@ -437,7 +457,7 @@ These are signed objects carried between phones and later to the backend. They a
 | Algorithm | ECDSA P-256 with SHA-256 |
 | Signature | Base64url of raw 64-byte `r‖s` |
 | Envelope | `{ "payload": { ... }, "signature": "base64url" }` |
-| Wire frame | `TPAY1:<TYPE>:<base64url JSON envelope>` for QR and the copyable code |
+| Wire frame | `TPAY1:<TYPE>:<base64url body>`, the same text for QR, the copyable code and Bluetooth. See 5.4. |
 
 ### 5.2 Message types
 
@@ -450,7 +470,7 @@ These are signed objects carried between phones and later to the backend. They a
 | Receipt | Merchant | `TPAY-RECEIPT-V1` | `vaultId`, `sequence`, `voucherHash`, `merchantKeyId`, `receivedAt` |
 | Spend statement | Customer | `TPAY-STATEMENT-V1` | `vaultId`, `lastSequence`, `totalIssuedUsdMinor`, `issuedAt` |
 
-A voucher frame also carries the customer's device certificate and vault certificate.
+A voucher frame also carries the customer's device certificate and vault certificate. Section 5.4 lists exactly what each frame holds.
 
 
 
@@ -470,6 +490,54 @@ The app shows translated text for each code. These never come from the backend.
 | `WRONG_PAYEE` | The voucher is for another merchant |
 | `DUPLICATE_VOUCHER` | This merchant already accepted this voucher |
 | `SELF_PAYMENT` | A person can't pay their own account |
+| `INVALID_FRAME` | The scanned, pasted or received text isn't a T-Pay code, or it's damaged |
+
+### 5.4 Frames and transport
+
+Phones exchange three frames. Build and read them only with `encodeFrame` and `decodeFrame` from `shared/src/domain/frames.ts`, so every transport sends the same text.
+
+| Frame | Sent by | Body, base64url of canonical JSON | Extra segment |
+| :--- | :--- | :--- | :--- |
+| `TPAY1:REQUEST:<body>[:<sessionCode>]` | Merchant | The signed payment request envelope | Optional Bluetooth session code |
+| `TPAY1:VOUCHER:<body>` | Customer | `{ voucher, customerCertificate, vaultCertificate }`, each a signed envelope | None |
+| `TPAY1:RECEIPT:<body>` | Merchant | The signed receipt envelope | None |
+
+`decodeFrame` checks only the frame's shape and refuses anything else with `INVALID_FRAME`. Signatures and certificates are checked afterwards by `issueVoucher` and `acceptVoucher`. A frame longer than 16,000 characters is refused unread.
+
+**Session code.** The merchant's phone makes it with `IRandom.nonce()`. It is 16 to 64 base64url characters and sits after the body, outside the signed request. It only tells the customer's phone which merchant to join over Bluetooth. A wrong or missing code can stop that path, but it can never change the amount or the payee, because both are signed.
+
+**Transports.** QR and the copyable code always work. Bluetooth, through Nearby Connections, is an upgrade that removes the second and third scans:
+
+| Step | Merchant phone | Customer phone |
+| :--- | :--- | :--- |
+| ACT-06 | Before showing the QR, ask only for what is missing: the Nearby devices permission, then to turn Bluetooth on. If Bluetooth is ready, add the session code and start hosting. | |
+| ACT-07 | | Scan the request. Ask only for what is missing, then join the merchant in the background while the person reviews the payment. On **Pay**, sign the voucher and send the voucher frame over Bluetooth. |
+| ACT-08 | Receive the voucher frame, verify it, save it, and send the receipt frame back over the same connection. | |
+| ACT-09 | | Receive and save the receipt. |
+| Fallback | Keep the voucher scanner open while hosting. | If Bluetooth is refused, is off, or isn't connected within 8 seconds of tapping **Pay**, show the voucher QR instead. |
+
+Bluetooth never blocks a payment, and the backend never knows which transport carried a voucher. `POST /vouchers` is unchanged.
+
+**Pairing.** Both phones use Nearby Connections with the point-to-point strategy and the app's package name as the service ID. Each frame travels as one UTF-8 bytes payload, exactly the text of the QR. The session code itself is never broadcast. Both phones derive two 16-character tags from it:
+
+| Tag | Value | Used as |
+| :--- | :--- | :--- |
+| Advertise | First 16 characters of base64url(SHA-256(`TPAY-NEARBY-V1\nADVERTISE\n<sessionCode>`)) | The merchant's advertised endpoint name |
+| Join | The same with `JOIN` in place of `ADVERTISE` | The customer's endpoint name when it connects |
+
+The merchant accepts a connection only from an endpoint named with the join tag and rejects every other. A phone that overhears the advertised tag can't make the join tag without the code, which only travels inside the QR the customer scanned. So it can't take the customer's place.
+
+**Shared rules for each step.** Build and check every message only with these functions from `shared/`:
+
+| Step | Function |
+| :--- | :--- |
+| ACT-06 | `createPaymentRequest`. A request lives 15 minutes and is refused with `INVALID_CERTIFICATE` when the merchant's certificate has expired |
+| ACT-07, before signing | `reviewPaymentRequest`: the merchant's name, the amount in naira and dollars, or the refusal, with no signature yet |
+| ACT-07, on Pay | `issueVoucher` |
+| ACT-08 | `acceptVoucher` |
+| ACT-09 | `acceptReceipt`: the receipt must be signed by the merchant in the request and cover exactly this voucher |
+| ACT-12 | `createSpendStatement`, which refuses sequences that are not exactly 1 to n |
+| ACT-15 offline | `parseOfflineIntent`. English and Pidgin phrases for now, plus digits in every language. With the optional on-phone model, its answer is checked by `checkModelProposal` with the same intent, amount and capacity rules as `POST /assistant/interpret`, and the rules win where they recognise something |
 
 
 

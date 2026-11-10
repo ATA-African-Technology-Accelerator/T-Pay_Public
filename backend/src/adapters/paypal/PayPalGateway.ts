@@ -2,7 +2,7 @@ import { ApiError } from '../../services/ApiError';
 import type {
   AuthorizeOrderInput, CaptureInput, CaptureResult, CreateOrderInput, FindCaptureInput,
   IPaymentGateway, PaymentAuthorization, PaymentOrder, PayoutInput, PayoutResult, PayoutStatus,
-  VoidResult, WebhookNotification,
+  ReauthorizeInput, ReauthorizeResult, VoidResult, WebhookNotification,
 } from '../../services/ports';
 
 
@@ -176,6 +176,32 @@ export class PayPalGateway implements IPaymentGateway {
   }
 
 
+  // PayPal guarantees an authorisation only for its three-day honor period.
+  // Reauthorising gives a new authorisation ID with a fresh honor period, so a
+  // vault can wait for its customer without the money becoming spendable.
+  public async reauthorize({ amountUsdMinor, authorizationId, requestId }: ReauthorizeInput): Promise<ReauthorizeResult> {
+    try {
+      const reply = await this.request(
+        `/v2/payments/authorizations/${encodeURIComponent(authorizationId)}/reauthorize`,
+        {
+          method: 'POST',
+          requestId,
+          body: { amount: { currency_code: 'USD', value: toUsdValue(amountUsdMinor) } },
+        },
+      );
+      if (reply.ok && reply.body?.id) {
+        return { outcome: 'REAUTHORIZED', authorizationId: reply.body.id };
+      }
+      if (reply.ok || RETRY_STATUSES.includes(reply.status) || reply.status >= SERVER_ERROR_STATUS) {
+        return { outcome: 'RETRY' };
+      }
+      return { outcome: 'REFUSED', reason: firstIssue(reply) ?? reply.body?.name ?? `HTTP_${reply.status}` };
+    } catch {
+      return { outcome: 'RETRY' };
+    }
+  }
+
+
   public async createPayout({ amountUsdMinor, receiverEmail, senderBatchId }: PayoutInput): Promise<PayoutResult> {
     try {
       const reply = await this.request(PAYOUTS_PATH, {
@@ -285,7 +311,12 @@ export class PayPalGateway implements IPaymentGateway {
     if (authorization.status !== 'CREATED') {
       return null;
     }
-    return { authorizationId: authorization.id, amountUsdMinor: Number(value.replace('.', '')) };
+    const expiresAt = new Date(authorization.expiration_time ?? Number.NaN);
+    return {
+      authorizationId: authorization.id,
+      amountUsdMinor: Number(value.replace('.', '')),
+      expiresAt: Number.isNaN(expiresAt.getTime()) ? null : expiresAt,
+    };
   }
 
   private assertOk(reply: PayPalReply, action: string): void {

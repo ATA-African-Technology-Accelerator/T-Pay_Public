@@ -61,6 +61,8 @@ const VAULT_COLUMNS: Record<keyof VaultChanges, string> = {
   declaredLastSequence: 'declared_last_sequence',
   declaredTotalUsdMinor: 'declared_total_usd_minor',
   releasedAt: 'released_at',
+  paypalAuthorizationId: 'paypal_authorization_id',
+  honorEndsAt: 'honor_ends_at',
 };
 
 

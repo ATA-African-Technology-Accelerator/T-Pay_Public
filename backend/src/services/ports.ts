@@ -57,6 +57,7 @@ export interface Vault {
   paypalAuthorizationId: string | null;
   spendBy: Date | null;
   settleBy: Date | null;
+  honorEndsAt: Date | null;
   declaredLastSequence: number | null;
   declaredTotalUsdMinor: number | null;
   releasedAt: Date | null;
@@ -67,6 +68,7 @@ export interface VaultLock {
   paypalAuthorizationId: string;
   spendBy: Date;
   settleBy: Date;
+  honorEndsAt: Date;
 }
 
 export interface IVaultRepository {
@@ -76,6 +78,7 @@ export interface IVaultRepository {
   findByOrderId(orderId: string): Promise<Vault | null>;
   findOpenForDevice(deviceId: string): Promise<Vault | null>;
   findDueForRelease(now: Date): Promise<Vault[]>;
+  findDueForReauthorization(now: Date): Promise<Vault[]>;
   activate(id: string, lock: VaultLock): Promise<Vault | null>;
   abandon(id: string): Promise<void>;
 }
@@ -119,7 +122,19 @@ export interface AuthorizeOrderInput {
 export interface PaymentAuthorization {
   authorizationId: string;
   amountUsdMinor: number;
+  expiresAt: Date | null;
 }
+
+export interface ReauthorizeInput {
+  authorizationId: string;
+  requestId: string;
+  amountUsdMinor: number;
+}
+
+export type ReauthorizeResult =
+  | { outcome: 'REAUTHORIZED'; authorizationId: string }
+  | { outcome: 'REFUSED'; reason: string }
+  | { outcome: 'RETRY' };
 
 export interface CaptureInput {
   authorizationId: string;
@@ -164,6 +179,7 @@ export interface IPaymentGateway {
   capture(input: CaptureInput): Promise<CaptureResult>;
   findCapture(input: FindCaptureInput): Promise<CaptureResult | null>;
   voidAuthorization(authorizationId: string): Promise<VoidResult>;
+  reauthorize(input: ReauthorizeInput): Promise<ReauthorizeResult>;
   createPayout(input: PayoutInput): Promise<PayoutResult>;
   getPayoutStatus(batchId: string): Promise<PayoutStatus>;
   verifyWebhook(notification: WebhookNotification): Promise<boolean>;
@@ -201,7 +217,8 @@ export type VoucherChanges = Partial<Pick<
 >>;
 
 export type VaultChanges = Partial<Pick<
-  Vault, 'status' | 'declaredLastSequence' | 'declaredTotalUsdMinor' | 'releasedAt'
+  Vault,
+  'status' | 'declaredLastSequence' | 'declaredTotalUsdMinor' | 'releasedAt' | 'paypalAuthorizationId' | 'honorEndsAt'
 >>;
 
 export type AlertType =
@@ -209,7 +226,8 @@ export type AlertType =
   | 'VOUCHER_OVERSPEND'
   | 'STATEMENT_VIOLATION'
   | 'SETTLEMENT_BLOCKED'
-  | 'PAYMENT_REVERSED';
+  | 'PAYMENT_REVERSED'
+  | 'REAUTHORIZATION_FAILED';
 
 export interface Alert {
   id: string;
@@ -266,6 +284,23 @@ export interface IVoucherRepository {
   listAlerts(vaultId: string): Promise<Alert[]>;
   rememberEvent(event: PayPalEventRecord): Promise<boolean>;
   forgetEvent(eventId: string): Promise<void>;
+}
+
+
+export type AssistantInput =
+  | { kind: 'text'; text: string }
+  | { kind: 'audio'; audioBase64: string; audioMimeType: string };
+
+export interface AssistantModelRequest {
+  input: AssistantInput;
+  language: Language;
+}
+
+// The model only ever sees the person's words and their language: never keys,
+// tokens, balances or signed data. It returns raw output that the backend
+// validates before anything reaches a person. Throws AI_UNAVAILABLE when unreachable.
+export interface IAssistantModel {
+  interpret(request: AssistantModelRequest): Promise<unknown>;
 }
 
 

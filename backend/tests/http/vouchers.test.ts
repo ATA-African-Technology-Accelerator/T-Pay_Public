@@ -188,9 +188,18 @@ describe('voucher API', () => {
 
       it('refuses a new voucher after settle-by', async () => {
         const voucher = await scenario.voucher(1);
-        fixture.time.now = new Date(fixture.time.now.getTime() + 49 * HOUR_MS);
+        fixture.time.now = new Date(fixture.time.now.getTime() + 28 * 24 * HOUR_MS + HOUR_MS);
 
         expect(errorCode(await scenario.submit(voucher))).toBe('VOUCHER_EXPIRED');
+      });
+
+      it('still settles a voucher a merchant brings in a week after spend-by', async () => {
+        const voucher = await scenario.voucher(1);
+        fixture.time.now = new Date(fixture.time.now.getTime() + 8 * 24 * HOUR_MS);
+
+        const response = await scenario.submit(voucher);
+
+        expect(response.body.data.status).toBe('SETTLED');
       });
     });
 

@@ -2,15 +2,17 @@ import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Vibration, View } from 'react-native';
 import Svg, { Circle, Path, Rect, Line } from 'react-native-svg';
 import { color, motion, radius, space, touch } from '../theme/tokens';
+import QRCode from 'react-native-qrcode-svg';
 import { T, naira, native, useReduceMotion } from './ui';
-import { t } from '../i18n/en';
+import { t } from '../i18n';
 
 const NOTES = [1000, 500, 200, 100, 50];
 export const noteValues = NOTES;
 const NOTE_W = 92, NOTE_H = 50, FAN = 6;
 
-export function breakIntoNotes(amount: number) {
-  let left = amount;
+/** Naira notes for an amount in kobo. Kobo below one naira is not shown as a note. */
+export function breakIntoNotes(kobo: number) {
+  let left = Math.floor(kobo / 100);
   const out: { value: number; count: number }[] = [];
   for (const value of NOTES) {
     const count = Math.floor(left / value);
@@ -25,7 +27,7 @@ export function Note({ value, w = NOTE_W, h = NOTE_H }: { value: number; w?: num
   const f = noteFace(value);
   return (
     <View style={[n.note, { width: w, height: h, backgroundColor: f.bg }]}>
-      <View style={[n.inner, { borderColor: f.bd }]}><T v="smallStrong">{naira(value)}</T></View>
+      <View style={[n.inner, { borderColor: f.bd }]}><T v="smallStrong">{naira(value * 100)}</T></View>
     </View>
   );
 }
@@ -37,7 +39,7 @@ export function NoteStack({ amount }: { amount: number }) {
   return (
     <View
       style={n.row} accessible
-      accessibilityLabel={groups.map(g => `${g.count} ${naira(g.value)} notes`).join(', ')}
+      accessibilityLabel={groups.map(g => t.notesOf(g.count, naira(g.value * 100))).join(", ")}
     >
       {groups.map((g, i) => <Pile key={g.value} value={g.value} count={g.count} delay={reduce ? 0 : i * motion.stagger} />)}
     </View>
@@ -58,7 +60,7 @@ function Pile({ value, count, delay }: { value: number; count: number; delay: nu
           <View key={i} style={{ position: 'absolute', left: i * FAN, top: (shown - 1 - i) * FAN }}><Note value={value} /></View>
         ))}
       </View>
-      {count > 1 && <T v="small" c={color.muted} style={{ textAlign: 'center', marginTop: space.xs }}>{`${count} notes`}</T>}
+      {count > 1 && <T v="small" c={color.muted} style={{ textAlign: 'center', marginTop: space.xs }}>{t.noteCount(count)}</T>}
     </Animated.View>
   );
 }
@@ -159,25 +161,22 @@ export function StatusMark({ status, size = 44, big }: { status: 'paid' | 'pendi
 /** Three-step dots: where you are in the exchange between two phones. */
 export function Steps({ at }: { at: 1 | 2 | 3 }) {
   return (
-    <View style={n.steps} accessible accessibilityLabel={`Step ${at} of 3`}>
+    <View style={n.steps} accessible accessibilityLabel={t.stepOf(at, 3)}>
       {[1, 2, 3].map(i => <View key={i} style={[n.step, i <= at && n.stepOn]} />)}
     </View>
   );
 }
 
-/** Scan code stand-in for the design pass. The real one encodes the signed voucher. */
-export function SampleCode({ size = 250, seed = 7 }: { size?: number; seed?: number }) {
-  const N = 25, c = size / N;
-  const finder = (x: number, y: number) => x < 7 && y < 7 ? [x, y] : x >= N - 7 && y < 7 ? [x - N + 7, y] : x < 7 && y >= N - 7 ? [x, y - N + 7] : null;
-  const cells: React.ReactNode[] = [];
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const f = finder(x, y);
-    const on = f
-      ? f[0] === 0 || f[0] === 6 || f[1] === 0 || f[1] === 6 || (f[0] >= 2 && f[0] <= 4 && f[1] >= 2 && f[1] <= 4)
-      : (x === 7 || y === 7 || x === N - 8 || y === N - 8) ? false : ((x * 13 + y * 7 + x * y * seed) % 5) < 2;
-    if (on) cells.push(<Rect key={`${x}-${y}`} x={x * c} y={y * c} width={c + 0.3} height={c + 0.3} fill={color.ink} />);
-  }
-  return <View style={n.code}><Svg width={size} height={size} accessibilityLabel="Payment code">{cells}</Svg></View>;
+/**
+ * A frame as a QR code. Dark on white whatever the theme, or cameras can't read it.
+ * Low error correction keeps a voucher frame (about 2 KB) scannable on a phone screen.
+ */
+export function FrameCode({ value, size = 250, label }: { value: string; size?: number; label: string }) {
+  return (
+    <View style={n.code} accessible accessibilityLabel={label}>
+      <QRCode value={value} size={size} ecl="L" color={color.ink} backgroundColor={color.white} quietZone={4} />
+    </View>
+  );
 }
 
 const n = StyleSheet.create({

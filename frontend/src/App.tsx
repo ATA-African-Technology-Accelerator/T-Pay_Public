@@ -10,19 +10,30 @@ import { Signal, Wifi, BatteryFull } from 'lucide-react-native';
 import { color, font, icon, motion, radius, space, shadow } from './theme/tokens';
 import { T, native, useReduceMotion } from './components/ui';
 import { Nav, NavCtx, Route } from './nav';
-import { StoreProvider } from './demo/store';
-import { Details, Language, Splash } from './features/onboarding';
-import { HomeScreen } from './features/home';
-import { Amount, Delivered, Duplicate, Refused, Review, Scan, Tampered, Voucher } from './features/pay';
-import { Credit, Request } from './features/collect';
-import { Activity, Assist, Ledger, Proposal, SettingsScreen, Speak } from './features/lists';
-import { Melt, VaultActive, VaultReview, VaultScreen } from './features/vault';
-import { CreatePin, Lock } from './features/lock';
-import { Receive, SendDone, SendReview, SendTo } from './features/send';
-import { Help } from './features/help';
-import { Receipt } from './features/receipt';
+import { Linking } from 'react-native';
+import { AppStateProvider, type HistoryWords } from './state/appState';
+import { Details, Language, Splash } from './features/onboarding/onboarding';
+import { CreatePin, Lock } from './features/onboarding/lock';
+import { HomeScreen } from './features/home/home';
+import { Amount } from './features/payment/amount';
+import { Scan } from './features/payment/scan';
+import { Credit, Request, endMerchantSession } from './features/payment/merchant';
+import { Delivered, Review, Voucher } from './features/payment/customer';
+import { Refusal } from './features/payment/refusal';
+import { closeLink } from './features/payment/link';
+import { Melt, VaultActive, VaultReview, VaultScreen } from './features/vault/vault';
+import { completeVault, readReturn } from './features/vault/vaultActivities';
+import { Activity, Receipt } from './features/transactions/activity';
+import { Ledger, Withdraw } from './features/ledger/ledger';
+import { Assist, ProposalScreen, Speak } from './features/assistant/speak';
+import { SettingsScreen } from './features/settings/settings';
+import { Help } from './features/settings/help';
+import { OfflineAssistant } from './features/settings/offlineAssistant';
 import { SideMenu } from './components/menu';
 import { appLock } from './composition';
+import { catalogueLanguage, t } from './i18n';
+import { onRevoked } from './session/guard';
+import { startSync } from './sync/syncCoordinator';
 
 // Like a bank app: away for longer than this and the PIN is needed again.
 const RELOCK_AFTER_MS = 60_000;
@@ -32,37 +43,33 @@ const OPEN_ROUTES: Route['name'][] = ['splash', 'language', 'details', 'createPi
 function render(r: Route) {
   switch (r.name) {
     case 'splash': return <Splash />;
-    case 'language': return <Language />;
-    case 'details': return <Details />;
+    case 'language': return <Language edit={r.edit} />;
+    case 'details': return <Details edit={r.edit} />;
     case 'createPin': return <CreatePin />;
     case 'lock': return <Lock />;
-    case 'help': return <Help />;
-    case 'receipt': return <Receipt id={r.id} />;
     case 'home': return <HomeScreen />;
     case 'activity': return <Activity />;
-    case 'ledger': return <Ledger />;
+    case 'receipt': return <Receipt id={r.id} />;
     case 'vault': return <VaultScreen />;
+    case 'amount': return <Amount mode={r.mode} />;
     case 'vaultReview': return <VaultReview amount={r.amount} hours={r.hours} />;
-    case 'vaultActive': return <VaultActive amount={r.amount} hours={r.hours} />;
+    case 'vaultActive': return <VaultActive />;
     case 'melt': return <Melt />;
+    case 'request': return <Request amount={r.amount} />;
+    case 'scan': return <Scan route={r} />;
+    case 'review': return <Review scanned={r.scanned} expected={r.expected} />;
+    case 'voucher': return <Voucher voucherId={r.voucherId} />;
+    case 'delivered': return <Delivered voucherId={r.voucherId} />;
+    case 'credit': return <Credit voucherId={r.voucherId} bluetooth={r.bluetooth} again={r.again} />;
+    case 'refusal': return <Refusal code={r.code} side={r.side} amount={r.amount} existingId={r.existingId} />;
+    case 'ledger': return <Ledger />;
+    case 'withdraw': return <Withdraw />;
     case 'speak': return <Speak />;
-    case 'proposal': return <Proposal amount={r.amount} offline={r.offline} />;
+    case 'proposal': return <ProposalScreen proposal={r.proposal} />;
     case 'assist': return <Assist />;
     case 'settings': return <SettingsScreen />;
-    case 'amount': return <Amount mode={r.mode} to={r.to} />;
-    case 'sendTo': return <SendTo />;
-    case 'sendReview': return <SendReview amount={r.amount} to={r.to} />;
-    case 'sendDone': return <SendDone amount={r.amount} to={r.to} id={r.id} />;
-    case 'receive': return <Receive />;
-    case 'scan': return <Scan kind={r.kind ?? 'request'} amount={r.amount ?? 0} />;
-    case 'review': return <Review amount={r.amount} />;
-    case 'refused': return <Refused amount={r.amount} />;
-    case 'tampered': return <Tampered amount={r.amount} />;
-    case 'duplicate': return <Duplicate amount={r.amount} />;
-    case 'voucher': return <Voucher amount={r.amount} />;
-    case 'delivered': return <Delivered amount={r.amount} />;
-    case 'request': return <Request amount={r.amount} />;
-    case 'credit': return <Credit amount={r.amount} again={r.again} />;
+    case 'help': return <Help />;
+    case 'offlineAi': return <OfflineAssistant />;
   }
 }
 
@@ -83,11 +90,29 @@ export default function App() {
   const ids = useRef(1);
   const nav = useMemo<Nav>(() => ({
     go: r => setStack(s => [...s, { r, id: ids.current++, dir: 1 }]),
-    reset: r => setStack([{ r, id: ids.current++, dir: 0 }]),
+    reset: r => {
+      // Going home ends a payment activity, and with it any Bluetooth link (contract 5.4).
+      if (r.name === 'home') { endMerchantSession(); closeLink(); }
+      setStack([{ r, id: ids.current++, dir: 0 }]);
+    },
     back: () => setStack(s => (s.length > 1 ? [...s.slice(0, -1).slice(0, -1), { ...s[s.length - 2], id: ids.current++, dir: -1 }] : s)),
     openMenu: () => setMenu(true),
   }), []);
   const current = useRef<Route['name']>('splash');
+  useEffect(() => startSync(), []);
+  // DEVICE_REVOKED: this identity is gone, so set the phone up again (contract section 6).
+  useEffect(() => onRevoked(() => { setMenu(false); nav.reset({ name: 'language' }); }), []);
+  // PayPal's return can arrive as a link if Android closed the in-app browser's caller.
+  useEffect(() => {
+    const handle = (url: string | null | undefined) => {
+      const back = url ? readReturn(url) : null;
+      if (back?.outcome !== 'approved') return;
+      void completeVault(back.vaultId).then(() => { if (!OPEN_ROUTES.includes(current.current)) nav.reset({ name: 'vaultActive' }); }).catch(() => undefined);
+    };
+    void Linking.getInitialURL().then(handle);
+    const sub = Linking.addEventListener('url', e => handle(e.url));
+    return () => sub.remove();
+  }, []);
   useEffect(() => {
     let leftAt: number | null = null;
     const sub = AppState.addEventListener('change', async state => {
@@ -112,10 +137,10 @@ export default function App() {
   const top = stack[stack.length - 1];
   current.current = top.r.name;
   return (
-    <StoreProvider>
+    <AppStateProvider words={words()}>
       <NavCtx.Provider value={nav}>
         <View style={st.stage}>
-          <View style={st.phone}>
+          <View key={catalogueLanguage()} style={st.phone}>
             <StatusBar style="light" />
             <Page key={top.id} route={top.r} dir={top.dir} />
             <SideMenu open={menu} current={top.r.name} onClose={() => setMenu(false)} />
@@ -123,11 +148,24 @@ export default function App() {
           </View>
         </View>
       </NavCtx.Provider>
-    </StoreProvider>
+    </AppStateProvider>
   );
 }
 
 const web = Platform.OS === 'web';
+
+let cachedWords: { language: string; words: HistoryWords } | null = null;
+/** History labels in the current language, stable between renders so state isn't rebuilt. */
+function words(): HistoryWords {
+  const language = catalogueLanguage();
+  if (cachedWords?.language !== language) {
+    cachedWords = { language, words: {
+      merchant: t.someMerchant, customer: t.someCustomer, locked: t.moneyLocked, released: t.moneyReleased,
+      withdrawal: t.withdrawalRequested, withdrawn: t.withdrawn, withdrawalFailed: t.withdrawalFailed,
+    } };
+  }
+  return cachedWords.words;
+}
 // The web preview's phone outline. It is not part of the app's design system.
 const PREVIEW_CORNER = 44;
 

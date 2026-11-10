@@ -1,5 +1,6 @@
 import express, { type Express } from 'express';
 import { createServices } from './composition/createServices';
+import { AssistantController } from './controllers/AssistantController';
 import { DeviceController } from './controllers/DeviceController';
 import { PayPalReturnController } from './controllers/PayPalReturnController';
 import { PayPalWebhookController, type RequestWithRawBody } from './controllers/PayPalWebhookController';
@@ -11,6 +12,8 @@ import { WalletController } from './controllers/WalletController';
 import { authenticate } from './middleware/authenticate';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { idempotent } from './middleware/idempotent';
+import { requestLog } from './middleware/requestLog';
+import { assistantBodyParser, createAssistantRouter } from './routes/assistant.routes';
 import { createDeviceRouter } from './routes/device.routes';
 import { createHealthRouter } from './routes/health.routes';
 import { createTransactionRouter } from './routes/transaction.routes';
@@ -21,9 +24,10 @@ import { AuthorizeVault } from './services/AuthorizeVault';
 import { CreateVaultOrder } from './services/CreateVaultOrder';
 import { GetActiveWallet } from './services/GetActiveWallet';
 import { GetCurrentVault } from './services/GetCurrentVault';
+import { InterpretRequest } from './services/InterpretRequest';
 import type {
-  IIdempotencyStore, IPaymentGateway, ITransactionRepository, IVaultRepository, IVoucherRepository,
-  IWalletRepository,
+  IAssistantModel, IIdempotencyStore, IPaymentGateway, ITransactionRepository, IVaultRepository,
+  IVoucherRepository, IWalletRepository,
 } from './services/ports';
 import { RegisterDevice, type RegisterDeviceDependencies } from './services/RegisterDevice';
 
@@ -39,6 +43,7 @@ export interface AppDependencies extends RegisterDeviceDependencies {
   wallet: IWalletRepository;
   idempotency: IIdempotencyStore;
   gateway: IPaymentGateway;
+  assistant: IAssistantModel;
   checkDatabase(): Promise<boolean>;
   paypalMode: 'sandbox' | 'live';
   fxRate: string;
@@ -55,6 +60,8 @@ export function createApp(dependencies: AppDependencies): Express {
   const services = createServices(dependencies);
   const requireDevice = authenticate(devices, signer);
 
+  app.use(requestLog);
+  app.use('/api/assistant', assistantBodyParser);
   app.use(express.json({
     verify: (request, _response, buffer) => {
       (request as RequestWithRawBody).rawBody = buffer;
@@ -96,6 +103,10 @@ export function createApp(dependencies: AppDependencies): Express {
       requireDevice,
       idempotent(idempotency, signer),
     ),
+  );
+  app.use(
+    '/api',
+    createAssistantRouter(new AssistantController(new InterpretRequest(dependencies.assistant)), requireDevice),
   );
   app.post('/api/webhooks/paypal', new PayPalWebhookController(gateway, services.applyPayPalEvent).handle);
   app.use(notFound);

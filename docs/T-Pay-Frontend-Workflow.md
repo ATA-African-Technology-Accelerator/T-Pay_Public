@@ -2,8 +2,8 @@
 title: T-Pay
 subtitle: Frontend Engineer Workflow
 tagline: Build the Android app one activity at a time
-version: 1.0
-date: 4 November 2026
+version: 1.1
+date: 10 November 2026
 author: T-Pay engineering
 status: Binding for frontend work. Derived from PRD v1.1 and the API contract.
 compact: true
@@ -20,19 +20,20 @@ You own the Android app in `frontend/`. A customer and a merchant use it to comp
 | Offline user flows | Deciding when a voucher is settled |
 | Showing every contract error correctly | Producing contract responses and errors |
 
-**Out of scope:** iOS, Bluetooth before M3 is proven, budgeting and transit screens, the old web prototype, and any endpoint not in the contract.
+**Out of scope:** iOS, NFC, Bluetooth before the QR flow in FE-06 works, budgeting and transit screens, the old web prototype, and any endpoint not in the contract.
 
 ## 2. Stack
 
 | Need | Use |
 | :--- | :--- |
 | App | Expo SDK 58, React Native, TypeScript in strict mode |
-| Navigation | Expo Router |
+| Navigation | A typed stack navigator in `src/nav.tsx`. Payment screens hand signed requests and vouchers to the next screen in memory; file-based routes would put them in URLs, where a deep link could expose or replay them |
 | Local database | `expo-sqlite` |
-| Private key storage | `expo-secure-store` |
+| Private key storage | The Android Keystore, in StrongBox when the phone has it, through the local `modules/tpay-keystore` module. `expo-secure-store` keeps only the key's name, the session and the PIN hash |
 | Randomness | `expo-crypto` |
-| Signing | `@noble/curves` inside an adapter that implements the shared `ISigner` port |
+| Signing | Keystore signatures, converted to the contract format by `DeviceSigner`, which implements the shared `ISigner` port. `@noble/curves` verifies and hashes, and signs only in web and development builds |
 | Camera and QR | `expo-camera`, `react-native-qrcode-svg` |
+| Bluetooth | `expo-nearby-connections`, with the Android Nearby devices permission and the system request to turn Bluetooth on |
 | PayPal approval | `expo-web-browser`, deep link scheme `tpay://` |
 | Connectivity | `@react-native-community/netinfo` |
 | Voice | `expo-audio`, `expo-speech`, `expo-speech-recognition` |
@@ -45,29 +46,35 @@ Do not add a state library or UI kit unless a ticket needs one. Keep the depende
 
 ```text
 frontend/
-  app/                     Expo Router routes only
+  modules/
+    tpay-keystore/         Android Keystore key and signing (native)
+    tpay-radio/            Bluetooth state and the turn-on request (native)
   src/
+    App.tsx                routes, unlock, re-lock and the tpay:// return
+    nav.tsx                typed stack navigator
     features/
-      onboarding/          screens, components, hooks
+      onboarding/          splash, language, details, PIN and lock
       home/
-      vault/
-      payment/
-      transactions/
-      ledger/
-      assistant/
-      settings/
+      vault/               screens and vault activities (ACT-03 to ACT-05, ACT-12)
+      payment/             screens, payment activities and the Bluetooth link (ACT-06 to ACT-09)
+      transactions/        history and receipts (ACT-11)
+      ledger/              Active wallet and withdraw (ACT-13, ACT-14)
+      assistant/           speak, proposals and typed input (ACT-15)
+      settings/            profile, language, security and help (ACT-16)
+    state/                 app state read from SQLite and the last sync
     components/            reusable design components
     theme/                 colours, spacing, typography
     i18n/                  en, pcm, yo, ig, ha catalogues
     adapters/
       api/                 HTTP client implementing ITPayApi
       crypto/              key store and signer
-      storage/             SQLite repositories
-      transport/           QR and copyable code
+      storage/             SQLite repositories and secure values
+      transport/           Nearby (Bluetooth); QR and copy code are drawn by the payment screens
       speech/              speech adapters
       connectivity/        network adapter
+    session/               registration, profile and the session guard
     sync/                  background sync coordinator
-    composition/           creates adapters and use cases
+    composition/           creates adapters
 ```
 
 ## 4. Clean code and SOLID rules
@@ -75,8 +82,8 @@ frontend/
 | Principle | What it means here |
 | :--- | :--- |
 | Single responsibility | A screen renders state and sends user intent. A hook coordinates one activity. An adapter talks to one device feature. |
-| Open and closed | Add Nearby Connections as a new `IProximityTransport` adapter. Screens must not change. |
-| Liskov substitution | QR, copy-code and fake transports all behave the same through the port, including failures. |
+| Open and closed | Nearby Connections is added as an `INearbyTransport` adapter. Its channels are `IProximityTransport`s, so the payment hooks send and receive frames the same way. |
+| Liskov substitution | QR, copy-code, Nearby and fake transports all behave the same through `IProximityTransport`, including failures. |
 | Interface segregation | A screen receives only the use case it needs, not the whole container. |
 | Dependency inversion | Features depend on ports from `shared/`. Only `src/composition/` creates concrete adapters. |
 
@@ -113,16 +120,27 @@ The IDs match the API contract. Each activity must show loading, success, empty,
 
 ### 5.3 Offline payment
 
-No activity in this section may wait for a network call. Test each one in airplane mode.
+No activity in this section may wait for a network call. Test each one in airplane mode with Bluetooth turned back on, and again with Bluetooth off to prove the QR fallback.
+
+With Bluetooth there is one scan: the customer scans the merchant's request, and the voucher and receipt travel over Bluetooth. Without it, the voucher and receipt are scanned as QR codes. The [API contract](T-Pay-API-Contract.md) section 5.4 defines the frames and the transport steps.
 
 | ID | Device | Trigger | App steps | Result |
 | :--- | :--- | :--- | :--- | :--- |
-| ACT-06 | Merchant | Enter or speak an amount | Create a signed payment request, show QR and copyable code | Waiting for voucher |
-| ACT-07 | Customer | Scan or paste request | Verify merchant certificate, show amount and merchant, confirm, reserve capacity and sequence, sign, then show voucher | Sent, not yet confirmed; pending debit |
-| ACT-08 | Merchant | Scan or paste voucher | Verify certificates and signature, reject duplicates, save, show pending credit and receipt | Pending credit, or a clear refusal |
-| ACT-09 | Customer | Scan or paste receipt | Verify and save receipt | Delivered |
+| ACT-06 | Merchant | Enter or speak an amount | Check Bluetooth readiness and prompt only for what is missing. Create a signed payment request; if Bluetooth is ready, add a session code from `IRandom.nonce()` and start hosting. Show the request QR and copyable code, and keep a voucher scanner ready | Waiting for voucher |
+| ACT-07 | Customer | Scan or paste request | Decode the frame, verify the merchant certificate, show amount and merchant. If the frame has a session code, prompt only for what is missing and join in the background. On **Pay**, reserve capacity and sequence, sign, then send the voucher frame over Bluetooth, or show the voucher QR | Sent, not yet confirmed; pending debit |
+| ACT-08 | Merchant | Voucher arrives over Bluetooth, or is scanned or pasted | Verify certificates and signature, reject duplicates, save, show pending credit, then send the receipt over the same Bluetooth channel, or show the receipt QR | Pending credit, or a clear refusal |
+| ACT-09 | Customer | Receipt arrives over Bluetooth, or is scanned or pasted | Verify and save receipt | Delivered |
 
-If delivery fails, resend the same voucher bytes. Never sign the same payment again. If the receipt is never scanned, keep the amount reserved and show sent, not confirmed.
+**Bluetooth prompts.** Call `INearbyTransport.readiness()` first. Only when it isn't `READY`, call `requestReady()`, which shows the Android permission prompt, then the system request to turn Bluetooth on. On Android 11 and older, Nearby also needs location services on. A person who already has both never sees a prompt. Never block a payment on the answer.
+
+| Readiness after prompting | Merchant | Customer |
+| :--- | :--- | :--- |
+| `READY` | Add the session code and host | Join, then send over Bluetooth |
+| `NEEDS_PERMISSION`, `BLUETOOTH_OFF` or `UNSUPPORTED` | Show the QR without a session code | Show the voucher QR |
+
+**Fallback.** Abort `join` and show the voucher QR if the channel isn't open within 8 seconds of tapping **Pay**, or if sending fails. On the merchant phone, abort `host` as soon as a voucher is scanned instead. Close every channel when the activity ends.
+
+If delivery fails, resend the same voucher frame, which `encodeFrame` makes identical every time. Never sign the same payment again. If the receipt never arrives, keep the amount reserved and show sent, not confirmed.
 
 ### 5.4 Sync and records
 
@@ -136,12 +154,14 @@ If delivery fails, resend the same voucher bytes. Never sign the same payment ag
 
 Only a backend response may set `SETTLED`. The phone must never decide this itself.
 
+**Sending the full vault record.** The backend keeps the PayPal hold until the customer's T-Pay app has reported everything, for up to `settleBy`, about 28 days. So once spend-by has passed and the customer's phone is online, ACT-10 uploads every voucher this phone signed, then starts ACT-12 with no tap, sending the spend statement. The person sees that their unspent money is being released. Opening PayPal on its own never releases the hold. Always show `settleBy` and `paypalAuthorizationId` from the latest backend response, because the authorisation ID changes every three days while the vault waits.
+
 ### 5.5 Voice and settings
 
 | ID | Screen and trigger | App steps | Network | Result |
 | :--- | :--- | :--- | :--- | :--- |
 | ACT-15 | Assistant | Capture speech or text, send it, validate the proposal, pre-fill the screen, ask the person to confirm | `POST /assistant/interpret` | Proposal goes to ACT-06, ACT-07 or ACT-17 |
-| ACT-15 offline | Assistant with no network | Use the shared rule-based parser, or tap and type input | None | Labelled as offline assistance |
+| ACT-15 offline | Assistant with no network | Use the shared rule-based parser. If the person downloaded the offline assistant from Settings, also ask the model on the phone (llama.rn, Qwen2.5 0.5B Instruct) and merge: the rules win where they recognise something, the model fills the gaps, and `checkModelProposal` checks its answer. Tap and type input always work | None | Labelled "AI on your phone" when the model answered, otherwise as offline assistance |
 | ACT-16 | Settings | Change language, view profile, key and assurance tier | `GET /profile`, `PATCH /profile` | Strings and profile update everywhere |
 | ACT-17 | Merchant sale (P1) | Use shared merchant rules and speak stock result | None | Stock updated locally |
 
@@ -153,18 +173,92 @@ The backend side publishes these interfaces in `shared/`. You provide the Androi
 
 | Port | Your adapter |
 | :--- | :--- |
-| `IKeyStore` | `SecureStoreKeyStore` |
-| `ISigner` | `NobleP256Signer` |
-| `IRandom` and `IClock` | Expo and device adapters |
-| `ILocalVaultRepository` | `SqliteVaultRepository` |
-| `ILocalVoucherRepository` | `SqliteVoucherRepository` |
-| `ISeenVoucherRepository` | `SqliteSeenVoucherRepository` |
-| `IProximityTransport` | `QrTransport`, `CopyCodeTransport` |
+| `IKeyStore` | `SecureKeyStore`, which keeps the Keystore key's name |
+| `ISigner` | `DeviceSigner` |
+| `IRandom` and `IClock` | `secureRandom` and `systemClock` |
+| `ILocalVaultRepository` | `LocalStore.vaults`, on SQLite |
+| `ILocalVoucherRepository` | `LocalStore.vouchers`, on SQLite |
+| `ISeenVoucherRepository` | `LocalStore.seen`, on SQLite |
+| `IProximityTransport` | QR and copy code are the same frame text drawn by `FrameCode` and read by the scan screen; Nearby channels below |
+| `INearbyTransport` | `NearbyTransport`, whose `host` and `join` return `IProximityChannel`s |
 | `ITPayApi` | `HttpTPayApi` |
 | `IConnectivity` | `NetInfoConnectivity` |
-| `ISpeechInput` and `ISpeechOutput` | Expo speech adapters |
-| `IPinStore` | `SecureStorePinStore` |
-| `IBiometricUnlock` | `ExpoBiometricUnlock` |
+| `ISpeechInput` and `ISpeechOutput` | `ExpoSpeechInput` and `ExpoSpeechOutput` |
+| `IPinStore` | `SecurePinStore` |
+| `IBiometricUnlock` | `DeviceBiometrics` |
+
+A voucher and the sequence it used are written in one SQLite transaction before the frame is shown or sent. The backend releases a hold only when sequences 1 to `lastSequence` have all arrived, so no sequence may be skipped or reused.
+
+### 6.1 Device keys and signing
+
+Each phone creates its own key pair on first launch. No key is written into the code, except the T-Pay root public key.
+
+| Key | Where it lives | Purpose |
+| :--- | :--- | :--- |
+| Device private key | Created inside the Android Keystore (StrongBox when present) and never leaves it. Web and development builds fall back to a software key in `expo-secure-store` | Signs registration, vouchers, receipts, payment requests and spend statements |
+| Device public key | Sent once in `POST /devices/register` and stored by the backend | Lets the backend and other phones check this phone's signatures |
+| T-Pay root public key | Built into the app | Checks device and vault certificates offline |
+| T-Pay root private key | Backend `.env` only | Signs certificates. The app never sees it |
+
+If the app is reinstalled, the private key is lost. The phone creates a new key pair and registers again as a new identity.
+
+**Formats.** These must match the backend exactly, or every request fails with `INVALID_SIGNATURE`.
+
+| Item | Format |
+| :--- | :--- |
+| Curve and hash | ECDSA P-256 (prime256v1) with SHA-256 |
+| Private key | 32 raw bytes, base64url |
+| Public key | 65-byte uncompressed point starting with `0x04`, base64url |
+| Signature | 64 raw bytes `r‖s` with low S, base64url |
+| Hash, for `voucherHash` | SHA-256 of the canonical JSON, base64url |
+| Signed text | Domain prefix, a newline, then the canonical JSON of the payload |
+
+Build the signed text only with `signingInput` and `MESSAGE_PREFIX` from `shared/`. Never use `JSON.stringify`.
+
+| Message | Prefix |
+| :--- | :--- |
+| Registration proof | `TPAY-REGISTER-V1` |
+| Payment request | `TPAY-REQUEST-V1` |
+| Voucher | `TPAY-VOUCHER-V1` |
+| Receipt | `TPAY-RECEIPT-V1` |
+| Spend statement | `TPAY-STATEMENT-V1` |
+| Device certificate, checked only | `TPAY-DEVICE-CERT-V1` |
+| Vault certificate, checked only | `TPAY-VAULT-CERT-V1` |
+
+**`NobleP256Signer`.** The backend tests already prove that these `@noble/curves` calls work with the backend:
+
+```ts
+import { p256 } from '@noble/curves/nist.js';
+
+const secretKey = p256.utils.randomSecretKey();
+const publicKey = p256.getPublicKey(secretKey, false);
+const signature = p256.sign(new TextEncoder().encode(signingInput), secretKey);
+const valid = p256.verify(signature, new TextEncoder().encode(signingInput), publicKey);
+```
+
+`p256.sign` hashes with SHA-256, returns 64 raw bytes and uses low S by default. Pass `false` to `getPublicKey` to get the uncompressed key. Convert the bytes to and from base64url.
+
+**Registration proof.** The proof is a signature over the other four fields:
+
+```text
+TPAY-REGISTER-V1
+{"displayName":"Ada","language":"en","payoutEmail":"ada@example.com","publicKey":"BHk3..."}
+```
+
+```ts
+const payload = { publicKey, displayName, language, payoutEmail };
+const proof = await signer.sign(signingInput(MESSAGE_PREFIX.REGISTRATION, payload), privateKey);
+await api.registerDevice({ ...payload, proof });
+```
+
+The backend rebuilds the same text from the request and checks it with the `publicKey` sent. Changing any field after signing gives `INVALID_SIGNATURE`. Save `deviceToken` and `deviceCertificate` from the response in secure storage.
+
+**How public keys are found later.**
+
+- **Online:** the backend never trusts a key sent with a voucher. It loads the payer's key from the vault's owner and the payee's key by `payeeKeyId`.
+- **Offline:** each phone shares its device certificate, which contains its public key and is signed by T-Pay. The other phone checks the certificate with the built-in root public key, then uses the public key inside it.
+
+**Check your adapter.** Register through your `NobleP256Signer`. A `201` response means the key and signature formats match. To compare with a working example, run `npm run postman -- device ada` in `backend/`. It prints a valid registration body made with the same steps.
 
 ## 7. Tickets
 
@@ -179,7 +273,7 @@ Each ticket needs a branch, a pull request, and the activity ID in its title.
 | FE-05 | ACT-01, ACT-02 and ACT-16 | FE-04, BE-05 | 6 Nov |
 | FE-06 | ACT-06 to ACT-09 with QR and copy code, on a fake vault | BE-04, FE-04 | 6–7 Nov |
 | FE-07 | ACT-03 to ACT-05, with PayPal approval and deep link | BE-06 | 7 Nov |
-| FE-08 | Test Nearby for up to half a day; keep QR if it fails | FE-06 | 7 Nov |
+| FE-08 | `NearbyTransport`, Bluetooth prompts and the one-scan flow, with QR fallback. Test for up to half a day on two phones; keep QR only if it fails | FE-06 | 10 Nov |
 | FE-09 | ACT-10 sync coordinator | BE-08 | 8 Nov |
 | FE-10 | ACT-11, ACT-12 and ACT-13, ACT-14 | BE-07, BE-09, BE-10 | 9 Nov |
 | FE-11 | ACT-15 with online and offline paths | BE-11 | 9 Nov |
@@ -194,7 +288,7 @@ Until an endpoint is live, use a fake `ITPayApi` in tests or a development build
 A ticket is done only when:
 
 1. Its activity behaves as specified on a real Android phone.
-2. Offline activities work in airplane mode.
+2. Offline activities work in airplane mode, both with Bluetooth turned back on and with it off.
 3. Loading, empty, offline and failure states are complete.
 4. All strings come from the catalogue.
 5. TypeScript and tests pass.

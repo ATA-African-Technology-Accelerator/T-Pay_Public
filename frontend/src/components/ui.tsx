@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, TextProps, View, ViewStyle, StyleProp, useWindowDimensions,
 } from 'react-native';
-import * as Speech from 'expo-speech';
 import { Volume2 } from 'lucide-react-native';
 import { color, icon, motion, radius, space, touch, type } from '../theme/tokens';
-import { t } from '../i18n/en';
+import { catalogueLanguage, t } from '../i18n';
+import { speechOut } from '../composition';
 
 export const native = Platform.OS !== 'web';
 
@@ -23,8 +23,32 @@ export function T({ v = 'body', c = color.text, style, ...rest }: TextProps & { 
   return <Text {...rest} style={[type[v], { color: c }, style]} />;
 }
 
-export const naira = (n: number) => `₦${Math.round(n).toLocaleString('en-US')}`;
-export const money = (n: number) => `${naira(n)}.00`;
+// Every amount in code is an integer in minor units (kobo, cents). These format it
+// for the screen, and are the only place that divides.
+const group = (n: number) => n.toLocaleString('en-US');
+const minor = (n: number) => `${group(Math.trunc(n / 100))}.${String(Math.abs(n % 100)).padStart(2, '0')}`;
+/** ₦1,250.50 from 125050 kobo. */
+export const money = (kobo: number) => `₦${minor(kobo)}`;
+/** ₦1,250 from 125050 kobo, for keypads and short labels. */
+export const naira = (kobo: number) => `₦${group(Math.round(kobo / 100))}`;
+/** $8.33 from 833 cents. */
+export const usd = (cents: number) => `$${minor(cents)}`;
+/** ₦1,500.00 from the contract's decimal rate string "1500.00". */
+export const rate = (fxRate: string) => {
+  const [whole = '0', part = '00'] = fxRate.split('.');
+  return `₦${group(Number(whole))}.${part}`;
+};
+/** Spoken form: "1,250 naira". */
+export const sayNaira = (kobo: number) => `${group(Math.round(kobo / 100))} naira`;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const two = (n: number) => String(n).padStart(2, '0');
+/** 8 Nov 2026, 12:56 in the phone's time zone. */
+export function when(iso: string | null | undefined, withYear = true): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}${withYear ? ` ${d.getFullYear()}` : ''}, ${two(d.getHours())}:${two(d.getMinutes())}`;
+}
 export const useCardW = () => Math.min(useWindowDimensions().width, 390) - space.md * 2;
 
 export function Card({ w, h, fill, pill, onPill, pillLabel, children, style }: {
@@ -60,7 +84,7 @@ export function RollingMoney({ value, v = 'money', c = color.text }: { value: nu
   const [shown, setShown] = useState(value);
   useEffect(() => {
     if (reduce) { setShown(value); return; }
-    const id = a.addListener(({ value: x }) => setShown(x));
+    const id = a.addListener(({ value: x }) => setShown(Math.round(x)));
     Animated.timing(a, { toValue: value, duration: motion.count, easing: motion.ease.out, useNativeDriver: false }).start();
     return () => a.removeListener(id);
   }, [value, reduce]);
@@ -126,9 +150,9 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
   );
 }
 
+/** Speaks in the chosen language when the phone has a voice for it, and stays silent otherwise (FR-34). */
 export function speak(text: string) {
-  Speech.stop();
-  Speech.speak(text, { language: 'en-NG', rate: 0.9 });
+  void speechOut.speak(text, catalogueLanguage());
 }
 
 export function HearIt({ say }: { say: string }) {
