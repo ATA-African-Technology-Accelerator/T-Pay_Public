@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Builds a Word file beside each project document in docs/.
+ * Builds docs/T-Pay-PRD.docx from docs/T-Pay-PRD.md.
  *
- * The markdown stays the single editable source. Run with `npm run docx`.
+ * The markdown stays the single editable source, the same way it does for the
+ * PDF. Run with `npm run docs:docx`.
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
@@ -31,7 +32,8 @@ import {
 import { marked } from 'marked';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const DOCUMENTS = ['T-Pay-PRD', 'T-Pay-API-Contract', 'T-Pay-Frontend-Workflow', 'T-Pay-Backend-Workflow'];
+const SOURCE = path.join(ROOT, 'docs/T-Pay-PRD.md');
+const OUTPUT = path.join(ROOT, 'docs/T-Pay-PRD.docx');
 
 const GREEN = '0B5D4B';
 const INK = '1B2430';
@@ -166,7 +168,7 @@ function bookmarkId(index) {
   return `section_${index}`;
 }
 
-function renderBody(tokens, compact) {
+function renderBody(tokens) {
   const blocks = [];
   const contents = [];
   let listInstance = 0;
@@ -183,7 +185,7 @@ function renderBody(tokens, compact) {
           blocks.push(
             new Paragraph({
               heading: HeadingLevel.HEADING_1,
-              pageBreakBefore: !compact,
+              pageBreakBefore: true,
               children: [new Bookmark({ id, children: runs })],
             }),
           );
@@ -237,7 +239,7 @@ function cover(meta) {
     new Paragraph({
       spacing: { before: 1800, after: 120 },
       border: { top: { style: BorderStyle.SINGLE, size: 36, color: GREEN, space: 16 } },
-      children: [new TextRun({ text: meta.subtitle.toUpperCase(), size: 18, color: GREEN, characterSpacing: 40 })],
+      children: [new TextRun({ text: 'PRODUCT REQUIREMENTS DOCUMENT', size: 18, color: GREEN, characterSpacing: 40 })],
     }),
     new Paragraph({
       spacing: { after: 100 },
@@ -286,12 +288,10 @@ const headingStyle = (size, before, after, color = INK) => ({
   paragraph: { spacing: { before, after }, keepNext: true },
 });
 
-async function buildDocument(name) {
-  const sourcePath = path.join(ROOT, 'docs', `${name}.md`);
-  const outputPath = path.join(ROOT, 'docs', `${name}.docx`);
-  const source = await readFile(sourcePath, 'utf8');
+async function main() {
+  const source = await readFile(SOURCE, 'utf8');
   const { meta, body } = parseFrontMatter(source);
-  const { blocks, contents } = renderBody(marked.lexer(body), meta.compact === 'true');
+  const { blocks, contents } = renderBody(marked.lexer(body));
 
   const document = new Document({
     title: `${meta.title} ${meta.subtitle}`,
@@ -342,7 +342,7 @@ async function buildDocument(name) {
               new Paragraph({
                 alignment: AlignmentType.RIGHT,
                 children: [
-                  new TextRun({ text: `T-Pay ${meta.subtitle}  ·  Page `, size: 16, color: MUTED }),
+                  new TextRun({ text: 'T-Pay PRD  ·  Page ', size: 16, color: MUTED }),
                   new TextRun({ children: [PageNumber.CURRENT], size: 16, color: MUTED }),
                 ],
               }),
@@ -354,11 +354,11 @@ async function buildDocument(name) {
     ],
   });
 
-  await writeFile(outputPath, await Packer.toBuffer(document));
-  console.log(`Built ${path.relative(ROOT, outputPath)} with ${contents.length} sections`);
+  await writeFile(OUTPUT, await Packer.toBuffer(document));
+  console.log(`Built ${path.relative(ROOT, OUTPUT)} with ${contents.length} sections`);
 }
 
-Promise.all(DOCUMENTS.map(buildDocument)).catch((error) => {
+main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
