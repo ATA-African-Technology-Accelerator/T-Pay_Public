@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { color, icon, motion, radius, space } from '../theme/tokens';
-import { Card, Press, Rise, Skeleton, T, money, naira, useCardW, useReduceMotion } from './ui';
+import { Press, Rise, Skeleton, T, money, when } from './ui';
 import { BagIcon, CoinPlusIcon, HandCoinIcon } from './icons';
-import { Entry, Status, useStore } from '../demo/store';
+import { Entry, Status, useApp } from '../state/appState';
 import { useNav } from '../nav';
-import { t } from '../i18n/en';
+import { t } from '../i18n';
 
 const tone: Record<Status, { word: string; Icon: typeof BagIcon }> = {
   paid: { word: color.green, Icon: BagIcon },
@@ -16,12 +16,13 @@ const tone: Record<Status, { word: string; Icon: typeof BagIcon }> = {
   blocked: { word: color.coral, Icon: CoinPlusIcon },
 };
 
-const signed = (e: Entry) => (e.dir === 'lock' || e.status === 'refused' || e.status === 'blocked' ? money(e.amount) : `${e.dir === 'in' ? '+' : '-'}${money(e.amount)}`);
+const unsigned = (e: Entry) => e.dir === 'lock' || e.dir === 'release' || e.status === 'refused' || e.status === 'blocked';
+const signed = (e: Entry) => (unsigned(e) ? money(e.amount) : `${e.dir === 'in' ? '+' : '-'}${money(e.amount)}`);
 
 /** One row per entry: mark, who and when, then the amount with its status word. */
 export function ActivityRows({ rows }: { rows: Entry[] }) {
   const nav = useNav();
-  const { ready } = useStore();
+  const { ready } = useApp();
   if (!ready) return <Skeleton />;
   if (!rows.length) return <T v="body" c={color.muted} style={r.empty}>{t.nothingHere}</T>;
   return (
@@ -29,15 +30,15 @@ export function ActivityRows({ rows }: { rows: Entry[] }) {
       {rows.map((e, i) => {
         const k = tone[e.status];
         return (
-          <Rise key={e.id} delay={i * motion.stagger}>
+          <Rise key={e.id} delay={Math.min(i, 6) * motion.stagger}>
             <Press
-              accessibilityRole="button" accessibilityLabel={`${e.who}, ${e.amount} naira, ${t.status[e.status]}`} accessibilityHint={t.receipt}
+              accessibilityRole="button" accessibilityLabel={`${e.who}, ${money(e.amount)}, ${t.status[e.status]}`} accessibilityHint={t.receipt}
               onPress={() => nav.go({ name: 'receipt', id: e.id })} style={r.row}
             >
               <View style={r.mark}><k.Icon size={icon.md} c={k.word} w={1.7} /></View>
               <View style={{ flex: 1 }}>
                 <T v="label" numberOfLines={2}>{e.who}</T>
-                <T v="small" c={color.muted} numberOfLines={1}>{e.when}</T>
+                <T v="small" c={color.muted} numberOfLines={1}>{when(e.at)}</T>
               </View>
               <View style={{ alignItems: 'flex-end', gap: space.hair }}>
                 <T v="label" style={r.nums}>{signed(e)}</T>
@@ -51,8 +52,8 @@ export function ActivityRows({ rows }: { rows: Entry[] }) {
   );
 }
 
-/** Two figures side by side, each with a soft mark. */
-export function Duo({ items }: { items: { label: string; value: string; fill: string; icon: React.ReactNode }[] }) {
+/** Two figures side by side. */
+export function Duo({ items }: { items: { label: string; value: string }[] }) {
   return (
     <View style={r.duo}>
       {items.map((x, i) => (
@@ -67,42 +68,13 @@ export function Duo({ items }: { items: { label: string; value: string; fill: st
   );
 }
 
-function Bar({ h, on, delay }: { h: number; on: boolean; delay: number }) {
-  const reduce = useReduceMotion();
-  const a = useRef(new Animated.Value(reduce ? h : 8)).current;
-  useEffect(() => {
-    Animated.timing(a, { toValue: h, duration: reduce ? 0 : motion.bar, delay: reduce ? 0 : delay, easing: motion.ease.out, useNativeDriver: false }).start();
-  }, [h, reduce]);
-  return <Animated.View style={[r.bar, { height: a, backgroundColor: on ? color.blue : color.panelHigh }]} />;
-}
-
-/** Rounded bars on the navy folder. Tap a day to read its amount; the bubble says it in numbers. */
-export function WeekBars({ title, days }: { title: string; days: { day: string; amount: number; note?: string }[] }) {
-  const w = useCardW();
-  const top = Math.max(...days.map(d => d.amount), 1);
-  const best = days.reduce((m, d, i) => (d.amount > days[m].amount ? i : m), 0);
-  const [pick, setPick] = useState(best);
-  const MAX = 138;
+/** A label and its value on one line, the value right-aligned. */
+export function Line({ label, value, strong, mono }: { label: string; value: string; strong?: boolean; mono?: boolean }) {
   return (
-    <Card w={w} h={268} fill={color.panel} pill={<T v="smallStrong" c={color.white}>{title}</T>}>
-      <View style={r.chart}>
-        <View style={r.bubbleRow}>
-          <View style={r.bubble}><T v="smallStrong" style={r.nums}>{naira(days[pick].amount)}</T></View>
-          <T v="small" c={color.onDark}>{days[pick].note ?? days[pick].day}</T>
-        </View>
-        <View style={r.bars}>
-          {days.map((d, i) => (
-            <Pressable
-              key={d.day} accessibilityRole="button" accessibilityState={{ selected: i === pick }} accessibilityLabel={`${d.day}, ${d.amount} naira`}
-              onPress={() => setPick(i)} style={r.col}
-            >
-              <Bar h={Math.max(10, (d.amount / top) * MAX)} on={i === pick} delay={i * motion.stagger} />
-              <T v="tiny" c={i === pick ? color.white : color.onDark}>{d.day}</T>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    </Card>
+    <View style={r.line} accessible accessibilityLabel={`${label}, ${value}`}>
+      <T v="body" c={color.muted}>{label}</T>
+      <T v={strong ? 'heading' : 'label'} style={[r.value, mono && r.nums]} selectable={mono}>{value}</T>
+    </View>
   );
 }
 
@@ -129,12 +101,8 @@ const r = StyleSheet.create({
   nums: { fontVariant: ['tabular-nums'] },
   duo: { flexDirection: 'row', gap: space.md },
   duoCard: { gap: space.hair, padding: space.lg, borderRadius: radius.md, backgroundColor: color.panel },
-  chart: { flex: 1, paddingHorizontal: space.xl, paddingTop: 66, paddingBottom: space.lg, justifyContent: 'flex-end', gap: space.sm },
-  bubbleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, position: 'absolute', top: space.xl, left: space.xl },
-  bubble: { backgroundColor: color.panelHigh, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.xs },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  col: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: space.sm, minHeight: 166 },
-  bar: { width: 30, borderRadius: radius.sm },
+  line: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg },
+  value: { flexShrink: 1, textAlign: 'right' },
   seg: { flexDirection: 'row', borderRadius: radius.md, padding: 0 },
   segItem: { flex: 1, height: 46, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   segOn: { backgroundColor: color.panelHigh },

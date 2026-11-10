@@ -1,13 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { color, glass, icon, radius, space, touch } from '../theme/tokens';
-import { Press, RollingMoney, T, speak } from './ui';
+import { Press, RollingMoney, T, sayNaira, speak } from './ui';
 import { Aurora } from './aurora';
 import { Eye, EyeOff, HelpCircle, Menu, Volume2 } from 'lucide-react-native';
 import { BellButton, inset } from './shell';
 import { useNav } from '../nav';
-import { Wallet, useStore } from '../demo/store';
-import { t } from '../i18n/en';
+import { Wallet, useApp } from '../state/appState';
+import { t } from '../i18n';
 
 export type HeroAction = { label: string; icon: React.ReactNode; onPress(): void };
 export type WalletPage = { key: Wallet; name: string; status: string; label: string; amount: number; note?: string; actions: HeroAction[] };
@@ -18,7 +18,7 @@ function greeting() {
 }
 
 function Page({ page, width, shown }: { page: WalletPage; width: number; shown: boolean }) {
-  const { hidden, toggleHidden } = useStore();
+  const { hidden, toggleHidden } = useApp();
   const Vis = hidden ? EyeOff : Eye;
   return (
     <View style={[h.page, { width }]} aria-hidden={!shown} importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'}>
@@ -28,7 +28,7 @@ function Page({ page, width, shown }: { page: WalletPage; width: number; shown: 
           <Pressable accessibilityRole="button" accessibilityLabel={hidden ? t.showBalance : t.hideBalance} hitSlop={8} onPress={toggleHidden} style={h.mini}>
             <Vis size={icon.sm} color={color.white} strokeWidth={1.8} />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={`${t.hearIt}: ${page.label}`} hitSlop={8} onPress={() => speak(`${page.label}. ${page.amount} naira`)} style={h.mini}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${t.hearIt}: ${page.label}`} hitSlop={8} onPress={() => speak(`${page.label}. ${sayNaira(page.amount)}`)} style={h.mini}>
             <Volume2 size={icon.sm} color={color.white} strokeWidth={1.8} />
           </Pressable>
         </View>

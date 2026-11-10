@@ -93,12 +93,12 @@ Called by ACT-02, and again by ACT-01 when the device certificate is near expiry
   "publicKey": "base64url",
   "displayName": "Mama Nkechi Provisions",
   "language": "pcm",
-  "payoutEmail": " `payoutEmail` is required",
+  "payoutEmail": "merchant-sandbox@example.com",
   "proof": "base64url signature over the other fields"
 }
 ```
 
-`payoutEmail` is required for merchants. Response `201` for a new key, `200` for a known key:
+`payoutEmail` is required for every account, because one account can both pay and collect. Response `201` for a new key, `200` for a known key. Registering a known key again issues a new token and a fresh 7-day certificate, which is how ACT-01 renews:
 
 ```json
 {
@@ -517,6 +517,27 @@ Phones exchange three frames. Build and read them only with `encodeFrame` and `d
 | Fallback | Keep the voucher scanner open while hosting. | If Bluetooth is refused, is off, or isn't connected within 8 seconds of tapping **Pay**, show the voucher QR instead. |
 
 Bluetooth never blocks a payment, and the backend never knows which transport carried a voucher. `POST /vouchers` is unchanged.
+
+**Pairing.** Both phones use Nearby Connections with the point-to-point strategy and the app's package name as the service ID. Each frame travels as one UTF-8 bytes payload, exactly the text of the QR. The session code itself is never broadcast. Both phones derive two 16-character tags from it:
+
+| Tag | Value | Used as |
+| :--- | :--- | :--- |
+| Advertise | First 16 characters of base64url(SHA-256(`TPAY-NEARBY-V1\nADVERTISE\n<sessionCode>`)) | The merchant's advertised endpoint name |
+| Join | The same with `JOIN` in place of `ADVERTISE` | The customer's endpoint name when it connects |
+
+The merchant accepts a connection only from an endpoint named with the join tag and rejects every other. A phone that overhears the advertised tag can't make the join tag without the code, which only travels inside the QR the customer scanned. So it can't take the customer's place.
+
+**Shared rules for each step.** Build and check every message only with these functions from `shared/`:
+
+| Step | Function |
+| :--- | :--- |
+| ACT-06 | `createPaymentRequest`. A request lives 15 minutes and is refused with `INVALID_CERTIFICATE` when the merchant's certificate has expired |
+| ACT-07, before signing | `reviewPaymentRequest`: the merchant's name, the amount in naira and dollars, or the refusal, with no signature yet |
+| ACT-07, on Pay | `issueVoucher` |
+| ACT-08 | `acceptVoucher` |
+| ACT-09 | `acceptReceipt`: the receipt must be signed by the merchant in the request and cover exactly this voucher |
+| ACT-12 | `createSpendStatement`, which refuses sequences that are not exactly 1 to n |
+| ACT-15 offline | `parseOfflineIntent`. English and Pidgin phrases for now, plus digits in every language. With the optional on-phone model, its answer is checked by `checkModelProposal` with the same intent, amount and capacity rules as `POST /assistant/interpret`, and the rules win where they recognise something |
 
 
 

@@ -5,32 +5,106 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/metro-runtime": "~58.0.17",
+    "@noble/curves": "^2.4.0",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "12.0.1",
     "expo": "^58.0.0",
     "expo-asset": "~58.0.20",
+    "expo-audio": "~58.0.11",
     "expo-blur": "~58.0.5",
+    "expo-camera": "~58.0.14",
     "expo-clipboard": "~58.0.4",
+    "expo-crypto": "~58.0.7",
+    "expo-device": "~58.0.5",
+    "expo-file-system": "~58.0.13",
     "expo-font": "~58.0.11",
+    "expo-local-authentication": "~58.0.2",
+    "expo-nearby-connections": "^1.1.1",
+    "expo-secure-store": "~58.0.2",
     "expo-speech": "~58.0.3",
+    "expo-speech-recognition": "^58.0.1",
     "expo-splash-screen": "~58.0.13",
+    "expo-sqlite": "~58.0.15",
     "expo-status-bar": "~58.0.4",
+    "expo-web-browser": "~58.0.7",
+    "llama.rn": "0.12.9",
     "lucide-react-native": "^1.69.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
+    "react-native-nitro-modules": "^0.37.2",
+    "react-native-qrcode-svg": "^6.3.54",
     "react-native-svg": "15.16.0",
     "react-native-web": "^0.21.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
+    "jest": "^30.5.2",
+    "jest-expo": "^58.0.14",
     "typescript": "~6.0.3"
   },
   "private": true,
-  "main": "index.ts"
+  "main": "index.ts",
+  "jest": {
+    "projects": [
+      {
+        "displayName": "logic",
+        "testEnvironment": "node",
+        "testMatch": [
+          "<rootDir>/src/**/__tests__/**/*.test.ts"
+        ],
+        "transform": {
+          "\\.[jt]sx?$": [
+            "babel-jest",
+            {
+              "presets": [
+                "babel-preset-expo"
+              ]
+            }
+          ]
+        },
+        "transformIgnorePatterns": [
+          "node_modules/(?!(@noble)/)"
+        ],
+        "moduleNameMapper": {
+          "^@tpay/shared/(.*)$": "<rootDir>/../shared/src/$1"
+        },
+        "modulePaths": [
+          "<rootDir>/node_modules"
+        ],
+        "modulePathIgnorePatterns": [
+          "<rootDir>/web-prototype"
+        ]
+      },
+      {
+        "displayName": "screens",
+        "preset": "jest-expo",
+        "testMatch": [
+          "<rootDir>/src/**/__tests__/**/*.test.tsx"
+        ],
+        "moduleNameMapper": {
+          "^@tpay/shared/(.*)$": "<rootDir>/../shared/src/$1"
+        },
+        "modulePaths": [
+          "<rootDir>/node_modules"
+        ],
+        "modulePathIgnorePatterns": [
+          "<rootDir>/web-prototype"
+        ],
+        "transformIgnorePatterns": [
+          "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|@noble/.*|lucide-react-native|react-native-svg|react-native-qrcode-svg)"
+        ]
+      }
+    ]
+  }
 }
