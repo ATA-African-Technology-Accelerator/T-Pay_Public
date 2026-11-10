@@ -109,6 +109,16 @@ export const t = {
   help: 'Help',
   openMenu: 'Open menu', closeMenu: 'Close menu',
   enterPin: 'Enter your PIN',
+  createPin: 'Create a 4-digit PIN',
+  createPinHint: 'You will use it to open T-Pay',
+  almostDone: 'Almost done',
+  confirmPin: 'Enter the same PIN again',
+  pinMismatch: "Those PINs didn't match. Start again.",
+  wrongPin: (left: number) => `Wrong PIN. ${left} ${left === 1 ? 'try' : 'tries'} left.`,
+  lockedOut: (seconds: number) => `Too many tries. Wait ${seconds} seconds.`,
+  fingerprintPrompt: 'Open T-Pay',
+  usePinInstead: 'Use PIN',
+  fingerprintFailed: "Fingerprint didn't work. Use your PIN.",
   useFingerprint: 'Use fingerprint',
   receipt: 'Receipt', shareReceipt: 'Share receipt',
   from: 'From', to: 'To', date: 'Date', reference: 'Reference', paypalCapture: 'PayPal capture',
@@ -118,6 +128,12 @@ export const t = {
   lockApp: 'Lock the app',
   phoneSecurity: 'Phone security',
   tierB: 'Tier B: software-protected key',
+  tierBHardware: 'Tier B: your key is locked inside this phone',
+  settingUp: 'Setting up your phone',
+  setupNoInternet: "We couldn't reach T-Pay. Check your internet and try again.",
+  setupCheckDetails: 'Check your name and PayPal email, then try again.',
+  setupBusy: 'T-Pay is busy right now. Wait a minute and try again.',
+  setupFailed: 'Something went wrong on our side. Please try again.',
   buildNote: 'This build uses PayPal sandbox. No real money moves.',
   faqs: [
     { q: 'What does Processing mean?', a: 'The payment is made and saved on both phones. It finishes by itself when either phone has network.' },
@@ -138,3 +154,5 @@ export const t = {
 } as const;
 
 export const languages = ['English', 'Pidgin', 'Yorùbá', 'Igbo', 'Hausa'];
+/** Contract codes, in the same order as `languages`. */
+export const languageCodes = ['en', 'pcm', 'yo', 'ig', 'ha'] as const;

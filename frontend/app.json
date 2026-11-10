@@ -2,6 +2,7 @@
   "expo": {
     "name": "T-Pay",
     "slug": "tpay-mobile",
+    "scheme": "tpay",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -26,6 +27,13 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#050608"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "T-Pay uses Face ID to open the app."
         }
       ]
     ],
