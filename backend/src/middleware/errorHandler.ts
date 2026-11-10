@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { ApiErrorBody } from '@tpay/shared/contracts/errors';
 import { ERROR_HTTP_STATUS, type ErrorCode } from '@tpay/shared/contracts/errors';
+import { currentRequestId } from '../logging/logger';
 import { ApiError } from '../services/ApiError';
 
 
@@ -32,6 +33,6 @@ export function errorHandler(
     sendError(response, 'VALIDATION_FAILED', 'The request body is too large');
     return;
   }
-  console.error(error);
+  console.error(`Unhandled error in request ${currentRequestId() ?? 'unknown'}`, error);
   sendError(response, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
 }

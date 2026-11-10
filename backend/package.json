@@ -14,8 +14,7 @@
     "postman": "tsx scripts/postmanHelper.ts",
     "db:up": "docker compose up -d --wait",
     "db:migrate": "tsx scripts/migrate.ts",
-    "test:db": "TEST_DATABASE_URL=postgres://tpay:tpay@localhost:5433/tpay vitest run && npm run test:api:db",
-    "test:api:db": "API_STORAGE=postgres TEST_DATABASE_URL=postgres://tpay:tpay@localhost:5433/tpay vitest run tests/http"
+    "test:db": "tsx scripts/testDatabase.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

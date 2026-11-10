@@ -12,6 +12,7 @@ import { WalletController } from './controllers/WalletController';
 import { authenticate } from './middleware/authenticate';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { idempotent } from './middleware/idempotent';
+import { requestLog } from './middleware/requestLog';
 import { assistantBodyParser, createAssistantRouter } from './routes/assistant.routes';
 import { createDeviceRouter } from './routes/device.routes';
 import { createHealthRouter } from './routes/health.routes';
@@ -59,6 +60,7 @@ export function createApp(dependencies: AppDependencies): Express {
   const services = createServices(dependencies);
   const requireDevice = authenticate(devices, signer);
 
+  app.use(requestLog);
   app.use('/api/assistant', assistantBodyParser);
   app.use(express.json({
     verify: (request, _response, buffer) => {

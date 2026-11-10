@@ -199,6 +199,7 @@ describe('POST /api/assistant/interpret', () => {
 
       expect(entries()).toEqual([{
         event: 'assistant.interpret',
+        requestId: expect.any(String),
         deviceId: device.deviceId,
         language: 'pcm',
         input: 'text',

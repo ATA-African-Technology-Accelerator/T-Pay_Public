@@ -1,5 +1,6 @@
 import type { InterpretRequest as InterpretBody, InterpretResponse } from '@tpay/shared/contracts/api';
 import type { Language } from '@tpay/shared/contracts/statuses';
+import { logEvent } from '../logging/logger';
 import { modelProposalSchema } from '../validation/schemas';
 import type { AssistantInput, Device, IAssistantModel } from './ports';
 
@@ -98,13 +99,12 @@ function overCapacity({ amountNgnMinor, intent }: Proposal, remainingNgnMinor: n
 // Every AI-assisted action is logged with its proposal and validation result
 // (FR-46). The person's words are personal data, so they are not logged.
 function log(device: Device, body: InterpretBody, input: AssistantInput, outcome: Outcome, proposal: Proposal | null) {
-  console.info(JSON.stringify({
-    event: 'assistant.interpret',
+  logEvent('assistant.interpret', {
     deviceId: device.id,
     language: body.language,
     input: input.kind,
     outcome,
     intent: proposal?.intent ?? null,
     amountNgnMinor: proposal?.amountNgnMinor ?? null,
-  }));
+  });
 }
