@@ -3,7 +3,7 @@ import React, { createContext, useContext } from 'react';
 import { Contact } from './demo/store';
 
 export type Route =
-  | { name: 'splash' } | { name: 'language' } | { name: 'details' } | { name: 'lock' }
+  | { name: 'splash' } | { name: 'language' } | { name: 'details' } | { name: 'createPin' } | { name: 'lock' }
   | { name: 'home' } | { name: 'activity' } | { name: 'vault' } | { name: 'speak' } | { name: 'settings' } | { name: 'help' } | { name: 'ledger' }
   | { name: 'receipt'; id: string }
   | { name: 'amount'; mode: 'lock' | 'collect' | 'send'; to?: Contact }
