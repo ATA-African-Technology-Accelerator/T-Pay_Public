@@ -27,11 +27,11 @@ You own the Android app in `frontend/`. A customer and a merchant use it to comp
 | Need | Use |
 | :--- | :--- |
 | App | Expo SDK 58, React Native, TypeScript in strict mode |
-| Navigation | Expo Router |
+| Navigation | A typed stack navigator in `src/nav.tsx`. Payment screens hand signed requests and vouchers to the next screen in memory; file-based routes would put them in URLs, where a deep link could expose or replay them |
 | Local database | `expo-sqlite` |
-| Private key storage | `expo-secure-store` |
+| Private key storage | The Android Keystore, in StrongBox when the phone has it, through the local `modules/tpay-keystore` module. `expo-secure-store` keeps only the key's name, the session and the PIN hash |
 | Randomness | `expo-crypto` |
-| Signing | `@noble/curves` inside an adapter that implements the shared `ISigner` port |
+| Signing | Keystore signatures, converted to the contract format by `DeviceSigner`, which implements the shared `ISigner` port. `@noble/curves` verifies and hashes, and signs only in web and development builds |
 | Camera and QR | `expo-camera`, `react-native-qrcode-svg` |
 | Bluetooth | `expo-nearby-connections`, with the Android Nearby devices permission and the system request to turn Bluetooth on |
 | PayPal approval | `expo-web-browser`, deep link scheme `tpay://` |
@@ -46,29 +46,35 @@ Do not add a state library or UI kit unless a ticket needs one. Keep the depende
 
 ```text
 frontend/
-  app/                     Expo Router routes only
+  modules/
+    tpay-keystore/         Android Keystore key and signing (native)
+    tpay-radio/            Bluetooth state and the turn-on request (native)
   src/
+    App.tsx                routes, unlock, re-lock and the tpay:// return
+    nav.tsx                typed stack navigator
     features/
-      onboarding/          screens, components, hooks
+      onboarding/          splash, language, details, PIN and lock
       home/
-      vault/
-      payment/
-      transactions/
-      ledger/
-      assistant/
-      settings/
+      vault/               screens and vault activities (ACT-03 to ACT-05, ACT-12)
+      payment/             screens, payment activities and the Bluetooth link (ACT-06 to ACT-09)
+      transactions/        history and receipts (ACT-11)
+      ledger/              Active wallet and withdraw (ACT-13, ACT-14)
+      assistant/           speak, proposals and typed input (ACT-15)
+      settings/            profile, language, security and help (ACT-16)
+    state/                 app state read from SQLite and the last sync
     components/            reusable design components
     theme/                 colours, spacing, typography
     i18n/                  en, pcm, yo, ig, ha catalogues
     adapters/
       api/                 HTTP client implementing ITPayApi
       crypto/              key store and signer
-      storage/             SQLite repositories
-      transport/           QR, copyable code and Nearby (Bluetooth)
+      storage/             SQLite repositories and secure values
+      transport/           Nearby (Bluetooth); QR and copy code are drawn by the payment screens
       speech/              speech adapters
       connectivity/        network adapter
+    session/               registration, profile and the session guard
     sync/                  background sync coordinator
-    composition/           creates adapters and use cases
+    composition/           creates adapters
 ```
 
 ## 4. Clean code and SOLID rules
@@ -167,19 +173,21 @@ The backend side publishes these interfaces in `shared/`. You provide the Androi
 
 | Port | Your adapter |
 | :--- | :--- |
-| `IKeyStore` | `SecureStoreKeyStore` |
-| `ISigner` | `NobleP256Signer` |
-| `IRandom` and `IClock` | Expo and device adapters |
-| `ILocalVaultRepository` | `SqliteVaultRepository` |
-| `ILocalVoucherRepository` | `SqliteVoucherRepository` |
-| `ISeenVoucherRepository` | `SqliteSeenVoucherRepository` |
-| `IProximityTransport` | `QrTransport`, `CopyCodeTransport` |
+| `IKeyStore` | `SecureKeyStore`, which keeps the Keystore key's name |
+| `ISigner` | `DeviceSigner` |
+| `IRandom` and `IClock` | `secureRandom` and `systemClock` |
+| `ILocalVaultRepository` | `LocalStore.vaults`, on SQLite |
+| `ILocalVoucherRepository` | `LocalStore.vouchers`, on SQLite |
+| `ISeenVoucherRepository` | `LocalStore.seen`, on SQLite |
+| `IProximityTransport` | QR and copy code are the same frame text drawn by `FrameCode` and read by the scan screen; Nearby channels below |
 | `INearbyTransport` | `NearbyTransport`, whose `host` and `join` return `IProximityChannel`s |
 | `ITPayApi` | `HttpTPayApi` |
 | `IConnectivity` | `NetInfoConnectivity` |
-| `ISpeechInput` and `ISpeechOutput` | Expo speech adapters |
-| `IPinStore` | `SecureStorePinStore` |
-| `IBiometricUnlock` | `ExpoBiometricUnlock` |
+| `ISpeechInput` and `ISpeechOutput` | `ExpoSpeechInput` and `ExpoSpeechOutput` |
+| `IPinStore` | `SecurePinStore` |
+| `IBiometricUnlock` | `DeviceBiometrics` |
+
+A voucher and the sequence it used are written in one SQLite transaction before the frame is shown or sent. The backend releases a hold only when sequences 1 to `lastSequence` have all arrived, so no sequence may be skipped or reused.
 
 ### 6.1 Device keys and signing
 
@@ -187,7 +195,7 @@ Each phone creates its own key pair on first launch. No key is written into the 
 
 | Key | Where it lives | Purpose |
 | :--- | :--- | :--- |
-| Device private key | Created on the phone, kept in `expo-secure-store`, never sent anywhere | Signs registration, vouchers, receipts, payment requests and spend statements |
+| Device private key | Created inside the Android Keystore (StrongBox when present) and never leaves it. Web and development builds fall back to a software key in `expo-secure-store` | Signs registration, vouchers, receipts, payment requests and spend statements |
 | Device public key | Sent once in `POST /devices/register` and stored by the backend | Lets the backend and other phones check this phone's signatures |
 | T-Pay root public key | Built into the app | Checks device and vault certificates offline |
 | T-Pay root private key | Backend `.env` only | Signs certificates. The app never sees it |
