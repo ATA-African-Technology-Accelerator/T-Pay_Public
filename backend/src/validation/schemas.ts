@@ -47,11 +47,22 @@ export const createVaultSchema = z
   .strict();
 
 
-export const paypalReturnQuerySchema = z.object({
-  vaultId: z.string().min(1),
-  outcome: z.enum(['approved', 'cancelled']),
-  token: z.string().optional(),
-});
+// PayPal sends the payer back here after a vault lock or an Add money checkout.
+export const paypalReturnQuerySchema = z
+  .object({
+    vaultId: z.string().min(1).optional(),
+    depositId: z.string().min(1).optional(),
+    outcome: z.enum(['approved', 'cancelled']),
+    token: z.string().optional(),
+  })
+  .refine(({ depositId, vaultId }) => (vaultId === undefined) !== (depositId === undefined), {
+    message: 'Send exactly one of vaultId or depositId',
+  });
+
+
+export const createDepositSchema = z
+  .object({ amountNgnMinor: z.number().int().positive().max(MAX_VAULT_NGN_MINOR) })
+  .strict();
 
 
 const envelope = <T extends z.ZodRawShape>(payload: T) =>
@@ -123,7 +134,7 @@ export const listVouchersQuerySchema = z
 
 
 export const withdrawSchema = z
-  .object({ amountUsdMinor: minorUnits.positive() })
+  .object({ amountUsdMinor: minorUnits.positive(), recipientEmail: z.string().trim().toLowerCase().email().max(254).optional() })
   .strict();
 
 
@@ -135,6 +146,9 @@ const AUDIO_MIME_TYPES = [
   'audio/wav', 'audio/x-wav', 'audio/mp3', 'audio/mpeg', 'audio/aac', 'audio/mp4', 'audio/m4a',
   'audio/x-m4a', 'audio/ogg', 'audio/webm', 'audio/flac', 'audio/aiff', 'audio/3gpp',
 ] as const;
+
+// A spoken reply is a sentence or two. A longer text is refused rather than paid for.
+const MAX_SPOKEN_REPLY = 300;
 
 export const interpretSchema = z
   .object({
@@ -151,6 +165,11 @@ export const interpretSchema = z
   .refine(({ audioBase64, audioMimeType }) => (audioBase64 === null) === (audioMimeType === null), {
     message: 'audioMimeType must be sent with audioBase64, and only then',
   });
+
+
+export const speakSchema = z
+  .object({ text: z.string().trim().min(1).max(MAX_SPOKEN_REPLY), language })
+  .strict();
 
 
 // What the model must return. Amounts come back in whole naira, which models

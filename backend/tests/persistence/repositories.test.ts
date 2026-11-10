@@ -320,6 +320,7 @@ describe.each(implementations)('$name repositories', ({ create }) => {
       amountNgnMinor: 200_000,
       voucherId: null,
       withdrawalId,
+      depositId: null,
       paypalCaptureId: null,
       createdAt: NOW,
     });

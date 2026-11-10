@@ -200,6 +200,7 @@ export class VoucherSettlement {
       amountNgnMinor: settled.amountNgnMinor,
       voucherId,
       withdrawalId: null,
+      depositId: null,
       paypalCaptureId: captureId,
       createdAt: now,
     });
@@ -253,6 +254,7 @@ export class VoucherSettlement {
       amountNgnMinor: reversed.amountNgnMinor,
       voucherId,
       withdrawalId: null,
+      depositId: null,
       paypalCaptureId: reversed.paypalCaptureId,
       createdAt: now,
     });

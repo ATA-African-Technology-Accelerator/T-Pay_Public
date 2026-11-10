@@ -1,7 +1,7 @@
 import { ApiError } from '../../services/ApiError';
 import type {
-  AuthorizeOrderInput, CaptureInput, CaptureResult, CreateOrderInput, FindCaptureInput,
-  IPaymentGateway, PaymentAuthorization, PaymentOrder, PayoutInput, PayoutResult, PayoutStatus,
+  AuthorizeOrderInput, CaptureInput, CaptureOrderInput, CaptureResult, CreateCaptureOrderInput, CreateOrderInput,
+  FindCaptureInput, IPaymentGateway, OrderCaptureResult, PaymentAuthorization, PaymentOrder, PayoutInput, PayoutResult, PayoutStatus,
   ReauthorizeInput, ReauthorizeResult, VoidResult, WebhookNotification,
 } from '../../services/ports';
 
@@ -12,6 +12,11 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const TOKEN_EXPIRY_MARGIN_MS = 60_000;
+// The first call after the server has been idle is the slowest: a cold connection and a
+// fresh login. One quick retry turns that into a short wait instead of a failed screen.
+const RETRY_DELAY_MS = 700;
+const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const CENTS_PER_DOLLAR = 100;
 const USD_VALUE_PATTERN = /^\d+\.\d{2}$/;
 const ALREADY_VOIDED_ISSUES = ['PREVIOUSLY_VOIDED', 'AUTHORIZATION_VOIDED'];
@@ -76,16 +81,69 @@ export class PayPalGateway implements IPaymentGateway {
     private readonly fetcher: typeof fetch = fetch,
   ) {}
 
-  public async createOrder(input: CreateOrderInput): Promise<PaymentOrder> {
+  public createOrder(input: CreateOrderInput): Promise<PaymentOrder> {
+    return this.placeOrder('AUTHORIZE', input.vaultId, input);
+  }
+
+
+  // Add money: the payer pays at once and the money is captured, with no hold in between.
+  public createCaptureOrder(input: CreateCaptureOrderInput): Promise<PaymentOrder> {
+    return this.placeOrder('CAPTURE', input.depositId, input);
+  }
+
+
+  public async captureOrder({ orderId, requestId }: CaptureOrderInput): Promise<OrderCaptureResult> {
+    try {
+      const reply = await this.request(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
+        method: 'POST',
+        requestId,
+        body: {},
+      });
+      if (reply.ok) {
+        return this.toOrderCapture(reply.body);
+      }
+      const issue = firstIssue(reply);
+      if (issue === 'ORDER_NOT_APPROVED') {
+        return { outcome: 'NOT_APPROVED' };
+      }
+      if (issue === 'ORDER_ALREADY_CAPTURED') {
+        // A repeat of a capture that already worked: read it back instead of failing.
+        const existing = await this.request(`/v2/checkout/orders/${encodeURIComponent(orderId)}`, { method: 'GET' });
+        return existing.ok ? this.toOrderCapture(existing.body) : { outcome: 'RETRY' };
+      }
+      if (RETRY_STATUSES.includes(reply.status) || reply.status >= SERVER_ERROR_STATUS) {
+        return { outcome: 'RETRY' };
+      }
+      return { outcome: 'BLOCKED', reason: issue ?? reply.body?.name ?? `HTTP_${reply.status}` };
+    } catch {
+      return { outcome: 'RETRY' };
+    }
+  }
+
+
+  private toOrderCapture(order: any): OrderCaptureResult {
+    const capture = order?.purchase_units?.[0]?.payments?.captures?.[0];
+    if (capture?.id && (capture.status === 'COMPLETED' || capture.status === 'PENDING')) {
+      return { outcome: capture.status, captureId: capture.id };
+    }
+    return capture ? { outcome: 'BLOCKED', reason: `CAPTURE_${capture.status}` } : { outcome: 'NOT_APPROVED' };
+  }
+
+
+  private async placeOrder(
+    intent: 'AUTHORIZE' | 'CAPTURE',
+    reference: string,
+    input: { requestId: string; amountUsdMinor: number; returnUrl: string; cancelUrl: string },
+  ): Promise<PaymentOrder> {
     const reply = await this.request('/v2/checkout/orders', {
       method: 'POST',
       requestId: input.requestId,
       body: {
-        intent: 'AUTHORIZE',
+        intent,
         purchase_units: [
           {
-            reference_id: input.vaultId,
-            custom_id: input.vaultId,
+            reference_id: reference,
+            custom_id: reference,
             amount: { currency_code: 'USD', value: toUsdValue(input.amountUsdMinor) },
           },
         ],
@@ -204,8 +262,11 @@ export class PayPalGateway implements IPaymentGateway {
 
   public async createPayout({ amountUsdMinor, receiverEmail, senderBatchId }: PayoutInput): Promise<PayoutResult> {
     try {
+      // PayPal asks for an idempotency key on payouts as well as a unique batch id: a repeat of the
+      // same payout, after a timeout or a 5xx, then returns the first one's state instead of paying twice.
       const reply = await this.request(PAYOUTS_PATH, {
         method: 'POST',
+        requestId: senderBatchId,
         body: {
           sender_batch_header: {
             sender_batch_id: senderBatchId,
@@ -339,7 +400,9 @@ export class PayPalGateway implements IPaymentGateway {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       ...(rawBody === undefined ? {} : { body: rawBody }),
-    });
+      // Only a call PayPal can recognise as a repeat (same PayPal-Request-Id) is retried,
+      // so a retry can never create a second order, capture or payout.
+    }, Boolean(requestId));
   }
 
 
@@ -356,7 +419,7 @@ export class PayPalGateway implements IPaymentGateway {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: 'grant_type=client_credentials',
-    });
+    }, true);
     if (!reply.ok || !reply.body?.access_token) {
       throw unavailable(`login returned ${reply.status}`);
     }
@@ -368,13 +431,24 @@ export class PayPalGateway implements IPaymentGateway {
   }
 
   
-  private async send(url: string, init: RequestInit): Promise<PayPalReply> {
-    try {
-      const response = await this.fetcher(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-      const text = await response.text();
-      return { ok: response.ok, status: response.status, body: text ? JSON.parse(text) : null };
-    } catch (error) {
-      throw unavailable(error instanceof Error ? error.message : 'unknown error');
+  private async send(url: string, init: RequestInit, retry = false): Promise<PayPalReply> {
+    const attempts = retry ? 2 : 1;
+    let failure: unknown = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const response = await this.fetcher(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+        const text = await response.text();
+        const reply = { ok: response.ok, status: response.status, body: text ? JSON.parse(text) : null };
+        if (attempt < attempts && TRANSIENT_STATUSES.has(response.status)) {
+          await pause(RETRY_DELAY_MS);
+          continue;
+        }
+        return reply;
+      } catch (error) {
+        failure = error;
+        if (attempt < attempts) await pause(RETRY_DELAY_MS);
+      }
     }
+    throw unavailable(failure instanceof Error ? failure.message : 'unknown error');
   }
 }

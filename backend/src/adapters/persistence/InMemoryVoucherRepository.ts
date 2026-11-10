@@ -82,10 +82,11 @@ export class InMemoryVoucherRepository implements IVoucherRepository {
 
 
   public appendLedger(entry: LedgerRecord): void {
-    const exists = this.ledger.some(({ type, voucherId, withdrawalId }) =>
+    const exists = this.ledger.some(({ type, voucherId, withdrawalId, depositId }) =>
       type === entry.type
       && ((voucherId !== null && voucherId === entry.voucherId)
-        || (withdrawalId !== null && withdrawalId === entry.withdrawalId)));
+        || (withdrawalId !== null && withdrawalId === entry.withdrawalId)
+        || (depositId !== null && depositId === entry.depositId)));
     if (!exists) {
       this.ledger.push(entry);
     }

@@ -139,4 +139,37 @@ describe('GeminiAssistantModel', () => {
     expect(constructed).toEqual([]);
     expect(generateContent).not.toHaveBeenCalled();
   });
+
+  describe('speak', () => {
+    const pcm = Buffer.from([1, 0, 2, 0]).toString('base64');
+    const audioReply = (data: string | undefined) => ({ candidates: [{ content: { parts: [{ inlineData: { data } }] } }] });
+
+    it('asks the voice model for audio and returns it as a WAV file', async () => {
+      generateContent.mockResolvedValue(audioReply(pcm));
+
+      const spoken = await model().speak({ text: 'You wan collect one thousand naira?', language: 'pcm' });
+      const wav = Buffer.from(spoken.audioBase64, 'base64');
+
+      expect(spoken.audioMimeType).toBe('audio/wav');
+      expect(wav.subarray(0, 4).toString()).toBe('RIFF');
+      expect(wav.subarray(8, 12).toString()).toBe('WAVE');
+      expect(wav.readUInt32LE(24)).toBe(24_000);
+      expect(wav.subarray(44)).toEqual(Buffer.from([1, 0, 2, 0]));
+      const params = generateContent.mock.calls[0]?.[0] as { config: { responseModalities: string[] }; contents: { parts: { text: string }[] }[] };
+      expect(params.config.responseModalities).toEqual(['AUDIO']);
+      expect(params.contents[0]?.parts[0]?.text).toContain('Nigerian Pidgin');
+    });
+
+    it('reports AI_UNAVAILABLE when the reply has no audio', async () => {
+      generateContent.mockResolvedValue(audioReply(undefined));
+
+      await expect(model().speak({ text: 'Hello', language: 'en' })).rejects.toMatchObject({ code: 'AI_UNAVAILABLE' });
+    });
+
+    it('reports AI_UNAVAILABLE when Gemini fails', async () => {
+      generateContent.mockRejectedValue(new Error('model not found'));
+
+      await expect(model().speak({ text: 'Hello', language: 'en' })).rejects.toMatchObject({ code: 'AI_UNAVAILABLE' });
+    });
+  });
 });

@@ -14,6 +14,7 @@ export class FakeAssistantModel implements IAssistantModel {
     spokenReply: 'You wan collect one thousand naira?',
   };
   public unavailable = false;
+  public readonly spoken: string[] = [];
 
   public async interpret(request: AssistantModelRequest): Promise<unknown> {
     this.requests.push(request);
@@ -21,5 +22,13 @@ export class FakeAssistantModel implements IAssistantModel {
       throw new ApiError('AI_UNAVAILABLE', 'The assistant could not be reached');
     }
     return this.reply;
+  }
+
+  public async speak({ text }: { text: string }) {
+    if (this.unavailable) {
+      throw new ApiError('AI_UNAVAILABLE', 'The assistant could not be reached');
+    }
+    this.spoken.push(text);
+    return { audioBase64: 'UklGRg==', audioMimeType: 'audio/wav' as const };
   }
 }

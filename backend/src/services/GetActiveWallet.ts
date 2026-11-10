@@ -20,7 +20,7 @@ const toLedgerEntry = (entry: LedgerRecord): LedgerEntry => ({
 
 
 export class GetActiveWallet {
-  constructor(private readonly vouchers: IVoucherRepository) {}
+  constructor(private readonly vouchers: IVoucherRepository, private readonly fxRate: string) {}
 
   public async execute(device: Device): Promise<ActiveWalletResponse> {
     const ledger = await this.vouchers.listLedgerForDevice(device.id);
@@ -29,6 +29,7 @@ export class GetActiveWallet {
       balanceNgnMinor: balanceNgn(ledger),
       pendingNgnMinor: await this.vouchers.pendingNgnForPayee(device.id),
       payoutEmail: device.payoutEmail,
+      fxRate: this.fxRate,
       entries: ledger.slice(0, RECENT_ENTRIES).map(toLedgerEntry),
     };
   }
