@@ -1,179 +1,219 @@
-# T-Pay: Hybrid SLM & Time-Locked Offline Market Vault
+# T-Pay
 
-> **Zero-connectivity mobile commerce & PayPal offline escrow engineered for Africa's blackout crisis.**
+**Offline payments backed by PayPal, for markets where the network fails.**
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev/)
-[![React Native Expo](https://img.shields.io/badge/Expo-52.0-000020?style=flat&logo=expo&logoColor=white)](https://expo.dev/)
-[![DDD Clean Architecture](https://img.shields.io/badge/Architecture-DDD%20Clean%20Architecture-10b981?style=flat)](./docs/DDD_ARCHITECTURE.md)
-[![Verification Suite](https://img.shields.io/badge/Tests-9%2F9%20Passed%20(100%25)-brightgreen?style=flat)](./shared/src/__tests__/domain-verification.ts)
-[![PayPal Hackathon](https://img.shields.io/badge/PayPal-Offline%20Escrow%20Ready-003087?style=flat&logo=paypal&logoColor=white)](https://developer.paypal.com/)
+A customer locks money in a PayPal-backed vault while they are online. Later, with no internet at all, they pay a seller phone to phone by QR code or Bluetooth. Each payment is a voucher signed by the customer's own phone, so it can't be forged or spent twice. When either phone reconnects, the backend captures the money from the PayPal hold and credits the seller, who can withdraw to PayPal. A voice assistant built on Gemini lets people ask for payments in English, Nigerian Pidgin, Yoruba, Igbo or Hausa.
+
+Built for the PayPal AI Hackathon, November 2026. MIT licensed.
 
 ---
 
-> **Project status (November 2026).** The claims below describe the target product, not the current build. An audit of the codebase found 7 of 23 capabilities met, 9 simulated or partial, and 7 missing — most importantly, device keys, voucher signatures and server-side settlement are prototypes. Read [docs/T-Pay-PRD.pdf](docs/T-Pay-PRD.pdf) for the itemized register, the requirement gaps, and the binding architecture rules; [docs/T-Pay-PRD.md](docs/T-Pay-PRD.md) is the editable source, running `npm run pdf` in `docs/` rebuilds it, and `npm run verify` fails if the committed PDF has drifted from that source.
-
----
-
-## 🌍 1. The Reality: The African Blackout Crisis
-
-In Nigeria and across sub-Saharan Africa, over **40% of digital point-of-sale transactions fail during grid outages and cellular network blackouts**. 
-
-- **Merchant Reality**: Informal market traders (e.g. Mama Nkechi) juggle 3 to 5 clunky bank POS terminals hoping at least one has signal. When networks collapse, commerce reverts to unrecorded cash or stalls entirely.
-- **Literacy Barrier**: Millions of market sellers cannot read or write spreadsheet formulas, making traditional accounting apps useless.
-- **Double-Spend Fraud**: Existing "offline payment" attempts fail because unscrupulous actors double-spend their offline balances before syncing.
-
-**T-Pay solves this with a dual-engine breakthrough**:
-1. **The Time-Locked Market Vault ("The Budget-Locked Vault")**: Cryptographic pre-authorization on PayPal servers that completely eliminates offline double-spending.
-2. **On-Device Hybrid Voice AI**: Natural speech recognition and audio readout in **Nigerian Pidgin, Yoruba, Igbo, Hausa, and English** that automates inventory deduction and physical cash audits without touching a spreadsheet.
-
----
-
-## ⚡ 2. Core Architectural Pillars
+## How a payment works
 
 ```mermaid
-flowchart TD
-    subgraph OnlineState["Step 1: Online Pre-Authorization (PayPal Cloud)"]
-        User["User App"] -->|"Pre-Auth Lock ₦10,000\n(5 Hours)"| PayPal["PayPal API Gateway"]
-        PayPal -->|"Cryptographic Lock\nHMAC-SHA256 Token"| Vault["Time-Locked Market Vault"]
-    end
-
-    subgraph BlackoutState["Step 2: Blackout Zone (Zero Internet / BLE Mesh)"]
-        Vault -->|"Signed Offline Voucher\n-₦2,000 for Coke"| Merchant["Merchant (Mama Nkechi)"]
-        Merchant -->|"Natural Voice:\n'Collect 1k for coke'"| SLM["On-Device Hybrid SLM"]
-        SLM -->|"Price-to-Qty Derivation"| Inventory["Stock -2 Bottles\nCash +₦1,000"]
-    end
-
-    subgraph SettlementState["Step 3: Opportunistic Clearinghouse"]
-        Merchant -->|"Either device reconnects\nto internet first"| Clearing["Opportunistic Sync"]
-        Clearing -->|"Transmits Cryptogram"| PayPal
-        PayPal -->|"Settles Funds to Merchant\nAuto-Melts Unspent back to User"| Settle["Final Settlement"]
-    end
+flowchart LR
+    A["1. Customer locks ₦10,000<br/>PayPal places a hold"] --> B["2. Offline: seller shows a QR<br/>with a signed payment request"]
+    B --> C["3. Customer scans, taps Pay<br/>phone signs a voucher"]
+    C --> D["4. Voucher reaches the seller<br/>by Bluetooth, or a second QR"]
+    D --> E["5. Either phone comes online<br/>backend captures from the hold"]
+    E --> F["6. Seller's T-Pay wallet is credited<br/>withdraw to PayPal any time"]
+    E --> G["7. Customer melts the vault<br/>the unspent hold is released"]
 ```
 
-### 1. The Time-Locked Market Vault ("The Big Gun")
-- **Online Pre-Funding**: While connected, the user pre-authorizes an offline shopping budget (e.g., ₦10,000 for 5 or 24 hours). PayPal's cloud places a cryptographic pre-auth hold on the user's balance.
-- **Zero Double-Spend**: Because the funds are locked on PayPal's servers, the user cannot spend that money elsewhere while offline. Every offline spend produces an HMAC-SHA256 voucher verified against the pre-auth.
-- **Opportunistic Clearinghouse**: Whichever peer reconnects to the internet first transmits the cryptogram to PayPal APIs for settlement.
-- **Auto-Melt Guarantee**: When the timer expires, any unspent funds automatically dissolve back into the user's primary PayPal checking account.
-
-### 2. Zero-Literacy Hybrid Voice AI
-- Runs locally offline via **Mobile SLM (Small Language Model)** with online Gemini cloud fallback.
-- Native dialect comprehension for **Nigerian Pidgin, Yoruba, Igbo, Hausa, and English**.
-- **Spoken Audio Readout**: Closes the literacy gap by speaking confirmations, inventory levels, and reconciliation summaries aloud so informal traders never need to read a screen.
-
-### 3. The 3 Specification Demo Personas
-- **Case 1: Mama Nkechi Provisions (Market Trader)**
-  - Natural voice sale: *"Collect 1k for coke"*.
-  - AI calculates price-to-quantity: ₦1,000 ÷ ₦500 unit price = auto-deducts 2 bottles from stock and logs ₦1,000 cash.
-  - Spoken inventory sheet setup: *"Coke, 42 packs, 500 naira for 1; Maltina, 56 packs, 600 for 1"*.
-  - Interactive **End-of-Day Physical Stock Audit & Cash Reconciliation** modal with spoken review.
-- **Case 2: Salary Earner (Personal Budgeting)**
-  - Budgets for Food (₦60k), Transport (₦30k), and Upkeep (₦40k).
-  - *"Send 2k for spag"* auto-categorizes under Food budget with a note.
-  - Conversational ambiguity resolution: *"Send 5k for sneakers"* prompts the user: *"Does this fall under Food, Transport, or Upkeep?"* with 1-tap classification.
-- **Case 3: Morufu Transport (7-Seater Korope Mini-Bus)**
-  - Driver announces *"Collect money from everybody"*.
-  - Proximity Bluetooth BLE mesh sweeps all passenger devices.
-  - Audio alert to driver: *"5 passengers have paid. You have 2 seats left."*
+| Guarantee | How it is enforced |
+| :--- | :--- |
+| Only the customer can create a payment | Vouchers are signed with a P-256 key that never leaves the customer's phone. The backend checks them against the key the customer registered. |
+| No double spending | The money is held by PayPal, the vault certificate states its size, and each voucher has a sequence number. A reused sequence blocks the vault, and so does a total above the hold. |
+| Either side can settle | The seller or the customer can submit a voucher. Resubmitting returns the stored result with no second capture. |
+| Offline sellers still get paid | The hold stays until the customer melts the vault in T-Pay, for up to 28 days. It is renewed every three days, while PayPal still guarantees the money. |
+| AI never moves money | The assistant only proposes. A person confirms on screen, and only the normal signing step can pay. |
 
 ---
 
-## 🏗️ 3. Clean Architecture & Domain-Driven Design (DDD)
+## What is built
 
-The codebase strictly adheres to DDD Clean Architecture in [`shared/src/`](./shared/src/):
-
-```
-shared/src/
-├── banking/              # BankAccount Aggregate, Balance Value Object
-├── escrow/               # Time-Locked Market Vault & Offline Escrow Tokens
-│   ├── domain/           # MarketVault Aggregate Root, Domain Events
-│   ├── application/      # LockMarketVaultUseCase, MeltMarketVaultUseCase
-│   └── infrastructure/   # LocalStorage & PayPal Gateway Adapters
-├── resource-tracking/    # Smart Resource Tracking
-│   ├── merchant/         # InventoryItem Aggregate, Price-to-Quantity derivation
-│   ├── budget/           # MonthlyBudget Aggregate, Ambiguity Resolver
-│   └── transit/          # KoropeTrip Aggregate (7-Seater Manifest)
-├── assistant/            # Hybrid SLM NLP Parser, Speech Synthesis Adapter
-└── __tests__/            # Verification suite (9/9 domain tests passing)
-```
-
-To run the architectural domain verification suite:
-```bash
-cd backend
-npm run test:domain
-```
+| Area | Status |
+| :--- | :--- |
+| Backend API: devices, vaults, vouchers, settlement, melt, wallet, withdrawals, webhooks, history | Done. 509 tests pass, plus 229 API tests on real Postgres. |
+| PayPal sandbox: Orders, authorisation, capture, void, reauthorisation, Payouts, webhooks | Done. Reauthorisation only becomes possible on day four of a real hold, so it hasn't been proven in the sandbox yet. |
+| Gemini assistant (`POST /api/assistant/interpret`) | Done. Live-checked in all five languages, and with prompt-injection attempts. |
+| Offline payment rules, signing, frames for QR and Bluetooth (`shared/`) | Done and tested |
+| Android app (`frontend/`) | Screens are designed. They still run on sample data and aren't wired to the API yet. |
 
 ---
 
-## 🚀 4. Quickstart Guide
+## PayPal and AI used
 
-### Backend
+**PayPal (sandbox).**
+
+| Product | Used for |
+| :--- | :--- |
+| Orders v2, intent `AUTHORIZE` | Locking a vault with the customer's approval |
+| Payments v2: capture, void and reauthorise | Settling vouchers, releasing holds, and keeping holds guaranteed |
+| Webhooks | Capture results, refunds, reversals and voids |
+| Payouts | Sellers withdrawing their T-Pay balance to PayPal |
+
+**AI.** Google Gemini (`gemini-3.5-flash`), called through `@google/genai` on the backend only:
+
+1. The app sends what the person said, as text or recorded audio, plus their language.
+2. Gemini returns a structured proposal, such as "collect ₦1,000" or "pay ₦2,000 for an item".
+3. The backend validates that proposal and refuses any payment above what the vault has left.
+4. The app pre-fills its screen and asks the person to confirm.
+
+The model never sees keys, tokens, balances or signed data. Every call is logged with its outcome, but what the person said isn't logged. With no network, the app falls back to a rule-based assistant, which is labelled as offline assistance.
+
+---
+
+## Repository
+
+```text
+backend/    Node, TypeScript, Express API. PayPal, Postgres, Gemini, settlement and jobs.
+shared/     Payment rules used by both sides: money, signing, certificates, vouchers, frames.
+            No dependencies, so it runs unchanged in Node and React Native.
+frontend/   Expo (React Native) Android app.
+docs/       PRD, API contract, backend and frontend workflows (Markdown, Word and PDF).
+```
+
+The [API contract](docs/T-Pay-API-Contract.md) is the source of truth for every endpoint and offline message.
+
+---
+
+## Run the backend locally
+
+You need **Node 22 or later**, **Docker** (Docker Desktop on Windows), and a **PayPal developer account** with sandbox app credentials.
 
 ```bash
 cd backend
 npm install
-npm start
+cp .env.example .env
 ```
 
-The API runs on port 4000. Copy `backend/.env.example` to `backend/.env` for local settings.
+On Windows, use `copy .env.example .env` instead of `cp`. Then fill in `backend/.env`:
 
-### Web prototype (retired, design reference only)
+1. Run `npm run keys:root` and paste the two lines it prints. This is the T-Pay key that signs device and vault certificates.
+2. Set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`, from developer.paypal.com → Apps & Credentials, in sandbox mode.
+3. Optionally set `GEMINI_API_KEY`. A free key comes from aistudio.google.com → Get API key. Without it, the assistant returns `AI_UNAVAILABLE` and the app uses its offline path.
+
+Start the database, create the tables, then run the API:
 
 ```bash
-cd frontend/web-prototype
-npm install
+npm run db:up
+npm run db:migrate
 npm run dev
 ```
 
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+Open http://localhost:4000/api/health. It should report `"database": "ok"` and `"paypal": "ok"`.
 
-### Mobile app (Expo)
+To check the PayPal sandbox end to end, run `npm run paypal:proof`. You approve one order in the browser, and the script then places a hold, makes two partial captures and releases the rest. If `PAYPAL_PROOF_PAYOUT_EMAIL` is set, it also sends a test payout.
+
+### Environment variables
+
+| Name | Required | Purpose |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | Yes | Postgres connection. Locally, the Docker database on port 5433; in production, Neon. |
+| `ROOT_PRIVATE_KEY`, `ROOT_PUBLIC_KEY` | Yes | Certificate signing key, from `npm run keys:root`. The app ships with the public key. |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Yes | PayPal sandbox app credentials |
+| `PAYPAL_BASE_URL` | Yes | `https://api-m.sandbox.paypal.com` |
+| `PUBLIC_BASE_URL` | Yes | Where PayPal returns the customer after approval. `http://localhost:4000` locally. |
+| `PAYPAL_WEBHOOK_ID` | For webhooks | From the webhook you add in the PayPal app. Until it is set, every webhook is refused. |
+| `GEMINI_API_KEY` | For the assistant | Google AI Studio key |
+| `GEMINI_MODEL` | No | Defaults to `gemini-3.5-flash` |
+| `FX_RATE` | No | Fixed demo rate, in naira per US dollar. Defaults to `1500.00`. |
+| `PORT` | No | Defaults to `4000` |
+
+### Tests
 
 ```bash
-# 1. Navigate to the mobile app directory
-cd frontend
-
-# 2. Install the app's own dependencies
-npm install
-
-# 3. Start the Expo development server
-npm start
-# or: npx expo start --web
+npm test
+npm run test:db
+npm run lint
 ```
 
----
+- `npm test` runs every test, using in-memory storage.
+- `npm run test:db` runs the same suite against the Docker Postgres. It needs `npm run db:up` first, and works on Windows, macOS and Linux.
+- `npm run lint` typechecks the backend and `shared/`.
 
-## 🏆 5. Judge Interactive Demo Walkthrough (5-Minute Tour)
+### Try the API by hand
 
-For hackathon judges evaluating T-Pay:
+Import [`backend/postman/T-Pay.postman_collection.json`](backend/postman/T-Pay.postman_collection.json) into Postman and set `baseUrl`. Registration, vouchers and spend statements must be signed, so generate their bodies with the helper and paste them in:
 
-1. **The Header & Pitch Hub**:
-   - Tap **"🏆 Pitch Hub"** in the top header or hamburger menu.
-   - Explore the **Pitch Deck**, the **3 Live Cases**, the **Vault Architecture**, and the **B2B Strategy**.
-2. **Experience the Market Vault ("The Big Gun")**:
-   - Tap **"🛡️ Vault"** in the top navigation.
-   - Select **₦10,000** budget and **5 Hours** duration.
-   - Tap **"Lock ₦10,000 on PayPal"** to see live countdown, HMAC-SHA256 hash, and PayPal Pre-Auth ID.
-   - Tap **"Simulate Spend ₦2,000 at Mama Nkechi"** to see offline cryptographic voucher creation.
-   - Tap **"Auto-Melt Unspent"** to see unspent funds return to checking balance.
-3. **Experience the 3 Smart Resource Tracker Personas**:
-   - Switch to the **Tracker** tab:
-     - **Mama Nkechi**: Tap *"Collect 1k for coke"* to see price-to-quantity derivation (-2 bottles Coke, +₦1,000 cash). Tap *"Daily Stock Review & Audit"* to hear spoken reconciliation.
-     - **Salary Budget**: Tap *"Send 2k for spag"* to see auto-budget tagging. Tap *"Send 5k for sneakers"* to test conversational ambiguity resolution.
-     - **Morufu Korope**: See the 7-seat mini-bus manifest. Tap *"Collect money from everybody"* to run the Bluetooth proximity sweep and fill the manifest.
-4. **Experience the Multilingual Voice Assistant**:
-   - Long-press the center circular button with opposing half-barb arrows.
-   - Switch dialects between **🇳🇬 Pidgin, 🇬🇧 English, 🇳🇬 Yoruba, 🇳🇬 Igbo, and 🇳🇬 Hausa**.
-   - Tap any voice scenario to trigger audio speech synthesis read aloud.
+```bash
+npm run postman -- device ada
+npm run postman -- voucher ada bola 1 200000
+npm run postman -- statement ada 1 133
+```
+
+Every response carries an `X-Request-Id` header. The same ID appears on that request's lines in the server log.
 
 ---
 
-## 📈 6. Commercial Strategy: Ecosystem to Open B2B Protocol
+## Deploy on Render with Neon
 
-- **Phase 1 (Hackathon Launch)**: Closed-loop ecosystem launch for PayPal wallet holders. Gives T-Pay users exclusive access to the Secure Offline Budget Vault.
-- **
+1. Create a **Web Service** from this repository, with root directory `backend`.
+2. Build command: `npm install`. Start command: `npm run db:migrate && npm start`. Running migrations on every start keeps the database in step with the code, and it is safe to repeat.
+3. Add the environment variables above. `DATABASE_URL` is the Neon connection string, `PUBLIC_BASE_URL` is the Render URL, and `PAYPAL_BASE_URL` stays on the sandbox.
+4. In the PayPal app, add a webhook to `https://<your-render-url>/api/webhooks/paypal` for these events, then set `PAYPAL_WEBHOOK_ID`:
+   - `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.PENDING`
+   - `PAYMENT.CAPTURE.DECLINED`, `PAYMENT.CAPTURE.DENIED`
+   - `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`
+   - `PAYMENT.AUTHORIZATION.VOIDED`
+   - `CHECKOUT.PAYMENT-APPROVAL.REVERSED`
+
 ---
 
-## 📄 License
-MIT © 2026 T-Pay Team.
+## Run the app
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Open it in Expo Go, or build an APK with EAS. The screens currently use sample data from `frontend/src/demo/store.tsx`. That file goes away once the screens are wired to the API.
+
+---
+
+## For judges
+
+> **To complete before submission.** Replace each placeholder below.
+
+| Item | Link |
+| :--- | :--- |
+| Android APK | *APK link to come* |
+| Hosted backend | *Render URL to come* (health check at `/api/health`) |
+| Demo video | *YouTube link to come* |
+| Sandbox test logins | *Customer and seller PayPal sandbox accounts to come* |
+
+**Demo, on two Android phones:**
+
+1. The customer locks a vault with a real PayPal sandbox approval.
+2. Turn on airplane mode on both phones, then turn Bluetooth back on. The phones can reach each other, but not the internet.
+3. The seller says "Abeg collect one thousand", or types it, and shows the payment QR.
+4. The customer scans it, checks the amount, and taps **Pay**. The voucher reaches the seller over Bluetooth. With Bluetooth off, the seller scans a second QR instead.
+5. Both phones show the payment as pending. A payment above the vault's remaining amount is refused, and so is a changed voucher.
+6. Reconnect either phone. The voucher settles automatically, and the PayPal capture ID appears on both phones and in the sandbox.
+7. The customer melts the vault, and the unspent hold is released in PayPal.
+
+---
+
+## Honest limits
+
+- **Sandbox only.** No live PayPal mode, no real money, and no KYC.
+- **Device keys** are protected by Android secure storage (assurance Tier B), not a hardware secure element.
+- **Exchange rate:** one fixed demo rate (`FX_RATE`), not a market rate.
+- **Hold limit:** a vault can wait at most 28 days. After that, PayPal ends the hold whatever T-Pay does.
+- **Offline assistant:** with no network it is rule-based, and it says so.
+- **Gemini free tier:** limited to 5 requests a minute, and Google may use free-tier prompts to improve its products. Use sandbox data only.
+- **Language review:** a native speaker still needs to check the Yoruba, Igbo and Hausa assistant lines.
+
+## Documents
+
+- [Product requirements (PDF)](docs/T-Pay-PRD.pdf) · [Markdown source](docs/T-Pay-PRD.md)
+- [API contract](docs/T-Pay-API-Contract.md)
+- [Backend workflow](docs/T-Pay-Backend-Workflow.md) · [Frontend workflow](docs/T-Pay-Frontend-Workflow.md)
+
+In `docs/`, `npm run docx` rebuilds the Word files and `npm run pdf` rebuilds the PRD PDF.
+
+## License
+
+[MIT](LICENSE) © 2026 T-Pay team
