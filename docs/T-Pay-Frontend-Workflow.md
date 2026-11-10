@@ -2,8 +2,8 @@
 title: T-Pay
 subtitle: Frontend Engineer Workflow
 tagline: Build the Android app one activity at a time
-version: 1.0
-date: 4 November 2026
+version: 1.1
+date: 10 November 2026
 author: T-Pay engineering
 status: Binding for frontend work. Derived from PRD v1.1 and the API contract.
 compact: true
@@ -20,7 +20,7 @@ You own the Android app in `frontend/`. A customer and a merchant use it to comp
 | Offline user flows | Deciding when a voucher is settled |
 | Showing every contract error correctly | Producing contract responses and errors |
 
-**Out of scope:** iOS, Bluetooth before M3 is proven, budgeting and transit screens, the old web prototype, and any endpoint not in the contract.
+**Out of scope:** iOS, NFC, Bluetooth before the QR flow in FE-06 works, budgeting and transit screens, the old web prototype, and any endpoint not in the contract.
 
 ## 2. Stack
 
@@ -33,6 +33,7 @@ You own the Android app in `frontend/`. A customer and a merchant use it to comp
 | Randomness | `expo-crypto` |
 | Signing | `@noble/curves` inside an adapter that implements the shared `ISigner` port |
 | Camera and QR | `expo-camera`, `react-native-qrcode-svg` |
+| Bluetooth | `expo-nearby-connections`, with the Android Nearby devices permission and the system request to turn Bluetooth on |
 | PayPal approval | `expo-web-browser`, deep link scheme `tpay://` |
 | Connectivity | `@react-native-community/netinfo` |
 | Voice | `expo-audio`, `expo-speech`, `expo-speech-recognition` |
@@ -63,7 +64,7 @@ frontend/
       api/                 HTTP client implementing ITPayApi
       crypto/              key store and signer
       storage/             SQLite repositories
-      transport/           QR and copyable code
+      transport/           QR, copyable code and Nearby (Bluetooth)
       speech/              speech adapters
       connectivity/        network adapter
     sync/                  background sync coordinator
@@ -75,8 +76,8 @@ frontend/
 | Principle | What it means here |
 | :--- | :--- |
 | Single responsibility | A screen renders state and sends user intent. A hook coordinates one activity. An adapter talks to one device feature. |
-| Open and closed | Add Nearby Connections as a new `IProximityTransport` adapter. Screens must not change. |
-| Liskov substitution | QR, copy-code and fake transports all behave the same through the port, including failures. |
+| Open and closed | Nearby Connections is added as an `INearbyTransport` adapter. Its channels are `IProximityTransport`s, so the payment hooks send and receive frames the same way. |
+| Liskov substitution | QR, copy-code, Nearby and fake transports all behave the same through `IProximityTransport`, including failures. |
 | Interface segregation | A screen receives only the use case it needs, not the whole container. |
 | Dependency inversion | Features depend on ports from `shared/`. Only `src/composition/` creates concrete adapters. |
 
@@ -113,16 +114,27 @@ The IDs match the API contract. Each activity must show loading, success, empty,
 
 ### 5.3 Offline payment
 
-No activity in this section may wait for a network call. Test each one in airplane mode.
+No activity in this section may wait for a network call. Test each one in airplane mode with Bluetooth turned back on, and again with Bluetooth off to prove the QR fallback.
+
+With Bluetooth there is one scan: the customer scans the merchant's request, and the voucher and receipt travel over Bluetooth. Without it, the voucher and receipt are scanned as QR codes. The [API contract](T-Pay-API-Contract.md) section 5.4 defines the frames and the transport steps.
 
 | ID | Device | Trigger | App steps | Result |
 | :--- | :--- | :--- | :--- | :--- |
-| ACT-06 | Merchant | Enter or speak an amount | Create a signed payment request, show QR and copyable code | Waiting for voucher |
-| ACT-07 | Customer | Scan or paste request | Verify merchant certificate, show amount and merchant, confirm, reserve capacity and sequence, sign, then show voucher | Sent, not yet confirmed; pending debit |
-| ACT-08 | Merchant | Scan or paste voucher | Verify certificates and signature, reject duplicates, save, show pending credit and receipt | Pending credit, or a clear refusal |
-| ACT-09 | Customer | Scan or paste receipt | Verify and save receipt | Delivered |
+| ACT-06 | Merchant | Enter or speak an amount | Check Bluetooth readiness and prompt only for what is missing. Create a signed payment request; if Bluetooth is ready, add a session code from `IRandom.nonce()` and start hosting. Show the request QR and copyable code, and keep a voucher scanner ready | Waiting for voucher |
+| ACT-07 | Customer | Scan or paste request | Decode the frame, verify the merchant certificate, show amount and merchant. If the frame has a session code, prompt only for what is missing and join in the background. On **Pay**, reserve capacity and sequence, sign, then send the voucher frame over Bluetooth, or show the voucher QR | Sent, not yet confirmed; pending debit |
+| ACT-08 | Merchant | Voucher arrives over Bluetooth, or is scanned or pasted | Verify certificates and signature, reject duplicates, save, show pending credit, then send the receipt over the same Bluetooth channel, or show the receipt QR | Pending credit, or a clear refusal |
+| ACT-09 | Customer | Receipt arrives over Bluetooth, or is scanned or pasted | Verify and save receipt | Delivered |
 
-If delivery fails, resend the same voucher bytes. Never sign the same payment again. If the receipt is never scanned, keep the amount reserved and show sent, not confirmed.
+**Bluetooth prompts.** Call `INearbyTransport.readiness()` first. Only when it isn't `READY`, call `requestReady()`, which shows the Android permission prompt, then the system request to turn Bluetooth on. On Android 11 and older, Nearby also needs location services on. A person who already has both never sees a prompt. Never block a payment on the answer.
+
+| Readiness after prompting | Merchant | Customer |
+| :--- | :--- | :--- |
+| `READY` | Add the session code and host | Join, then send over Bluetooth |
+| `NEEDS_PERMISSION`, `BLUETOOTH_OFF` or `UNSUPPORTED` | Show the QR without a session code | Show the voucher QR |
+
+**Fallback.** Abort `join` and show the voucher QR if the channel isn't open within 8 seconds of tapping **Pay**, or if sending fails. On the merchant phone, abort `host` as soon as a voucher is scanned instead. Close every channel when the activity ends.
+
+If delivery fails, resend the same voucher frame, which `encodeFrame` makes identical every time. Never sign the same payment again. If the receipt never arrives, keep the amount reserved and show sent, not confirmed.
 
 ### 5.4 Sync and records
 
@@ -160,6 +172,7 @@ The backend side publishes these interfaces in `shared/`. You provide the Androi
 | `ILocalVoucherRepository` | `SqliteVoucherRepository` |
 | `ISeenVoucherRepository` | `SqliteSeenVoucherRepository` |
 | `IProximityTransport` | `QrTransport`, `CopyCodeTransport` |
+| `INearbyTransport` | `NearbyTransport`, whose `host` and `join` return `IProximityChannel`s |
 | `ITPayApi` | `HttpTPayApi` |
 | `IConnectivity` | `NetInfoConnectivity` |
 | `ISpeechInput` and `ISpeechOutput` | Expo speech adapters |
@@ -250,7 +263,7 @@ Each ticket needs a branch, a pull request, and the activity ID in its title.
 | FE-05 | ACT-01, ACT-02 and ACT-16 | FE-04, BE-05 | 6 Nov |
 | FE-06 | ACT-06 to ACT-09 with QR and copy code, on a fake vault | BE-04, FE-04 | 6–7 Nov |
 | FE-07 | ACT-03 to ACT-05, with PayPal approval and deep link | BE-06 | 7 Nov |
-| FE-08 | Test Nearby for up to half a day; keep QR if it fails | FE-06 | 7 Nov |
+| FE-08 | `NearbyTransport`, Bluetooth prompts and the one-scan flow, with QR fallback. Test for up to half a day on two phones; keep QR only if it fails | FE-06 | 10 Nov |
 | FE-09 | ACT-10 sync coordinator | BE-08 | 8 Nov |
 | FE-10 | ACT-11, ACT-12 and ACT-13, ACT-14 | BE-07, BE-09, BE-10 | 9 Nov |
 | FE-11 | ACT-15 with online and offline paths | BE-11 | 9 Nov |
@@ -265,7 +278,7 @@ Until an endpoint is live, use a fake `ITPayApi` in tests or a development build
 A ticket is done only when:
 
 1. Its activity behaves as specified on a real Android phone.
-2. Offline activities work in airplane mode.
+2. Offline activities work in airplane mode, both with Bluetooth turned back on and with it off.
 3. Loading, empty, offline and failure states are complete.
 4. All strings come from the catalogue.
 5. TypeScript and tests pass.

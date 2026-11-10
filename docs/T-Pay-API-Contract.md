@@ -2,8 +2,8 @@
 title: T-Pay
 subtitle: Activity and API Contract
 tagline: Every endpoint belongs to a screen activity, and every network call is listed here
-version: 1.0
-date: 4 November 2026
+version: 1.1
+date: 10 November 2026
 author: T-Pay engineering
 status: Binding for frontend and backend work. Derived from PRD v1.1.
 compact: true
@@ -38,7 +38,7 @@ P0 must work in the demo. P1 follows only after every P0 activity is verified.
 | ACT-06 | Merchant creates payment request | Merchant | Offline | None | FR-38 | P0 |
 | ACT-07 | Customer reviews, signs and presents voucher | Customer | Offline | None | FR-07, FR-11, FR-13, FR-38 | P0 |
 | ACT-08 | Merchant verifies voucher and presents receipt | Merchant | Offline | None | FR-36 to FR-39 | P0 |
-| ACT-09 | Customer scans receipt | Customer | Offline | None | FR-22, FR-38 | P0 |
+| ACT-09 | Customer receives receipt | Customer | Offline | None | FR-22, FR-38 | P0 |
 | ACT-10 | Background sync and settlement | Both | Reconnect | `POST /vouchers`, `GET /vouchers` | FR-15, FR-23, FR-24, FR-44 | P0 |
 | ACT-11 | Transaction list and detail | Both | Offline first | `GET /vouchers/{id}`, `GET /transactions` when online | FR-20, FR-22 | P0 |
 | ACT-12 | Melt vault | Customer | Online | `POST /vaults/{id}/melt` | FR-09, FR-39 | P0 |
@@ -437,7 +437,7 @@ These are signed objects carried between phones and later to the backend. They a
 | Algorithm | ECDSA P-256 with SHA-256 |
 | Signature | Base64url of raw 64-byte `r‖s` |
 | Envelope | `{ "payload": { ... }, "signature": "base64url" }` |
-| Wire frame | `TPAY1:<TYPE>:<base64url JSON envelope>` for QR and the copyable code |
+| Wire frame | `TPAY1:<TYPE>:<base64url body>`, the same text for QR, the copyable code and Bluetooth. See 5.4. |
 
 ### 5.2 Message types
 
@@ -450,7 +450,7 @@ These are signed objects carried between phones and later to the backend. They a
 | Receipt | Merchant | `TPAY-RECEIPT-V1` | `vaultId`, `sequence`, `voucherHash`, `merchantKeyId`, `receivedAt` |
 | Spend statement | Customer | `TPAY-STATEMENT-V1` | `vaultId`, `lastSequence`, `totalIssuedUsdMinor`, `issuedAt` |
 
-A voucher frame also carries the customer's device certificate and vault certificate.
+A voucher frame also carries the customer's device certificate and vault certificate. Section 5.4 lists exactly what each frame holds.
 
 
 
@@ -470,6 +470,33 @@ The app shows translated text for each code. These never come from the backend.
 | `WRONG_PAYEE` | The voucher is for another merchant |
 | `DUPLICATE_VOUCHER` | This merchant already accepted this voucher |
 | `SELF_PAYMENT` | A person can't pay their own account |
+| `INVALID_FRAME` | The scanned, pasted or received text isn't a T-Pay code, or it's damaged |
+
+### 5.4 Frames and transport
+
+Phones exchange three frames. Build and read them only with `encodeFrame` and `decodeFrame` from `shared/src/domain/frames.ts`, so every transport sends the same text.
+
+| Frame | Sent by | Body, base64url of canonical JSON | Extra segment |
+| :--- | :--- | :--- | :--- |
+| `TPAY1:REQUEST:<body>[:<sessionCode>]` | Merchant | The signed payment request envelope | Optional Bluetooth session code |
+| `TPAY1:VOUCHER:<body>` | Customer | `{ voucher, customerCertificate, vaultCertificate }`, each a signed envelope | None |
+| `TPAY1:RECEIPT:<body>` | Merchant | The signed receipt envelope | None |
+
+`decodeFrame` checks only the frame's shape and refuses anything else with `INVALID_FRAME`. Signatures and certificates are checked afterwards by `issueVoucher` and `acceptVoucher`. A frame longer than 16,000 characters is refused unread.
+
+**Session code.** The merchant's phone makes it with `IRandom.nonce()`. It is 16 to 64 base64url characters and sits after the body, outside the signed request. It only tells the customer's phone which merchant to join over Bluetooth. A wrong or missing code can stop that path, but it can never change the amount or the payee, because both are signed.
+
+**Transports.** QR and the copyable code always work. Bluetooth, through Nearby Connections, is an upgrade that removes the second and third scans:
+
+| Step | Merchant phone | Customer phone |
+| :--- | :--- | :--- |
+| ACT-06 | Before showing the QR, ask only for what is missing: the Nearby devices permission, then to turn Bluetooth on. If Bluetooth is ready, add the session code and start hosting. | |
+| ACT-07 | | Scan the request. Ask only for what is missing, then join the merchant in the background while the person reviews the payment. On **Pay**, sign the voucher and send the voucher frame over Bluetooth. |
+| ACT-08 | Receive the voucher frame, verify it, save it, and send the receipt frame back over the same connection. | |
+| ACT-09 | | Receive and save the receipt. |
+| Fallback | Keep the voucher scanner open while hosting. | If Bluetooth is refused, is off, or isn't connected within 8 seconds of tapping **Pay**, show the voucher QR instead. |
+
+Bluetooth never blocks a payment, and the backend never knows which transport carried a voucher. `POST /vouchers` is unchanged.
 
 
 
