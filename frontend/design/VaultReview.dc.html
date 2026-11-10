@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Review before PayPal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 44px 20px 24px; background: #F2F3EE; color: #14172B; font-family: 'Noto Sans', sans-serif; display: flex; flex-direction: column; gap: 20px">
+  <div style="display: flex; align-items: center; gap: 4px; margin-left: -12px">
+    <a href="VaultAmount.dc.html" aria-label="Back" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; color: #14172B"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <div style="font-size: 22px; font-weight: 800">Check your vault</div>
+  </div>
+  <div style="background: #FFFFFF; border-radius: 16px; padding: 22px 20px; display: flex; flex-direction: column; gap: 16px">
+    <div style="font-size: 56px; font-weight: 800; line-height: 1; letter-spacing: -1px">₦10,000</div>
+    <div style="font-size: 18px; font-weight: 600">PayPal will hold $6.67</div>
+    <div style="height: 1px; background: #E1E2DA"></div>
+    <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 16px"><span style="color: #4A4F66">Rate</span><span style="font-weight: 600; text-align: right">₦1,500.00 per $1, fixed demo rate</span></div>
+    <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 16px"><span style="color: #4A4F66">Spend by</span><span style="font-weight: 600">24 hours from now</span></div>
+    <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 16px"><span style="color: #4A4F66">Unspent money</span><span style="font-weight: 600; text-align: right">Released when you close the vault</span></div>
+  </div>
+  <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px">
+    <div style="font-size: 16px; font-weight: 500; color: #4A4F66; text-align: center">PayPal sandbox opens next. Nothing is charged until you pay a seller.</div>
+    <a href="VaultActive.dc.html" style="height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #2A2F8F; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none">Continue to PayPal</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

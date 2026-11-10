@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Customer scans receipt</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 44px 20px 24px; background: #14172B; color: #FFFFFF; font-family: 'Noto Sans', sans-serif; display: flex; flex-direction: column; gap: 20px">
+  <div style="font-size: 17px; font-weight: 700; text-align: center; padding-top: 8px">Step 3 of 3: scan the seller's receipt</div>
+  <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center">
+    <div style="width: 330px; height: 330px; box-sizing: border-box; border: 4px solid #FFC53D; border-radius: 20px"></div>
+  </div>
+  <div style="font-size: 17px; font-weight: 500; text-align: center">Your money stays reserved until this is scanned or settled</div>
+  <button style="height: 56px; flex: none; border: 2px solid #FFFFFF; border-radius: 12px; background: transparent; color: #FFFFFF; font-family: inherit; font-size: 18px; font-weight: 700">Paste code instead</button>
+  <a href="CDelivered.dc.html" style="height: 56px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #FFFFFF; color: #14172B; font-size: 18px; font-weight: 700; text-decoration: none">Simulate a valid scan</a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

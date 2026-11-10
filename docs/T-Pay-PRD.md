@@ -3,7 +3,7 @@ title: T-Pay
 subtitle: Product Requirements Document
 tagline: Offline-first payments on a dual-device trust model
 version: 1.1
-date: 4 November 2026
+date: 10 November 2026
 author: T-Pay engineering
 status: Internal — hackathon MVP baseline
 ---
@@ -21,7 +21,7 @@ Version 1.1 narrows the build to one complete customer-to-merchant payment on tw
 | AI | A real model is mandatory under the hackathon rules. It stays an accessibility feature and can never sign or move money. |
 | Merchant trust | A backend-signed device certificate and vault certificate let a phone verify its peer with no network. |
 | Replay rule | The highest-sequence rejection is removed. It would reject honest vouchers arriving out of order. Uniqueness is tracked per vault and sequence. |
-| Closing a vault | Early melt can no longer void vouchers still held by offline merchants. A settlement grace period protects them. |
+| Closing a vault | Early melt can no longer void vouchers still held by offline merchants. The hold stays until the customer melts in T-Pay with every declared voucher settled, or until a day before PayPal's 29-day authorisation expires. |
 | Merchant funds | Captures reach the T-Pay business account, the T-Pay ledger credits the merchant, and sandbox Payouts complete the path if verified. |
 | Fraud claim | Overspending is bounded and detected. T-Pay does not claim that fraud is impossible. |
 
@@ -131,7 +131,7 @@ Recorded so the register cannot quietly grow. Each has a reason, and each is re-
 | Card issuance, savings, yield | Out of the product's stated problem. |
 | iOS build | Two Android phones satisfy the demo. iOS doubles device testing and signing work inside an eight-day window. |
 | Hardware-backed signing keys | Requires a native module. The demo uses Tier B and labels it honestly (see 5.1). |
-| Authorisation reauthorisation | Vault close always falls inside the three-day honor period, so reauthorisation is not needed. |
+| Authorisation reauthorisation | No longer parked. A vault can wait up to 28 days for its customer, so the backend reauthorises the uncaptured amount each time the three-day honor period ends. |
 | On-device language model | Not achievable reliably in eight days across five languages. Offline voice remains rule-based and is labelled so. |
 | Budget and transit on mobile | Both remain tested domain logic. They return to the app only after M10 is signed off. |
 | AG Studio dashboard, Render Workflows | Sponsor prize stretch work. Neither starts before M10 is signed off. |
@@ -245,7 +245,7 @@ Priorities decide what survives the deadline. **P0** must work in the demo. **P1
 | FR-06 | Locking a vault creates a PayPal order with `intent=AUTHORIZE` on the backend, has the payer approve it, and authorises it, producing an authorisation identifier stored with the vault. | Locking opens a real PayPal sandbox approval in an in-app browser and returns to the app; the stored identifier resolves through the PayPal API; no identifier is generated locally. | W-12, G-F05 |
 | FR-07 | A voucher may only be signed if its amount is within the vault's remaining capacity. | Attempting to sign a voucher larger than the remaining capacity is refused before any signature is produced, with the remaining amount stated. | W-11, G-F04 |
 | FR-08 | The vault tracks reserved, settled and remaining capacity separately in settlement-currency minor units, and remaining equals authorised minus reserved minus settled. | After two vouchers and one settlement, the three figures reconcile exactly; a property test over random sequences finds no state where their sum exceeds the authorised amount, and negative amounts are refused. | W-06, W-11 |
-| FR-09 | Melting a vault never voids funds that issued vouchers may need. Melt stops new signing at once; the remaining hold is released only after the customer's signed spend statement shows every issued voucher settled, or at the settle-by time. | Melt with an unsettled declared voucher schedules release at the settle-by time and names the voucher; melt with all vouchers settled releases the hold now and PayPal shows it released. | W-12, G-F15 |
+| FR-09 | Melting a vault never voids funds that issued vouchers may need. Melt stops new signing at once; the remaining hold is released only after the customer's signed spend statement shows every issued voucher settled, or at the settle-by time, a day before PayPal's 29-day authorisation expires. The customer using PayPal outside T-Pay never releases it. | Melt with an unsettled declared voucher schedules release at the settle-by time and names the voucher; melt with all vouchers settled releases the hold now and PayPal shows it released. | W-12, G-F15 |
 | FR-10 | The vault certificate and every voucher record the FX rate and settlement-currency amount, obtained through a single FX port. | The voucher shows the NGN amount, the USD amount and the rate; the rate is fixed at vault lock; the adapter contains no numeric rate literal; the demo rate is labelled as a fixed demo rate. | W-14, G-F08 |
 
 #### 3.4.3 Offline voucher
@@ -307,7 +307,7 @@ Priorities decide what survives the deadline. **P0** must work in the demo. **P1
 
 | ID | Requirement | Acceptance criterion | Closes |
 | :--- | :--- | :--- | :--- |
-| FR-36 | Registration issues a backend-signed device certificate binding key identifier, public key, display name, role and expiry. Both phones verify the peer's certificate against a T-Pay public key pinned in the app. | With networking off, a certificate signed by any other key, or an expired one, is refused and the screen says why. | W-25, G-F14 |
+| FR-36 | Registration issues a backend-signed device certificate binding key identifier, public key, display name and expiry. Both phones verify the peer's certificate against a T-Pay public key pinned in the app. | With networking off, a certificate signed by any other key, or an expired one, is refused and the screen says why. | W-25, G-F14 |
 | FR-37 | Locking a vault issues a backend-signed vault certificate binding vault, device key, authorised amount, FX rate, spend-by time and settle-by time. | With networking off, a merchant phone rejects a voucher with no certificate, with a certificate for another device, past its spend-by time, or above the certificate amount. | W-25, G-F14 |
 | FR-38 | Payment is a three-step exchange: the merchant presents a payment request, the customer returns a signed voucher, and the merchant returns a signed receipt. Delivery retries resend the same bytes and never re-sign. | A completed exchange gives both phones the same voucher; a tampered voucher is rejected; if the receipt is missed, the customer sees sent but unconfirmed and the amount stays reserved. | W-15, G-F09 |
 | FR-39 | The merchant phone records every vault and sequence it accepts and refuses a repeat. | Presenting the same voucher twice to one offline merchant produces one pending credit and a visible duplicate warning. | W-10, G-F03 |
@@ -391,7 +391,7 @@ An exact duplicate is not a state change. The backend returns the stored outcome
 
 ### 3.7 Minimum interface surface
 
-Only what the Android app needs. Every mutating client endpoint is authenticated by device token and idempotent.
+Only what the Android app needs. Every mutating client endpoint is authenticated by device token and idempotent. The API contract in `docs/T-Pay-API-Contract.md` is the binding detail for payloads, errors and the activity that calls each endpoint.
 
 | Method and path | Purpose | Idempotency |
 | :--- | :--- | :--- |
@@ -439,7 +439,7 @@ The consequence is unavoidable and better stated plainly than discovered late: a
 
 The second useful discovery is that PayPal's authorisation model maps onto the vault almost exactly. An order created with `intent=AUTHORIZE`, then authorised, puts a hold on the payer's funds; that authorisation can be captured **partially and repeatedly** while `final_capture` remains false; and the remainder is released by voiding the authorisation. Lock, spend, melt therefore become create-and-authorise, partial capture, void — with PayPal itself enforcing the ceiling rather than trusting our arithmetic.
 
-The caveats are real: an authorisation's honor period is three days and its validity twenty-nine. A voucher whose authorisation has expired must become a blocked state, not a retry that spins forever. This release avoids reauthorisation by closing every vault inside the honor period: spend-by is at most 24 hours after lock, and settle-by is at most 24 hours later.
+The caveats are real: an authorisation's honor period is three days and its validity twenty-nine. A voucher whose authorisation has expired must become a blocked state, not a retry that spins forever. Both phones may stay offline for days, and the customer may open PayPal without opening T-Pay, so a short settle-by would release money that offline merchants are owed. Spend-by stays at most 24 hours after lock. Settle-by is a day before the authorisation expires, at most 28 days after lock. Each time an honor period ends, the backend reauthorises the uncaptured amount, which gives a new authorisation ID with a fresh three-day guarantee.
 
 PayPal states that multiple partial captures must be enabled on the account for PayPal payments. M0 proves partial capture, remaining-hold release and Payouts on the project's sandbox accounts before any dependent code is written.
 
@@ -453,7 +453,7 @@ The third constraint is the payee. The capture request carries amount, invoice i
 | PP-02 | Client identifier and secret exist only in backend environment variables. Clients receive only an identifier where the SDK requires one, never a secret. | Bundle search finds no secret; rotating the secret requires no client release. | developer.paypal.com/api/rest/authentication/ |
 | PP-03 | The OAuth token is cached in memory and refreshed before `expires_in` elapses; one token per settlement is a defect. | A batch of ten settlements produces one token request. | developer.paypal.com/api/rest/authentication/ |
 | PP-04 | The vault is an authorisation: create with `intent=AUTHORIZE`, authorise, then capture partially with `final_capture=false`, recording the voucher identifier as `invoice_id`. | Each settled voucher corresponds to one capture against the vault's authorisation identifier; the sum of captures never exceeds the authorised amount. | developer.paypal.com/v5/checkout/auth-capture |
-| PP-05 | Authorisation lifetime is respected: settle-by falls inside the three-day honor period, and expiry is a blocking state. Reauthorisation is parked. | A simulated expired authorisation produces SETTLEMENT_BLOCKED, not a retry loop; no vault can be created with settle-by beyond 48 hours after lock. | developer.paypal.com/docs/checkout/standard/customize/authorization-honor |
+| PP-05 | Authorisation lifetime is respected: settle-by falls a day before the 29-day authorisation expires, each honor period is renewed by reauthorisation, and expiry is a blocking state. | A simulated expired authorisation produces SETTLEMENT_BLOCKED, not a retry loop; no vault has settle-by beyond 28 days after lock; a vault nobody melts is reauthorised on day three and a day-one voucher settles on day eight. | developer.paypal.com/docs/checkout/standard/customize/authorization-honor |
 | PP-06 | Own the deduplication. The database is the authority keyed on voucher identity; `PayPal-Request-Id` is a UUID bound to the payload hash for a single logical attempt. Assume PayPal remembers it for six hours at most. | A duplicate submitted eight hours later is still deduplicated by our store; the same key is never reused with a different body. | developer.paypal.com/api/rest/reference/idempotency |
 | PP-07 | Reconcile before retry. On timeout or 5xx, read the order or authorisation back before deciding; retry only timeouts and 5xx, with backoff and jitter. | A forced timeout with a completed capture results in one capture and a settled voucher. | developer.paypal.com/api/make-api-requests |
 | PP-08 | Webhooks are the source of truth; polling is a bounded reconciliation fallback. Handlers verify signatures, are idempotent, and accept both decline spellings. | Replaying an event is a no-op; both `PAYMENT.CAPTURE.DECLINED` and `PAYMENT.CAPTURE.DENIED` are handled. | developer.paypal.com/api/rest/webhooks/event-names |
@@ -666,7 +666,7 @@ The list in 1.11 is normative for the whole roadmap. No parked item may be start
 | O-02 | Whether the sandbox supports partial capture, hold release and Payouts as designed | The vault and merchant funds path depend on it | Run PP-16 first; requires a PayPal developer account |
 | O-03 | Which assurance tier the demo presents | Presenting Tier B as hardware would be false | Decided: Tier B, labelled |
 | O-04 | Source of the FX rate | A signed rate implies an audit trail | Proposed: fixed demo rate labelled as such; confirm the number |
-| O-05 | Maximum offline window | Bounded by the honor period and product intent | Proposed: spend-by 24 hours, settle-by 24 hours later, with short durations for the demo |
+| O-05 | Maximum offline window | Bounded by PayPal's 29-day authorisation and product intent | Decided 10 November: spend-by at most 24 hours; settle-by a day before the authorisation expires, at most 28 days after lock |
 | O-06 | The web build's role | The product is an app | Decided: retired as a product surface; remove it after the mobile screens replace it |
 | O-07 | Who absorbs a rejected overspend after launch | Merchants need to know whether an offline pending credit is guaranteed | Proposed for the demo: not guaranteed, with a per-voucher cap; decide a post-hackathon policy |
 | O-08 | Whether the team has two Android phones and one person for each demo role | The video must show the app on the device it was built for | Confirm by 5 November |

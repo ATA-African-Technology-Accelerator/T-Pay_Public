@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vault amount and duration</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 44px 20px 24px; background: #F2F3EE; color: #14172B; font-family: 'Noto Sans', sans-serif; display: flex; flex-direction: column; gap: 18px">
+  <div style="display: flex; align-items: center; gap: 4px; margin-left: -12px">
+    <a href="HomeEmpty.dc.html" aria-label="Back" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; color: #14172B"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <div style="font-size: 22px; font-weight: 800">Lock a vault</div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="font-size: 16px; font-weight: 600; color: #4A4F66">How much to lock?</div>
+    <div style="font-size: 56px; font-weight: 800; line-height: 1.1; letter-spacing: -1px">₦10,000</div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+    <sc-for list="{{presets}}" as="p" hint-placeholder-count="3"><button style="height: 52px; border: 0; border-radius: 12px; background: {{p.bg}}; color: {{p.fg}}; font-family: inherit; font-size: 17px; font-weight: 700">{{p.t}}</button></sc-for>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex-grow: 1">
+    <sc-for list="{{keys}}" as="k" hint-placeholder-count="12"><button aria-label="{{k.a}}" style="border: 0; border-radius: 12px; background: #FFFFFF; color: #14172B; font-family: inherit; font-size: 26px; font-weight: 700">{{k.t}}</button></sc-for>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="font-size: 16px; font-weight: 600; color: #4A4F66">How long can you spend it?</div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{durs}}" as="d" hint-placeholder-count="3"><button style="height: 52px; border: 0; border-radius: 12px; background: {{d.bg}}; color: {{d.fg}}; font-family: inherit; font-size: 17px; font-weight: 700">{{d.t}}</button></sc-for>
+    </div>
+  </div>
+  <a href="VaultReview.dc.html" style="height: 56px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #2A2F8F; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none">Continue</a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const on = { bg: '#2A2F8F', fg: '#FFFFFF' }, off = { bg: '#E7E8F7', fg: '#2A2F8F' };
+    return {
+      presets: [{ t: '₦5,000', ...off }, { t: '₦10,000', ...on }, { t: '₦20,000', ...off }],
+      durs: [{ t: '6 hours', ...off }, { t: '12 hours', ...off }, { t: '24 hours', ...on }],
+      keys: ['1','2','3','4','5','6','7','8','9','00','0','⌫'].map((t) => ({ t, a: t === '⌫' ? 'Delete' : t }))
+    };
+  }
+}
+</script>
+</body>
+</html>
