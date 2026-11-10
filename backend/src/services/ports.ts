@@ -287,6 +287,23 @@ export interface IVoucherRepository {
 }
 
 
+export type AssistantInput =
+  | { kind: 'text'; text: string }
+  | { kind: 'audio'; audioBase64: string; audioMimeType: string };
+
+export interface AssistantModelRequest {
+  input: AssistantInput;
+  language: Language;
+}
+
+// The model only ever sees the person's words and their language: never keys,
+// tokens, balances or signed data. It returns raw output that the backend
+// validates before anything reaches a person. Throws AI_UNAVAILABLE when unreachable.
+export interface IAssistantModel {
+  interpret(request: AssistantModelRequest): Promise<unknown>;
+}
+
+
 export type WithdrawalStatus = PayoutStatus;
 
 export interface Withdrawal {

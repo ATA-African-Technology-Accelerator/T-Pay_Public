@@ -1,3 +1,4 @@
+import { DEFAULT_GEMINI_MODEL, GeminiAssistantModel } from '../adapters/ai/GeminiAssistantModel';
 import { NodeP256Signer } from '../adapters/crypto/NodeP256Signer';
 import { PayPalGateway } from '../adapters/paypal/PayPalGateway';
 import { createPool, isDatabaseReachable } from '../adapters/persistence/database';
@@ -40,6 +41,11 @@ export function createDependencies(env: NodeJS.ProcessEnv): AppDependencies {
       clientSecret: required(env, 'PAYPAL_CLIENT_SECRET'),
       baseUrl: paypalBaseUrl,
       ...(env.PAYPAL_WEBHOOK_ID ? { webhookId: env.PAYPAL_WEBHOOK_ID } : {}),
+    }),
+    // Optional: without a key the server still runs and the app uses its offline assistant.
+    assistant: new GeminiAssistantModel({
+      apiKey: env.GEMINI_API_KEY || undefined,
+      model: env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
     }),
     checkDatabase: () => isDatabaseReachable(pool),
     paypalMode: paypalBaseUrl.includes('sandbox') ? 'sandbox' : 'live',

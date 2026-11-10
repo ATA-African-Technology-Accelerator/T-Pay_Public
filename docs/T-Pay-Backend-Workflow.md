@@ -187,6 +187,15 @@ A void notice for an authorisation that has already been replaced matches no vau
 5. Log the proposal and validation result, without secrets.
 6. Return a proposal. Never sign or call payment services.
 
+| Part | File |
+| :--- | :--- |
+| Port | `IAssistantModel` in `services/ports.ts`: words or audio, plus the language, in; raw output out |
+| Adapter | `adapters/ai/GeminiAssistantModel.ts`: JSON schema output, temperature 0, 15-second timeout |
+| Service | `services/InterpretRequest.ts`: validates against `modelProposalSchema`, converts naira to kobo, applies capacity, logs |
+| Settings | `GEMINI_API_KEY`, which is optional. Without it the endpoint returns `AI_UNAVAILABLE`. `GEMINI_MODEL` defaults to `gemini-2.5-flash`. |
+
+The model returns whole naira, which is more reliable than kobo. The instruction lists number words for each language, and quotes the request so it can't pose as part of the prompt. The fixed refusal lines in `InterpretRequest.ts`, and the example phrases in the instruction, need a native speaker's review.
+
 ## 8. Tickets
 
 Each ticket needs a branch, a pull request, tests, and the activity or endpoint in its title.

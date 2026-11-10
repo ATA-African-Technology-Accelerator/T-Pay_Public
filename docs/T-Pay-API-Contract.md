@@ -358,7 +358,21 @@ Response `200`:
 
 Allowed intents are `CREATE_PAYMENT_REQUEST`, `PAY_AMOUNT`, `RECORD_SALE`, `CHECK_BALANCE` and `UNKNOWN`. A proposal only pre-fills a screen. A person must confirm it, and only the normal signing activity can sign.
 
-Errors: `AI_UNAVAILABLE`, `VALIDATION_FAILED`.
+| Rule | Detail |
+| :--- | :--- |
+| Authentication | Device token required. No `Idempotency-Key`, because nothing changes. |
+| `text` | 1 to 500 characters |
+| `audioBase64` | Standard base64, at most 1,400,000 characters, which is about a minute of compressed speech. This route alone accepts a body up to 2 MB. |
+| `audioMimeType` | Required with audio, otherwise null: `audio/wav`, `audio/x-wav`, `audio/mp3`, `audio/mpeg`, `audio/aac`, `audio/mp4`, `audio/m4a`, `audio/x-m4a`, `audio/ogg`, `audio/webm`, `audio/flac`, `audio/aiff` or `audio/3gpp` |
+| What the model sees | Only the words or audio, and the language. Never `context`, tokens, keys or vault data. |
+| `amountNgnMinor` | In kobo. Null when no amount was said, so the screen asks for one. Always null for `CHECK_BALANCE` and `UNKNOWN`. |
+| Capacity | A `PAY_AMOUNT` above `context.remainingNgnMinor` is refused |
+
+**Refused answers.** If the model's answer breaks the schema, or proposes a payment above capacity, the response is still `200`, but the proposal is `{ "intent": "UNKNOWN", "amountNgnMinor": null, "itemName": null }`. In that case `spokenReply` is a fixed backend line in the request's language, never the model's words. It says either that the request wasn't understood or that the amount is more than the vault has left. The app treats it like any `UNKNOWN` proposal: it shows and speaks the reply and offers typed input.
+
+Every call is logged with its proposal and outcome: `ACCEPTED`, `REJECTED_INVALID` or `REJECTED_OVER_CAPACITY`. What the person said is not logged.
+
+Errors: `AI_UNAVAILABLE` (no Gemini key is set, or Gemini failed or timed out), `VALIDATION_FAILED`.
 
 ### 4.13 POST /webhooks/paypal
 

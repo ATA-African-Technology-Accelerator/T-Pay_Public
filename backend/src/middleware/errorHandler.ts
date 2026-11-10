@@ -28,6 +28,10 @@ export function errorHandler(
     sendError(response, 'VALIDATION_FAILED', 'The request body is not valid JSON');
     return;
   }
+  if ((error as { type?: string } | null)?.type === 'entity.too.large') {
+    sendError(response, 'VALIDATION_FAILED', 'The request body is too large');
+    return;
+  }
   console.error(error);
   sendError(response, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
 }

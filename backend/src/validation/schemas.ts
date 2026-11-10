@@ -127,6 +127,49 @@ export const withdrawSchema = z
   .strict();
 
 
+// About a minute of compressed speech. Express accepts a larger body on this route only.
+export const MAX_AUDIO_BASE64_LENGTH = 1_400_000;
+export const ASSISTANT_BODY_LIMIT = '2mb';
+const MAX_UTTERANCE_LENGTH = 500;
+const AUDIO_MIME_TYPES = [
+  'audio/wav', 'audio/x-wav', 'audio/mp3', 'audio/mpeg', 'audio/aac', 'audio/mp4', 'audio/m4a',
+  'audio/x-m4a', 'audio/ogg', 'audio/webm', 'audio/flac', 'audio/aiff', 'audio/3gpp',
+] as const;
+
+export const interpretSchema = z
+  .object({
+    text: z.string().trim().min(1).max(MAX_UTTERANCE_LENGTH).nullable(),
+    audioBase64: z.string().min(1).max(MAX_AUDIO_BASE64_LENGTH).regex(/^[A-Za-z0-9+/]+={0,2}$/).nullable(),
+    audioMimeType: z.enum(AUDIO_MIME_TYPES).nullable(),
+    language,
+    context: z.object({ remainingNgnMinor: minorUnits }).strict(),
+  })
+  .strict()
+  .refine(({ audioBase64, text }) => (text === null) !== (audioBase64 === null), {
+    message: 'Send exactly one of text or audioBase64',
+  })
+  .refine(({ audioBase64, audioMimeType }) => (audioBase64 === null) === (audioMimeType === null), {
+    message: 'audioMimeType must be sent with audioBase64, and only then',
+  });
+
+
+// What the model must return. Amounts come back in whole naira, which models
+// handle more reliably than kobo, and are converted by the backend.
+const MAX_SPOKEN_LENGTH = 300;
+const MAX_ITEM_LENGTH = 80;
+export const ASSISTANT_INTENTS = ['CREATE_PAYMENT_REQUEST', 'PAY_AMOUNT', 'RECORD_SALE', 'CHECK_BALANCE', 'UNKNOWN'] as const;
+
+export const modelProposalSchema = z
+  .object({
+    intent: z.enum(ASSISTANT_INTENTS),
+    amountNaira: z.number().int().positive().max(MAX_VAULT_NGN_MINOR / 100).nullable(),
+    itemName: z.string().trim().min(1).max(MAX_ITEM_LENGTH).nullable(),
+    transcript: z.string().trim().max(MAX_UTTERANCE_LENGTH),
+    spokenReply: z.string().trim().min(1).max(MAX_SPOKEN_LENGTH),
+  })
+  .strict();
+
+
 export const paypalWebhookSchema = z.looseObject({
   id: requiredText,
   event_type: requiredText,
