@@ -1,5 +1,6 @@
 // The only place that creates concrete adapters. Features import what they need from here.
 import { AppLock } from '@tpay/shared/application/use-cases/appLock';
+import { loadOnDeviceModel } from '../adapters/ai/onDeviceModel';
 import { HttpTPayApi } from '../adapters/api/httpApi';
 import { NetInfoConnectivity } from '../adapters/connectivity/netInfoConnectivity';
 import { DeviceSigner } from '../adapters/crypto/deviceSigner';
@@ -29,3 +30,5 @@ export const connectivity = new NetInfoConnectivity();
 export const nearby = new NearbyTransport(loadNearbyDriver(), loadRadio());
 export const speechIn = new ExpoSpeechInput();
 export const speechOut = new ExpoSpeechOutput();
+/** The offline assistant model. Nothing is downloaded unless the person asks in Settings. */
+export const localModel = loadOnDeviceModel();

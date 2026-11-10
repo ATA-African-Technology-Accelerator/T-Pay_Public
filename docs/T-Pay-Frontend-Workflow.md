@@ -161,7 +161,7 @@ Only a backend response may set `SETTLED`. The phone must never decide this itse
 | ID | Screen and trigger | App steps | Network | Result |
 | :--- | :--- | :--- | :--- | :--- |
 | ACT-15 | Assistant | Capture speech or text, send it, validate the proposal, pre-fill the screen, ask the person to confirm | `POST /assistant/interpret` | Proposal goes to ACT-06, ACT-07 or ACT-17 |
-| ACT-15 offline | Assistant with no network | Use the shared rule-based parser, or tap and type input | None | Labelled as offline assistance |
+| ACT-15 offline | Assistant with no network | Use the shared rule-based parser. If the person downloaded the offline assistant from Settings, also ask the model on the phone (llama.rn, Qwen2.5 0.5B Instruct) and merge: the rules win where they recognise something, the model fills the gaps, and `checkModelProposal` checks its answer. Tap and type input always work | None | Labelled "AI on your phone" when the model answered, otherwise as offline assistance |
 | ACT-16 | Settings | Change language, view profile, key and assurance tier | `GET /profile`, `PATCH /profile` | Strings and profile update everywhere |
 | ACT-17 | Merchant sale (P1) | Use shared merchant rules and speak stock result | None | Stock updated locally |
 

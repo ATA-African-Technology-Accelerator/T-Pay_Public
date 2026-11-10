@@ -10,7 +10,7 @@ export type Side = 'merchant' | 'customer';
 export type Route =
   | { name: 'splash' } | { name: 'language'; edit?: boolean } | { name: 'details'; edit?: boolean } | { name: 'createPin' } | { name: 'lock' }
   | { name: 'home' } | { name: 'activity' } | { name: 'vault' } | { name: 'speak' } | { name: 'settings' } | { name: 'help' }
-  | { name: 'ledger' } | { name: 'withdraw' }
+  | { name: 'ledger' } | { name: 'withdraw' } | { name: 'offlineAi' }
   | { name: 'receipt'; id: string }
   | { name: 'amount'; mode: 'lock' | 'collect' }
   | { name: 'vaultReview'; amount: number; hours: number } | { name: 'vaultActive' } | { name: 'melt' }

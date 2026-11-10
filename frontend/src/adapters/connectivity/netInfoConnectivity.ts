@@ -10,6 +10,12 @@ export class NetInfoConnectivity implements IConnectivity {
     return online(await NetInfo.fetch());
   }
 
+  /** Big downloads ask first when this is false: mobile data costs people money. */
+  async onWifi(): Promise<boolean> {
+    const s = await NetInfo.fetch();
+    return s.type === 'wifi' || s.type === 'ethernet';
+  }
+
   /** Fires each time the phone goes from offline to online (FR-24, FR-44). */
   onReconnect(listener: () => void): () => void {
     let was: boolean | null = null;

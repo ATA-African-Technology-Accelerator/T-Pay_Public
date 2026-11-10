@@ -23,13 +23,13 @@ const PHRASES: Partial<Record<Language, [AssistantIntent, string[]][]>> = {
   en: [
     ['CREATE_PAYMENT_REQUEST', ['pay me', 'collect', 'receive', 'charge', 'request']],
     ['RECORD_SALE', ['sold', 'sale', 'i sell']],
-    ['CHECK_BALANCE', ['balance', 'how much do i have', 'how much is left', 'my money', 'check']],
+    ['CHECK_BALANCE', ['balance', 'how much do i have', 'how much is left', 'check my money']],
     ['PAY_AMOUNT', ['pay', 'send', 'give']],
   ],
   pcm: [
     ['CREATE_PAYMENT_REQUEST', ['pay me', 'make e pay me', 'collect', 'receive', 'abeg collect']],
     ['RECORD_SALE', ['i don sell', 'i sell', 'sold']],
-    ['CHECK_BALANCE', ['how much i get', 'how much remain', 'wetin remain', 'my money', 'balance', 'check']],
+    ['CHECK_BALANCE', ['how much i get', 'how much remain', 'wetin remain', 'check my money', 'balance']],
     ['PAY_AMOUNT', ['make i pay', 'i wan pay', 'pay', 'send', 'give']],
   ],
 };
@@ -73,12 +73,16 @@ function matchIntent(words: string[], language: Language): AssistantIntent {
 }
 
 
-// "1500", "1,500", "1.5k", "2 thousand"
+// "1500", "1,500", "1.5k", "2 thousand". With several numbers, the largest is the
+// money: "sold 3 loaves for 1500" is 1500, not 3.
 function readDigits(words: string[]): number | null {
-  const index = words.findIndex((word) => /^\d+(\.\d+)?$/.test(word));
-  if (index === -1) return null;
-  const scale = SCALES[words[index + 1] ?? ''] ?? 1;
-  return clamp(Math.round(Number(words[index]) * scale));
+  let best: number | null = null;
+  words.forEach((word, index) => {
+    if (!/^\d+(\.\d+)?$/.test(word)) return;
+    const value = clamp(Math.round(Number(word) * (SCALES[words[index + 1] ?? ''] ?? 1)));
+    if (value !== null && (best === null || value > best)) best = value;
+  });
+  return best;
 }
 
 

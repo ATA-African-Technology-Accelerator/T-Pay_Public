@@ -537,7 +537,7 @@ The merchant accepts a connection only from an endpoint named with the join tag 
 | ACT-08 | `acceptVoucher` |
 | ACT-09 | `acceptReceipt`: the receipt must be signed by the merchant in the request and cover exactly this voucher |
 | ACT-12 | `createSpendStatement`, which refuses sequences that are not exactly 1 to n |
-| ACT-15 offline | `parseOfflineIntent`. English and Pidgin phrases for now, plus digits in every language |
+| ACT-15 offline | `parseOfflineIntent`. English and Pidgin phrases for now, plus digits in every language. With the optional on-phone model, its answer is checked by `checkModelProposal` with the same intent, amount and capacity rules as `POST /assistant/interpret`, and the rules win where they recognise something |
 
 
 

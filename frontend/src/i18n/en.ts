@@ -177,6 +177,28 @@ export const en = {
   notUnderstood: 'I didn’t understand. Tap what you want, or type it.',
   salesLater: 'Recording sales by voice comes in a later version.',
   micDenied: 'T-Pay needs the microphone to hear you. You can type instead.',
+  aiOnPhone: 'AI on your phone. What you say stays on it.',
+  overCapacity: 'That is more than your vault has left. Choose a smaller amount.',
+  getOfflineAi: 'Get the offline assistant in Settings for smarter help with no network.',
+
+  // Offline assistant download (optional, ACT-15 offline)
+  offlineAssistant: 'Offline assistant',
+  offlineAiIntro: 'Understands what you type when there is no network, using AI that runs on your phone.',
+  offlineAiOptional: 'Optional. Without it, simple rules still work.',
+  offlineAiDownload: (size: string) => `Download (${size})`,
+  offlineAiWifi: 'You are on mobile data. This download is large, so Wi-Fi is better.',
+  offlineAiDownloading: (percent: number) => `Downloading ${percent}%`,
+  offlineAiReady: 'Ready. Works with no network.',
+  offlineAiNotDownloaded: 'Not downloaded',
+  offlineAiRemove: 'Remove from phone',
+  offlineAiCancel: 'Stop download',
+  offlineAiDevice: 'This build can’t run it. Install the T-Pay app to use it.',
+  offlineAiMemory: 'This phone doesn’t have enough memory for it. Simple rules still work.',
+  offlineAiSpace: 'Not enough free space. Free some space and try again.',
+  offlineAiNetwork: 'The download stopped. Try again when you have network.',
+  offlineAiDamaged: 'The download was damaged, so it was deleted. Try again.',
+  offlineAiPrivacy: 'Nothing you type is sent anywhere. The model only suggests; you always confirm.',
+  megabytes: (mb: number) => `${mb} MB`,
 
   // Setup, PIN and lock (ACT-01, ACT-02)
   yourDetails: 'Your details', yourName: 'Your name or shop name', nameHint: 'People see this before they pay you',

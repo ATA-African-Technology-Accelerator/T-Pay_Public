@@ -9,7 +9,8 @@ import { useApp } from '../../state/appState';
 import { t } from '../../i18n';
 import { speechIn } from '../../composition';
 import { apiMessage } from '../errors';
-import { interpretSpeech, interpretText, offlineProposal, type Proposal } from './assistant';
+import { interpretSpeech, interpretText, offlineAnswer, type Proposal } from './assistant';
+import { useModelState } from '../settings/offlineAssistant';
 
 type Phase = 'idle' | 'listening' | 'thinking';
 
@@ -20,6 +21,7 @@ export function Speak() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [problem, setProblem] = useState<string | null>(null);
   const pulse = useRef(new Animated.Value(0)).current;
+  const model = useModelState();
 
   useEffect(() => {
     if (phase !== 'listening' || reduce) return;
@@ -33,7 +35,7 @@ export function Speak() {
     setPhase('listening');
     const heard = await speechIn.transcribeOffline(language);
     setPhase('idle');
-    if (heard) nav.go({ name: 'proposal', proposal: offlineProposal(heard, language) });
+    if (heard) nav.go({ name: 'proposal', proposal: await offlineAnswer(heard, language, offline.leftNgn) });
     else nav.go({ name: 'assist' });
   };
 
@@ -61,7 +63,7 @@ export function Speak() {
     <Screen tabsFor="speak" head={<CurvedHeader home title={t.speak} />}>
       <View style={a.speak}>
         <T v="hello" style={a.center} accessibilityLiveRegion="polite">{title}</T>
-        <T v="body" c={color.muted} style={a.center}>{phase === 'listening' ? t.tapToStop : online ? t.saySomething : t.noAiOffline}</T>
+        <T v="body" c={color.muted} style={a.center}>{phase === 'listening' ? t.tapToStop : online ? t.saySomething : model.kind === 'ready' ? t.aiOnPhone : t.noAiOffline}</T>
         <View style={a.micWrap}>
           <Animated.View style={[a.ring, { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 0] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }] }]} />
           <Pressable accessibilityRole="button" accessibilityLabel={phase === 'listening' ? t.tapToStop : t.tapToTalk} accessibilityState={{ busy: phase === 'thinking' }} onPress={() => { void start(); }} style={a.mic}>
@@ -70,6 +72,9 @@ export function Speak() {
         </View>
         {problem && <T v="label" c={color.coral} style={a.center}>{problem}</T>}
         <Button kind="quiet" label={t.typeInstead} onPress={() => nav.go({ name: 'assist' })} />
+        {!online && model.kind === 'absent' && (
+          <Button kind="quiet" label={t.getOfflineAi} onPress={() => nav.go({ name: 'offlineAi' })} />
+        )}
       </View>
     </Screen>
   );
@@ -77,6 +82,7 @@ export function Speak() {
 
 function question(p: Proposal, leftNgn: number): string {
   if (p.spokenReply) return p.spokenReply;
+  if (p.overCapacity) return t.overCapacity;
   switch (p.intent) {
     case 'CREATE_PAYMENT_REQUEST': return p.amountNgnMinor ? t.askCollect(money(p.amountNgnMinor)) : t.askAmount;
     case 'PAY_AMOUNT': return p.amountNgnMinor ? t.askPay(money(p.amountNgnMinor)) : t.askAmount;
@@ -119,7 +125,7 @@ export function ProposalScreen({ proposal }: { proposal: Proposal }) {
       )}
       {proposal.transcript ? <T v="small" c={color.muted}>{`${t.youSaid}: ${proposal.transcript}`}</T> : null}
       <HearIt say={proposal.amountNgnMinor ? `${ask} ${sayNaira(proposal.amountNgnMinor)}` : ask} />
-      {proposal.offline && <T v="small" c={color.muted} style={a.center}>{t.noAiOffline}</T>}
+      {proposal.offline && <T v="small" c={color.muted} style={a.center}>{proposal.onDevice ? t.aiOnPhone : t.noAiOffline}</T>}
     </Screen>
   );
 }

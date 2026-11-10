@@ -28,6 +28,7 @@ import { Ledger, Withdraw } from './features/ledger/ledger';
 import { Assist, ProposalScreen, Speak } from './features/assistant/speak';
 import { SettingsScreen } from './features/settings/settings';
 import { Help } from './features/settings/help';
+import { OfflineAssistant } from './features/settings/offlineAssistant';
 import { SideMenu } from './components/menu';
 import { appLock } from './composition';
 import { catalogueLanguage, t } from './i18n';
@@ -68,6 +69,7 @@ function render(r: Route) {
     case 'assist': return <Assist />;
     case 'settings': return <SettingsScreen />;
     case 'help': return <Help />;
+    case 'offlineAi': return <OfflineAssistant />;
   }
 }
 

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { ChevronRight, Globe, HelpCircle, Lock, ShieldCheck, UserRound } from 'lucide-react-native';
+import { ChevronRight, Cpu, Globe, HelpCircle, Lock, ShieldCheck, UserRound } from 'lucide-react-native';
 import { color, icon, radius, space, touch } from '../../theme/tokens';
 import { Panel, Press, T } from '../../components/ui';
 import { Avatar, CurvedHeader, Screen } from '../../components/shell';
@@ -11,11 +11,13 @@ import { softwareOnly } from '../../adapters/crypto/deviceSigner';
 import { api } from '../../composition';
 import { profileStore } from '../../session/profileStore';
 import { withSession } from '../../session/guard';
+import { modelNote, useModelState } from './offlineAssistant';
 
 /** ACT-16. Read from the phone; when online, the backend's copy wins and is saved here. */
 export function SettingsScreen() {
   const nav = useNav();
   const { name, profile, language, online, reload } = useApp();
+  const model = useModelState();
   useEffect(() => {
     if (!online || !profile) return;
     void withSession(() => api.getProfile()).then(async remote => {
@@ -50,6 +52,7 @@ export function SettingsScreen() {
         <T v="smallStrong" c={color.muted}>{t.account}</T>
         <Row label={t.yourDetails} note={profile?.payoutEmail} Icon={UserRound} onPress={() => nav.go({ name: 'details', edit: true })} />
         <Row label={t.changeLanguage} note={languages[languageCodes.indexOf(language)]} Icon={Globe} onPress={() => nav.go({ name: 'language', edit: true })} />
+        <Row label={t.offlineAssistant} note={modelNote(model)} Icon={Cpu} onPress={() => nav.go({ name: 'offlineAi' })} />
       </View>
       <View style={a.group}>
         <T v="smallStrong" c={color.muted}>{t.security}</T>
