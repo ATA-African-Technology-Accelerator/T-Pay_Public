@@ -1,4 +1,4 @@
-import { Easing } from 'react-native';
+import { Easing, Platform } from 'react-native';
 
 // Every visual value in the app lives here. Screens never hard-code a colour.
 // Dark wallet direction chosen by the owner on 5 Nov 2026. Page, panels and hero blues are sampled from that reference.
@@ -59,6 +59,11 @@ export const type = {
   micro: { fontFamily: font.medium, fontSize: 11, lineHeight: 14 },
   key: { fontFamily: font.medium, fontSize: 24, lineHeight: 30 },
 } as const;
+
+// The app is designed as a phone-width column. On a tablet it stays that width, centred, instead
+// of stretching: a keypad or a button three times as wide is harder to use, not easier.
+// The web preview shows a phone mock-up.
+export const layout = { maxWidth: Platform.OS === 'web' ? 390 : 560 } as const;
 
 export const shadow = {
   card: { shadowColor: color.ink, shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 4 },

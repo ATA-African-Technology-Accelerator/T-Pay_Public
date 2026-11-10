@@ -3,7 +3,7 @@ import {
   AccessibilityInfo, ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, TextProps, View, ViewStyle, StyleProp, useWindowDimensions,
 } from 'react-native';
 import { Volume2 } from 'lucide-react-native';
-import { color, icon, motion, radius, space, touch, type } from '../theme/tokens';
+import { color, icon, layout, motion, radius, space, touch, type } from '../theme/tokens';
 import { catalogueLanguage, t } from '../i18n';
 import { speechOut } from '../composition';
 
@@ -49,7 +49,12 @@ export function when(iso: string | null | undefined, withYear = true): string {
   if (Number.isNaN(d.getTime())) return '';
   return `${d.getDate()} ${MONTHS[d.getMonth()]}${withYear ? ` ${d.getFullYear()}` : ''}, ${two(d.getHours())}:${two(d.getMinutes())}`;
 }
-export const useCardW = () => Math.min(useWindowDimensions().width, 390) - space.md * 2;
+/**
+ * The width the app has to work with. A real phone gives the app its whole width, whatever it
+ * is: 360, 411 or a tablet's. Only the web preview is held to a phone-shaped 390.
+ */
+export const useScreenWidth = () => Math.min(useWindowDimensions().width, layout.maxWidth);
+export const useCardW = () => useScreenWidth() - space.md * 2;
 
 export function Card({ w, h, fill, pill, onPill, pillLabel, children, style }: {
   w: number; h: number; fill: string; pill?: React.ReactNode; onPill?(): void; pillLabel?: string; children?: React.ReactNode; style?: StyleProp<ViewStyle>;
@@ -153,6 +158,11 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
 /** Speaks in the chosen language when the phone has a voice for it, and stays silent otherwise (FR-34). */
 export function speak(text: string) {
   void speechOut.speak(text, catalogueLanguage());
+}
+
+/** The assistant talking: a lifelike voice when online, the phone's voice otherwise. */
+export function speakNaturally(text: string): Promise<void> {
+  return speechOut.speak(text, catalogueLanguage(), true);
 }
 
 export function HearIt({ say }: { say: string }) {

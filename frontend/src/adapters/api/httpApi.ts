@@ -1,8 +1,9 @@
 import { randomUUID } from 'expo-crypto';
 import type { ITPayApi, MutationOptions } from '@tpay/shared/application/ports/api';
 import type {
-  ActiveWalletResponse, AuthorizeVaultResponse, CreateVaultRequest, CreateVaultResponse,
-  CurrentVaultResponse, InterpretRequest, InterpretResponse, ListTransactionsResponse,
+  ActiveWalletResponse, AuthorizeVaultResponse, CompleteDepositResponse, CreateDepositRequest, CreateDepositResponse,
+  CreateVaultRequest, CreateVaultResponse, PayLinkResponse,
+  CurrentVaultResponse, InterpretRequest, InterpretResponse, SpeakRequest, SpeakResponse, ListTransactionsResponse,
   ListVouchersResponse, MeltVaultRequest, MeltVaultResponse, ProfileView, RegisterDeviceRequest,
   RegisterDeviceResponse, SubmitVoucherRequest, SubmitVoucherResponse, UpdateProfileRequest,
   VoucherView, WithdrawRequest, WithdrawResponse,
@@ -10,6 +11,12 @@ import type {
 import type { ApiErrorBody, ErrorCode } from '@tpay/shared/contracts/errors';
 
 const TIMEOUT_MS = 20_000;
+// The first request after the free server has slept takes up to a minute to be answered.
+const WAKE_TIMEOUT_MS = 70_000;
+const RETRY_DELAY_MS = 1_500;
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+// Speech is only worth waiting for briefly: the phone's own voice covers a slow answer.
+const SPEAK_TIMEOUT_MS = 8_000;
 const ASSISTANT_TIMEOUT_MS = 40_000;
 
 /** A refusal from the backend, or `NETWORK` when it couldn't be reached. Screens switch on `code`. */
@@ -21,7 +28,10 @@ export class ApiRequestError extends Error {
 
 // `idempotent` takes the caller's key, kept across retries of one action, or makes one
 // for a single attempt.
-type Options = { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; auth?: boolean; idempotent?: MutationOptions | true; timeoutMs?: number };
+// `retry`: send once more after a dropped connection or "PayPal unavailable". Only for calls
+// that are safe to repeat: reads, registration (the same key always gives the same identity)
+// and anything carrying an Idempotency-Key.
+type Options = { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; auth?: boolean; idempotent?: MutationOptions | true; timeoutMs?: number; retry?: boolean };
 
 /**
  * Talks to the T-Pay backend. Every response is `{ data }`; errors are `{ error: { code } }`.
@@ -31,7 +41,7 @@ export class HttpTPayApi implements ITPayApi {
   constructor(private readonly baseUrl: string, private readonly token: () => Promise<string | null>) {}
 
   registerDevice(request: RegisterDeviceRequest) {
-    return this.call<RegisterDeviceResponse>('/devices/register', { method: 'POST', body: request, auth: false });
+    return this.call<RegisterDeviceResponse>('/devices/register', { method: 'POST', body: request, auth: false, timeoutMs: WAKE_TIMEOUT_MS, retry: true });
   }
   getProfile() { return this.call<ProfileView>('/profile'); }
   updateProfile(request: UpdateProfileRequest) { return this.call<ProfileView>('/profile', { method: 'PATCH', body: request }); }
@@ -45,11 +55,19 @@ export class HttpTPayApi implements ITPayApi {
   meltVault(vaultId: string, request: MeltVaultRequest, options: MutationOptions = {}) {
     return this.call<MeltVaultResponse>(`/vaults/${encodeURIComponent(vaultId)}/melt`, { method: 'POST', body: request, idempotent: options });
   }
-  submitVoucher(request: SubmitVoucherRequest) { return this.call<SubmitVoucherResponse>('/vouchers', { method: 'POST', body: request }); }
+  // Unique on vault and sequence at the backend, so sending it twice is safe.
+  submitVoucher(request: SubmitVoucherRequest) { return this.call<SubmitVoucherResponse>('/vouchers', { method: 'POST', body: request, retry: true }); }
   listVouchers(since?: string) { return this.call<ListVouchersResponse>(`/vouchers${query({ since })}`); }
   getVoucher(voucherId: string) { return this.call<VoucherView>(`/vouchers/${encodeURIComponent(voucherId)}`); }
   listTransactions(since?: string) { return this.call<ListTransactionsResponse>(`/transactions${query({ since })}`); }
   getActiveWallet() { return this.call<ActiveWalletResponse>('/wallet'); }
+  getPayLink() { return this.call<PayLinkResponse>('/wallet/pay-link'); }
+  createDeposit(request: CreateDepositRequest, options: MutationOptions = {}) {
+    return this.call<CreateDepositResponse>('/wallet/deposits', { method: 'POST', body: request, idempotent: options });
+  }
+  completeDeposit(depositId: string, options: MutationOptions = {}) {
+    return this.call<CompleteDepositResponse>(`/wallet/deposits/${encodeURIComponent(depositId)}/complete`, { method: 'POST', body: {}, idempotent: options });
+  }
   withdraw(request: WithdrawRequest, options: MutationOptions = {}) {
     return this.call<WithdrawResponse>('/wallet/withdrawals', { method: 'POST', body: request, idempotent: options });
   }
@@ -58,7 +76,32 @@ export class HttpTPayApi implements ITPayApi {
     return this.call<InterpretResponse>('/assistant/interpret', { method: 'POST', body: request, timeoutMs: ASSISTANT_TIMEOUT_MS });
   }
 
-  private async call<T>(path: string, { method = 'GET', body, auth = true, idempotent, timeoutMs = TIMEOUT_MS }: Options = {}): Promise<T> {
+  // A short clip of the reply read aloud. Changes nothing, so no Idempotency-Key.
+  speak(request: SpeakRequest) {
+    return this.call<SpeakResponse>('/assistant/speak', { method: 'POST', body: request, timeoutMs: SPEAK_TIMEOUT_MS });
+  }
+
+  /** Wakes a sleeping server, and PayPal's login behind it, while the person is still typing. */
+  async warmUp(): Promise<void> {
+    try { await fetch(`${this.baseUrl}/api/health`, { method: 'GET' }); } catch { /* nothing to do: the real call will try again */ }
+  }
+
+  private async call<T>(path: string, options: Options = {}): Promise<T> {
+    const { method = 'GET', idempotent, retry = method === 'GET' || !!idempotent } = options;
+    // One key for every attempt, so a repeated request can never be applied twice.
+    const key = idempotent ? (idempotent !== true && idempotent.idempotencyKey) || randomUUID() : null;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await this.attempt<T>(path, options, key);
+      } catch (e) {
+        const again = retry && attempt < 2 && e instanceof ApiRequestError && (e.code === 'NETWORK' || e.code === 'PAYPAL_UNAVAILABLE');
+        if (!again) throw e;
+        await sleep(RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  private async attempt<T>(path: string, { method = 'GET', body, auth = true, timeoutMs = TIMEOUT_MS }: Options, key: string | null): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (auth) {
@@ -66,7 +109,7 @@ export class HttpTPayApi implements ITPayApi {
       if (!token) throw new ApiRequestError('UNAUTHENTICATED', 'This phone is not registered yet', 401);
       headers.Authorization = `Bearer ${token}`;
     }
-    if (idempotent) headers['Idempotency-Key'] = (idempotent !== true && idempotent.idempotencyKey) || randomUUID();
+    if (key) headers['Idempotency-Key'] = key;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);

@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
 import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
 import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Signal, Wifi, BatteryFull } from 'lucide-react-native';
-import { color, font, icon, motion, radius, space, shadow } from './theme/tokens';
+import { color, font, icon, layout, motion, radius, space, shadow } from './theme/tokens';
 import { T, native, useReduceMotion } from './components/ui';
 import { Nav, NavCtx, Route } from './nav';
 import { Linking } from 'react-native';
@@ -25,14 +26,20 @@ import { Melt, VaultActive, VaultReview, VaultScreen } from './features/vault/va
 import { completeVault, readReturn } from './features/vault/vaultActivities';
 import { Activity, Receipt } from './features/transactions/activity';
 import { Ledger, Withdraw } from './features/ledger/ledger';
+import { AddMoney } from './features/ledger/addMoney';
+import { completeDeposit, readDepositReturn } from './features/ledger/walletActivities';
 import { Assist, ProposalScreen, Speak } from './features/assistant/speak';
 import { SettingsScreen } from './features/settings/settings';
 import { Help } from './features/settings/help';
+import { Stock } from './features/business/stock';
+import { Budget } from './features/business/budget';
 import { OfflineAssistant } from './features/settings/offlineAssistant';
 import { SideMenu } from './components/menu';
-import { appLock } from './composition';
+import { api, appLock } from './composition';
+import { config } from './config';
 import { catalogueLanguage, t } from './i18n';
 import { onRevoked } from './session/guard';
+import { onDoubleVolumeUp } from '../modules/tpay-volume';
 import { startSync } from './sync/syncCoordinator';
 
 // Like a bank app: away for longer than this and the PIN is needed again.
@@ -64,12 +71,15 @@ function render(r: Route) {
     case 'refusal': return <Refusal code={r.code} side={r.side} amount={r.amount} existingId={r.existingId} />;
     case 'ledger': return <Ledger />;
     case 'withdraw': return <Withdraw />;
-    case 'speak': return <Speak />;
-    case 'proposal': return <ProposalScreen proposal={r.proposal} />;
+    case 'addMoney': return <AddMoney />;
+    case 'speak': return <Speak auto={r.auto} />;
+    case 'proposal': return <ProposalScreen proposal={r.proposal} handsFree={r.handsFree} />;
     case 'assist': return <Assist />;
     case 'settings': return <SettingsScreen />;
     case 'help': return <Help />;
     case 'offlineAi': return <OfflineAssistant />;
+    case 'stock': return <Stock />;
+    case 'budget': return <Budget />;
   }
 }
 
@@ -100,11 +110,18 @@ export default function App() {
   }), []);
   const current = useRef<Route['name']>('splash');
   useEffect(() => startSync(), []);
+  // The free server sleeps when idle. Waking it now means setup and the first lock don't wait.
+  useEffect(() => { if (!config.sampleOnly) void api.warmUp(); }, []);
   // DEVICE_REVOKED: this identity is gone, so set the phone up again (contract section 6).
   useEffect(() => onRevoked(() => { setMenu(false); nav.reset({ name: 'language' }); }), []);
   // PayPal's return can arrive as a link if Android closed the in-app browser's caller.
   useEffect(() => {
     const handle = (url: string | null | undefined) => {
+      const paid = url ? readDepositReturn(url) : null;
+      if (paid?.outcome === 'approved') {
+        void completeDeposit(paid.depositId).then(() => { if (!OPEN_ROUTES.includes(current.current)) nav.reset({ name: 'ledger' }); }).catch(() => undefined);
+        return;
+      }
       const back = url ? readReturn(url) : null;
       if (back?.outcome !== 'approved') return;
       void completeVault(back.vaultId).then(() => { if (!OPEN_ROUTES.includes(current.current)) nav.reset({ name: 'vaultActive' }); }).catch(() => undefined);
@@ -113,6 +130,14 @@ export default function App() {
     const sub = Linking.addEventListener('url', e => handle(e.url));
     return () => sub.remove();
   }, []);
+  // Volume Up twice opens the assistant and starts listening, once the app is unlocked. Where the
+  // phone can't do this, or on the screens that already listen, it does nothing.
+  useEffect(() => onDoubleVolumeUp(() => {
+    const here = current.current;
+    if (OPEN_ROUTES.includes(here) || here === 'speak' || here === 'proposal') return;
+    setMenu(false);
+    nav.go({ name: 'speak', auto: true });
+  }), []);
   useEffect(() => {
     let leftAt: number | null = null;
     const sub = AppState.addEventListener('change', async state => {
@@ -137,6 +162,7 @@ export default function App() {
   const top = stack[stack.length - 1];
   current.current = top.r.name;
   return (
+    <SafeAreaProvider>
     <AppStateProvider words={words()}>
       <NavCtx.Provider value={nav}>
         <View style={st.stage}>
@@ -149,6 +175,7 @@ export default function App() {
         </View>
       </NavCtx.Provider>
     </AppStateProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -160,7 +187,7 @@ function words(): HistoryWords {
   const language = catalogueLanguage();
   if (cachedWords?.language !== language) {
     cachedWords = { language, words: {
-      merchant: t.someMerchant, customer: t.someCustomer, locked: t.moneyLocked, released: t.moneyReleased,
+      paymentLink: t.paymentLinkReceived, deposit: t.depositDone, merchant: t.someMerchant, customer: t.someCustomer, locked: t.moneyLocked, released: t.moneyReleased,
       withdrawal: t.withdrawalRequested, withdrawn: t.withdrawn, withdrawalFailed: t.withdrawalFailed,
     } };
   }
@@ -189,7 +216,7 @@ function DeviceChrome() {
 
 const st = StyleSheet.create({
   stage: { flex: 1, backgroundColor: web ? color.stage : color.page, alignItems: 'center', justifyContent: 'center' },
-  phone: { flex: 1, width: '100%', backgroundColor: color.page, overflow: 'hidden', ...(web ? { maxWidth: 390, maxHeight: 844, borderRadius: PREVIEW_CORNER, ...shadow.card } : null) },
+  phone: { flex: 1, width: '100%', maxWidth: layout.maxWidth, backgroundColor: color.page, overflow: 'hidden', ...(web ? { maxHeight: 844, borderRadius: PREVIEW_CORNER, ...shadow.card } : null) },
   status: { position: 'absolute', top: 12, left: 26, right: 22, height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   island: { width: 104, height: 29, borderRadius: radius.pill, backgroundColor: color.black },
   right: { width: 66, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: space.hair },

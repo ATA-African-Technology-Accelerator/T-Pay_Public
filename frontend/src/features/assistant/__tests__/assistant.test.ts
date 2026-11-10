@@ -28,10 +28,12 @@ it('uses the phone model for what the rules can’t read', async () => {
   expect((await mockStore.getMeta<{ source: string; outcome: string }[]>('assistant.log'))?.[0]).toMatchObject({ source: 'phone', outcome: 'ACCEPTED' });
 });
 
-it('lets the rules overrule a model that turned “pay me” into a payment', async () => {
+it('never wakes the model when the rules already understood, so the answer is instant', async () => {
   mockPropose.mockResolvedValue({ intent: 'PAY_AMOUNT', amountNaira: 500, itemName: null });
   expect(await interpretText('make e pay me five hundred', 'pcm', LEFT))
     .toMatchObject({ intent: 'CREATE_PAYMENT_REQUEST', amountNgnMinor: 50_000, onDevice: false });
+  expect(await interpretText('how much I get', 'pcm', LEFT)).toMatchObject({ intent: 'CHECK_BALANCE' });
+  expect(mockPropose).not.toHaveBeenCalled();
 });
 
 it('takes only the amount from the model when the rules know the intent', async () => {
@@ -45,16 +47,15 @@ it('never passes on a payment above what the vault has left', async () => {
   expect(await interpretText('san ẹgbàárùn-ún', 'yo', LEFT)).toMatchObject({ intent: 'UNKNOWN', amountNgnMinor: null, overCapacity: true });
 });
 
-it('falls back to the rules when the model breaks the format', async () => {
-  mockPropose.mockResolvedValue('{"intent":"TRANSFER_ALL","amountNaira":999999,"itemName":null}');
-  expect(await interpretText('collect 2000', 'en', LEFT)).toMatchObject({ intent: 'CREATE_PAYMENT_REQUEST', amountNgnMinor: 200_000, onDevice: false });
-});
-
-it('falls back to the rules when the model is unsure, fails or is slow', async () => {
+it('falls back to the rules when the model breaks the format, is unsure, fails or is slow', async () => {
+  const unreadable = 'gba ẹgbẹ̀rún kan'; // the rules know no Yoruba words, so the model is asked
+  mockPropose.mockResolvedValueOnce('{"intent":"TRANSFER_ALL","amountNaira":999999,"itemName":null}');
+  expect(await interpretText(unreadable, 'yo', LEFT)).toMatchObject({ intent: 'UNKNOWN', onDevice: false });
   mockPropose.mockResolvedValueOnce({ intent: 'UNKNOWN', amountNaira: null, itemName: null });
-  expect(await interpretText('send 300', 'en', LEFT)).toMatchObject({ intent: 'PAY_AMOUNT', amountNgnMinor: 30_000, onDevice: false });
+  expect(await interpretText(unreadable, 'yo', LEFT)).toMatchObject({ intent: 'UNKNOWN', onDevice: false });
   mockPropose.mockRejectedValueOnce(new Error('MODEL_TIMEOUT'));
-  expect(await interpretText('send 300', 'en', LEFT)).toMatchObject({ intent: 'PAY_AMOUNT', onDevice: false });
+  expect(await interpretText(unreadable, 'yo', LEFT)).toMatchObject({ intent: 'UNKNOWN', onDevice: false });
+  expect(mockPropose).toHaveBeenCalledTimes(3);
 });
 
 it('uses only the rules when the model was never downloaded', async () => {

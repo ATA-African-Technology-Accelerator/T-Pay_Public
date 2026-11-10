@@ -1,16 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { AlertCircle, Check, ShieldCheck, Volume2 } from 'lucide-react-native';
+import { AlertCircle, Check, Volume2, Wifi } from 'lucide-react-native';
 import { color, glass, icon, motion, radius, space, touch, type } from '../../theme/tokens';
 import { Aurora } from '../../components/aurora';
 import { Button, Panel, Rise, T, native, speak, useReduceMotion } from '../../components/ui';
 import { BagIcon } from '../../components/icons';
 import { CurvedHeader, Screen } from '../../components/shell';
 import { useNav } from '../../nav';
-import { useApp } from '../../state/appState';
+import { useApp, type AccountKind } from '../../state/appState';
 import { languageCodes, languages, t } from '../../i18n';
 import { ApiRequestError } from '../../adapters/api/httpApi';
-import { softwareOnly } from '../../adapters/crypto/deviceSigner';
 import { api, appLock, keyStore, signer } from '../../composition';
 import { config } from '../../config';
 import { registerDevice } from '../../session/registerDevice';
@@ -84,11 +83,19 @@ export function Language({ edit }: { edit?: boolean }) {
  */
 export function Details({ edit }: { edit?: boolean }) {
   const nav = useNav();
-  const { draft, setDraft, profile, language } = useApp();
+  const { draft, setDraft, profile, language, accountKind, setAccountKind } = useApp();
+  const [kind, setKind] = useState<AccountKind>(edit ? accountKind : 'personal');
   const [name, setName] = useState(edit ? profile?.displayName ?? '' : draft.displayName);
   const [payout, setPayout] = useState(edit ? profile?.payoutEmail ?? '' : draft.payoutEmail);
   const [busy, setBusy] = useState(false);
+  const [slow, setSlow] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // The server may be waking up. Say so, instead of leaving a spinner that looks stuck.
+  useEffect(() => {
+    if (!busy) { setSlow(false); return; }
+    const id = setTimeout(() => setSlow(true), 8_000);
+    return () => clearTimeout(id);
+  }, [busy]);
 
   const finish = async () => {
     setBusy(true); setProblem(null);
@@ -101,6 +108,7 @@ export function Details({ edit }: { edit?: boolean }) {
       }
       await registerDevice(details, { api, signer, keyStore, rootPublicKey: config.rootPublicKey });
       await profileStore.save(details);
+      await setAccountKind(kind);
       if (edit) nav.back(); else nav.reset({ name: 'createPin' });
     } catch (e) {
       setProblem(setupMessage(e));
@@ -123,6 +131,29 @@ export function Details({ edit }: { edit?: boolean }) {
         <TextInput accessibilityLabel={t.payoutEmail} value={payout} onChangeText={setPayout} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" style={o.input} />
         <T v="small" c={color.muted}>{t.payoutHint}</T>
       </View>
+      <View style={o.field}>
+        <T v="label">{t.accountTypeTitle}</T>
+        <View style={{ gap: space.sm }} accessibilityRole="radiogroup">
+          {([['personal', t.accountPersonal, t.accountPersonalHint], ['business', t.accountBusiness, t.accountBusinessHint]] as const).map(([value, title, hint]) => {
+            const on = kind === value;
+            return (
+              <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${title}. ${hint}`} disabled={busy} onPress={() => setKind(value)} style={[o.kind, on && { backgroundColor: color.panelHigh, borderColor: color.blue }]}>
+                <View style={{ flex: 1 }}>
+                  <T v="heading">{title}</T>
+                  <T v="small" c={color.muted}>{hint}</T>
+                </View>
+                {on && <Check size={icon.md} color={color.blue} strokeWidth={2.4} />}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+      {busy && slow && (
+        <Panel style={o.note}>
+          <Wifi size={icon.md} color={color.amber} strokeWidth={1.7} />
+          <T v="small" style={{ flex: 1 }} accessibilityLiveRegion="polite">{t.wakingUp}</T>
+        </Panel>
+      )}
       {problem && (
         <Panel style={o.note}>
           <AlertCircle size={icon.md} color={color.coral} strokeWidth={1.8} />
@@ -130,11 +161,8 @@ export function Details({ edit }: { edit?: boolean }) {
         </Panel>
       )}
       <Panel style={o.note}>
-        <ShieldCheck size={icon.md} color={color.green} strokeWidth={1.7} />
-        <View style={{ flex: 1 }}>
-          <T v="label">{softwareOnly ? t.tierB : t.tierBHardware}</T>
-          <T v="small" c={color.muted}>{t.needsInternetOnce}</T>
-        </View>
+        <Wifi size={icon.md} color={color.blue} strokeWidth={1.7} />
+        <T v="small" c={color.muted} style={{ flex: 1 }}>{t.needsInternetOnce}</T>
       </Panel>
     </Screen>
   );
@@ -159,4 +187,5 @@ const o = StyleSheet.create({
   field: { gap: space.xs },
   input: { ...type.heading, color: color.text, height: touch.field, paddingHorizontal: space.lg, backgroundColor: color.panel, borderRadius: radius.md },
   note: { flexDirection: 'row', alignItems: 'center' },
+  kind: { minHeight: touch.row, padding: space.lg, gap: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: 'transparent', backgroundColor: color.panel, flexDirection: 'row', alignItems: 'center' },
 });

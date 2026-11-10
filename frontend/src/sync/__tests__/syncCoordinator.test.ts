@@ -28,7 +28,7 @@ const mockApi = {
   submitVoucher: jest.fn(),
   listVouchers: jest.fn(async () => ({ items: [], nextCursor: null })),
   getCurrentVault: jest.fn(async () => ({ vault: null })),
-  getActiveWallet: jest.fn(async () => ({ balanceUsdMinor: 0, balanceNgnMinor: 0, pendingNgnMinor: 0, payoutEmail: 'a@example.com', entries: [] })),
+  getActiveWallet: jest.fn(async () => ({ balanceUsdMinor: 0, balanceNgnMinor: 0, pendingNgnMinor: 0, payoutEmail: 'a@example.com', fxRate: '1500.00', entries: [] })),
   listTransactions: jest.fn(async () => ({ items: [], nextCursor: null })),
   meltVault: jest.fn(async (vaultId: string) => ({ vaultId, status: 'CLOSED' as const, releasedAt: mockNow.toISOString(), releaseScheduledFor: null, blockingVoucherIds: [] as string[] })),
 } satisfies Partial<ITPayApi>;
