@@ -184,6 +184,7 @@ describe.each(implementations)('$name repositories', ({ create }) => {
       paypalAuthorizationId: 'AUTH-1',
       spendBy: new Date('2026-11-07T10:00:00.000Z'),
       settleBy: new Date('2026-11-08T10:00:00.000Z'),
+      honorEndsAt: new Date('2026-11-07T22:00:00.000Z'),
     };
 
     beforeAll(async () => {
@@ -230,6 +231,16 @@ describe.each(implementations)('$name repositories', ({ create }) => {
 
       expect(due.map(({ id }) => id)).toContain('vlt_lock');
       expect(early.map(({ id }) => id)).not.toContain('vlt_lock');
+    });
+
+    it('lists vaults whose honor period has ended, until settle-by', async () => {
+      const due = await repositories.vaults.findDueForReauthorization(lock.honorEndsAt);
+      const early = await repositories.vaults.findDueForReauthorization(new Date('2026-11-07T21:59:59.000Z'));
+      const late = await repositories.vaults.findDueForReauthorization(lock.settleBy);
+
+      expect(due.map(({ id }) => id)).toContain('vlt_lock');
+      expect(early.map(({ id }) => id)).not.toContain('vlt_lock');
+      expect(late.map(({ id }) => id)).not.toContain('vlt_lock');
     });
 
     it('frees the device when a pending vault is abandoned, but never an active one', async () => {

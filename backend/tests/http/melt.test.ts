@@ -7,7 +7,7 @@ describe('POST /api/vaults/:id/melt', () => {
   let scenario: Awaited<ReturnType<typeof createPaymentScenario>>;
 
   const vaultRow = () => fixture.vaults.findById(scenario.vaultId);
-  const afterSettleBy = () => new Date(fixture.time.now.getTime() + 49 * HOUR_MS);
+  const afterSettleBy = () => new Date(fixture.time.now.getTime() + 28 * 24 * HOUR_MS + HOUR_MS);
 
   beforeEach(async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -182,6 +182,15 @@ describe('POST /api/vaults/:id/melt', () => {
   });
 
   describe('release job', () => {
+    it('never releases a vault the customer has not melted in T-Pay, even a week later', async () => {
+      fixture.time.now = new Date(fixture.time.now.getTime() + 7 * 24 * HOUR_MS);
+
+      await fixture.jobs.runOnce();
+
+      expect((await vaultRow())?.status).toBe('ACTIVE');
+      expect(fixture.gateway.voidedAuthorizations).toHaveLength(0);
+    });
+
     it('does nothing before settle-by', async () => {
       await scenario.melt(1, 133);
 

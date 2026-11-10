@@ -14,6 +14,7 @@ export interface VaultRow {
   paypal_authorization_id: string | null;
   spend_by: Date | null;
   settle_by: Date | null;
+  honor_ends_at: Date | null;
   declared_last_sequence: number | null;
   declared_total_usd_minor: string | null;
   released_at: Date | null;
@@ -32,6 +33,7 @@ export const toVault = (row: VaultRow): Vault => ({
   paypalAuthorizationId: row.paypal_authorization_id,
   spendBy: row.spend_by,
   settleBy: row.settle_by,
+  honorEndsAt: row.honor_ends_at,
   declaredLastSequence: row.declared_last_sequence,
   declaredTotalUsdMinor: row.declared_total_usd_minor === null ? null : Number(row.declared_total_usd_minor),
   releasedAt: row.released_at,
@@ -92,6 +94,15 @@ export class PostgresVaultRepository implements IVaultRepository {
     return rows.map(toVault);
   }
 
+  public async findDueForReauthorization(now: Date): Promise<Vault[]> {
+    const { rows } = await this.pool.query<VaultRow>(
+      `SELECT * FROM vaults
+       WHERE status IN ('ACTIVE', 'SPEND_CLOSED') AND honor_ends_at <= $1 AND settle_by > $1`,
+      [now],
+    );
+    return rows.map(toVault);
+  }
+
   public async findOpenForDevice(deviceId: string): Promise<Vault | null> {
     const { rows } = await this.pool.query<VaultRow>(
       "SELECT * FROM vaults WHERE device_id = $1 AND status <> 'CLOSED'",
@@ -103,10 +114,10 @@ export class PostgresVaultRepository implements IVaultRepository {
   public async activate(id: string, lock: VaultLock): Promise<Vault | null> {
     const { rows } = await this.pool.query<VaultRow>(
       `UPDATE vaults
-       SET status = 'ACTIVE', paypal_authorization_id = $2, spend_by = $3, settle_by = $4
+       SET status = 'ACTIVE', paypal_authorization_id = $2, spend_by = $3, settle_by = $4, honor_ends_at = $5
        WHERE id = $1 AND status = 'PENDING_APPROVAL'
        RETURNING *`,
-      [id, lock.paypalAuthorizationId, lock.spendBy, lock.settleBy],
+      [id, lock.paypalAuthorizationId, lock.spendBy, lock.settleBy, lock.honorEndsAt],
     );
     return rows[0] ? toVault(rows[0]) : null;
   }

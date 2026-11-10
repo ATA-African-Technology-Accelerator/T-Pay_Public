@@ -8,7 +8,7 @@ const JOB_INTERVAL_MS = 30_000;
 
 
 export function createBackgroundJobs(dependencies: AppDependencies) {
-  const { settlement, vaultRelease, withdrawToPayPal } = createServices(dependencies);
+  const { renewVaultHold, settlement, vaultRelease, withdrawToPayPal } = createServices(dependencies);
   const { clock, vaults } = dependencies;
 
   const guarded = async (name: string, work: () => Promise<void>) => {
@@ -20,6 +20,7 @@ export function createBackgroundJobs(dependencies: AppDependencies) {
   };
 
   const runOnce = async () => {
+    await guarded('hold renewals', () => renewVaultHold.processDue());
     await guarded('voucher retries', () => settlement.retryDue());
     for (const vault of await vaults.findDueForRelease(clock.now())) {
       await guarded(`release ${vault.id}`, () => vaultRelease.release(vault));

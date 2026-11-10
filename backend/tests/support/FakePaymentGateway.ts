@@ -2,7 +2,7 @@ import { ApiError } from '../../src/services/ApiError';
 import type {
   AuthorizeOrderInput, CaptureInput, CaptureResult, CreateOrderInput, FindCaptureInput,
   IPaymentGateway, PaymentAuthorization, PaymentOrder, PayoutInput, PayoutResult, PayoutStatus,
-  VoidResult, WebhookNotification,
+  ReauthorizeInput, ReauthorizeResult, VoidResult, WebhookNotification,
 } from '../../src/services/ports';
 
 export interface RecordedCapture extends CaptureInput {
@@ -23,6 +23,9 @@ export class FakePaymentGateway implements IPaymentGateway {
   public unavailable = false;
   public webhookIsValid = true;
   public voidResult: VoidResult = 'VOIDED';
+  public authorizationExpiresAt: Date | null = null;
+  public readonly reauthorizeCalls: ReauthorizeInput[] = [];
+  public readonly plannedReauthorizations: ReauthorizeResult[] = [];
   private readonly approved = new Set<string>();
 
   public approve(orderId: string): void {
@@ -46,7 +49,14 @@ export class FakePaymentGateway implements IPaymentGateway {
     return {
       authorizationId: `AUTH-${input.orderId}`,
       amountUsdMinor: (this.orders[position] as CreateOrderInput).amountUsdMinor,
+      expiresAt: this.authorizationExpiresAt,
     };
+  }
+
+  public async reauthorize(input: ReauthorizeInput): Promise<ReauthorizeResult> {
+    this.reauthorizeCalls.push(input);
+    return this.plannedReauthorizations.shift()
+      ?? { outcome: 'REAUTHORIZED', authorizationId: `${input.authorizationId}-R${this.reauthorizeCalls.length}` };
   }
 
   public async capture(input: CaptureInput): Promise<CaptureResult> {

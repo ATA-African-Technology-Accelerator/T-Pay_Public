@@ -212,7 +212,7 @@ describe('vault API', () => {
         settledUsdMinor: 0,
         remainingUsdMinor: 667,
         spendBy: new Date(NOW.getTime() + 24 * HOUR_MS).toISOString(),
-        settleBy: new Date(NOW.getTime() + 48 * HOUR_MS).toISOString(),
+        settleBy: new Date(NOW.getTime() + 28 * 24 * HOUR_MS).toISOString(),
         paypalAuthorizationId: 'AUTH-ORDER-1',
       });
     });
@@ -224,7 +224,23 @@ describe('vault API', () => {
       const { vault } = (await authorize(vaultId)).body.data;
 
       expect(vault.spendBy).toBe(new Date(NOW.getTime() + 2 * HOUR_MS).toISOString());
-      expect(vault.settleBy).toBe(new Date(NOW.getTime() + 26 * HOUR_MS).toISOString());
+      expect(vault.settleBy).toBe(new Date(NOW.getTime() + 28 * 24 * HOUR_MS).toISOString());
+    });
+
+    it('waits until a day before PayPal says the hold expires, when that is sooner', async () => {
+      fixture.gateway.authorizationExpiresAt = new Date(NOW.getTime() + 10 * 24 * HOUR_MS);
+
+      const { vault } = (await authorize(await approvedVault())).body.data;
+
+      expect(vault.settleBy).toBe(new Date(NOW.getTime() + 9 * 24 * HOUR_MS).toISOString());
+    });
+
+    it('never waits longer than PayPal’s 29-day hold, whatever expiry PayPal reports', async () => {
+      fixture.gateway.authorizationExpiresAt = new Date(NOW.getTime() + 60 * 24 * HOUR_MS);
+
+      const { vault } = (await authorize(await approvedVault())).body.data;
+
+      expect(vault.settleBy).toBe(new Date(NOW.getTime() + 28 * 24 * HOUR_MS).toISOString());
     });
 
     it('issues a vault certificate signed by the root key', async () => {

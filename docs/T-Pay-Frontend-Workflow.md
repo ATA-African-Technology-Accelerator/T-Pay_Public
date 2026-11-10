@@ -148,6 +148,8 @@ If delivery fails, resend the same voucher frame, which `encodeFrame` makes iden
 
 Only a backend response may set `SETTLED`. The phone must never decide this itself.
 
+**Sending the full vault record.** The backend keeps the PayPal hold until the customer's T-Pay app has reported everything, for up to `settleBy`, about 28 days. So once spend-by has passed and the customer's phone is online, ACT-10 uploads every voucher this phone signed, then starts ACT-12 with no tap, sending the spend statement. The person sees that their unspent money is being released. Opening PayPal on its own never releases the hold. Always show `settleBy` and `paypalAuthorizationId` from the latest backend response, because the authorisation ID changes every three days while the vault waits.
+
 ### 5.5 Voice and settings
 
 | ID | Screen and trigger | App steps | Network | Result |

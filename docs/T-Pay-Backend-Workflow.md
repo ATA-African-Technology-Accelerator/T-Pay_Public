@@ -2,8 +2,8 @@
 title: T-Pay
 subtitle: Backend Workflow
 tagline: Build trusted settlement behind the agreed activities
-version: 1.0
-date: 4 November 2026
+version: 1.1
+date: 10 November 2026
 author: T-Pay engineering
 status: Binding for backend work. Derived from PRD v1.1 and the API contract.
 compact: true
@@ -119,7 +119,7 @@ Offline activities ACT-01, ACT-06 to ACT-09, ACT-16 and ACT-17 have no endpoint.
 | :--- | :--- | :--- |
 | `devices` | `id`, `key_id`, `public_key`, `display_name`, `payout_email`, `revoked_at` | Unique `public_key` |
 | `device_tokens` | `device_id`, `token_hash`, `created_at` | Store only a hash |
-| `vaults` | `id`, `device_id`, `paypal_order_id`, `paypal_authorization_id`, amounts, `fx_rate`, `status`, `spend_by`, `settle_by` | One open vault per device |
+| `vaults` | `id`, `device_id`, `paypal_order_id`, `paypal_authorization_id`, amounts, `fx_rate`, `status`, `spend_by`, `settle_by`, `honor_ends_at` | One open vault per device |
 | `vouchers` | `id`, `vault_id`, `sequence`, `payload_hash`, `payload`, `payer_device_id`, `payee_device_id`, amounts, `status`, `paypal_capture_id`, `attempts`, `next_attempt_at`, `lease_until` | Unique `vault_id, sequence` |
 | `ledger_entries` | `id`, `device_id`, `type`, `amount_usd_minor`, `amount_ngn_minor`, `voucher_id`, `withdrawal_id`, `paypal_capture_id` | Unique `voucher_id, type` and `withdrawal_id, type` |
 | `withdrawals` | `id`, `device_id`, `receiver_email`, amounts, `paypal_batch_id`, `status`, `attempts`, `next_attempt_at` | The `id` is the PayPal `sender_batch_id` |
@@ -156,7 +156,29 @@ Captures on one vault are serialised with a voucher lease taken under the vault 
 
 Release uses a void when nothing has been captured. If captures exist, use the method proven by the PayPal sandbox test.
 
-### 7.3 Assistant
+Nothing else releases a hold early. Both phones can stay offline for days, and the customer may open PayPal without opening T-Pay. So the hold must stay in place until the customer's T-Pay app sends its vouchers and its spend statement.
+
+### 7.3 Keeping the hold
+
+| Rule | Value |
+| :--- | :--- |
+| `spendBy` | Lock time plus the chosen duration, at most 24 hours |
+| `settleBy` | One day before PayPal's authorisation expiry, and never more than 28 days after lock |
+| `honorEndsAt` | Three days after lock, then three days after each reauthorisation |
+
+`RenewVaultHold` runs with the other jobs. For each `ACTIVE` or `SPEND_CLOSED` vault whose `honorEndsAt` has passed and whose `settleBy` hasn't:
+
+1. Lock the vault row. Skip the vault if a capture lease is active, and try again on the next run.
+2. Reauthorise the uncaptured amount, which is authorised minus settled. The `PayPal-Request-Id` is the current authorisation ID plus `-reauthorize`, so a retry can't reauthorise twice.
+3. On success, store the new authorisation ID and set `honorEndsAt` three days ahead. Later captures use the new ID.
+4. If PayPal doesn't answer, try again in an hour. If PayPal refuses, raise `REAUTHORIZATION_FAILED` and try again the next day.
+5. Once everything is captured, clear `honorEndsAt`.
+
+A void notice for an authorisation that has already been replaced matches no vault, so it changes nothing.
+
+**Not yet proven in the sandbox.** PayPal allows reauthorisation only after the first honor period, so the sandbox proof can't run until day four of a real hold. Run it before relying on holds longer than three days. In particular, check reauthorising after a partial capture.
+
+### 7.4 Assistant
 
 1. Accept only `text` or audio.
 2. Send a bounded instruction and the language to Gemini.
@@ -199,6 +221,7 @@ Each ticket needs a branch, a pull request, tests, and the activity or endpoint 
 | PayPal failures | Timeout, 429, 5xx, expired and declined paths reach the right state. |
 | Webhooks | Replay changes nothing, and bad signatures are refused. |
 | Melt | Early melt never releases funds needed by an issued voucher. |
+| Hold | A vault nobody melts stays held for a week. Each honor period ends with a reauthorisation, and a voucher signed on day one settles on day eight. |
 | Assistant | Invalid and over-limit model responses never create a proposal. |
 | Secrets | No secret appears in responses, logs or the app bundle. |
 

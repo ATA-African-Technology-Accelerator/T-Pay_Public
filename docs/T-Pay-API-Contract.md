@@ -179,7 +179,7 @@ Called by ACT-03. Response `200`, with `null` when the device has no locked vaul
       "settledUsdMinor": 0,
       "remainingUsdMinor": 534,
       "spendBy": "2026-11-09T10:00:00Z",
-      "settleBy": "2026-11-10T10:00:00Z",
+      "settleBy": "2026-12-06T10:00:00Z",
       "paypalAuthorizationId": "SANDBOX-ID"
     }
   }
@@ -187,6 +187,10 @@ Called by ACT-03. Response `200`, with `null` when the device has no locked vaul
 ```
 
 The backend sees only submitted vouchers. While offline vouchers exist, the phone's local reserved amount decides what can be signed.
+
+**Spend-by and settle-by.** `spendBy` is when the customer must stop signing, at most 24 hours after lock. `settleBy` is the last moment any voucher can settle. It is one day before PayPal's 29-day authorisation expires, so about 28 days after lock. Until then the hold stays in place, even if neither phone comes back online for a week. It is released earlier only when the customer melts the vault in T-Pay and every declared voucher has settled (4.6).
+
+PayPal guarantees an authorisation for three days. Each time that honor period ends, the backend reauthorises whatever hasn't been captured. That gives a new `paypalAuthorizationId`, so the app must always read the current ID from the backend and never keep the first one.
 
 ### 4.6 POST /vaults/{id}/melt
 
@@ -204,13 +208,15 @@ Response `200`:
     "vaultId": "vlt_123",
     "status": "SPEND_CLOSED",
     "releasedAt": null,
-    "releaseScheduledFor": "2026-11-10T10:00:00Z",
+    "releaseScheduledFor": "2026-12-06T10:00:00Z",
     "blockingVoucherIds": ["vch_456"]
   }
 }
 ```
 
 When nothing blocks release, `status` is `CLOSED`, `releasedAt` is set, and `releaseScheduledFor` is null. `blockingVoucherIds` lists only vouchers the backend has seen, so it can be empty while `status` is `SPEND_CLOSED` if a declared voucher has not arrived yet. Repeating melt is safe, and the first signed statement stands. A blocked vault stays `BLOCKED` until `settleBy`.
+
+Only this call can release a hold before `settleBy`, and only with the customer's signed spend statement. The customer opening PayPal, or simply going quiet, never releases it.
 
 Errors: `VAULT_NOT_FOUND`, `INVALID_SIGNATURE`, `IDEMPOTENCY_CONFLICT`, `PAYPAL_UNAVAILABLE`.
 
