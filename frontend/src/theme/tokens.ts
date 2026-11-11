@@ -29,13 +29,16 @@ export const color = {
   stage: '#000A1A',
   // The logo's own navy. Only the loading screens use it, so the logo sits on its own background.
   brand: '#061A42',
+  // The dark navy the app opens on, before it fills with the logo's blue. Android's own splash uses it too.
+  night: '#000D20',
   black: '#000000',
 } as const;
 
 // Hero glow stops, deepest first. Only Aurora uses these. The edge is the soft white light at the top.
 export const glow = { base: '#000F25', mid: '#160D0E', bright: '#290000', edge: '#F2EEEE' } as const;
 // The body's glow behind the glass cards: maroon light on the dark brown page, with a hint of navy.
-export const bodyGlow = { a: '#3A0606', b: '#290000', c: '#000F25' } as const;
+// The two reds are a few steps brighter than the palette's maroons so the pulse can be seen on a phone.
+export const bodyGlow = { a: '#5A0C0C', b: '#420404', c: '#001A3D' } as const;
 
 // Glass controls that sit on the hero glow.
 export const glass = { fill: 'rgba(255,255,255,0.10)', line: 'rgba(255,255,255,0.22)', lineStrong: 'rgba(255,255,255,0.34)', well: 'rgba(0,13,32,0.35)', tint: 'rgba(228,232,240,0.16)' } as const;
