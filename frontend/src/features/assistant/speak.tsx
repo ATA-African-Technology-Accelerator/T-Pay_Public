@@ -13,6 +13,9 @@ import { interpretSpeech, interpretText, offlineAnswer, type Proposal } from './
 import { useModelState } from '../settings/offlineAssistant';
 
 type Phase = 'idle' | 'listening' | 'thinking';
+// Held at least this long, letting go ends the recording. Shorter is a tap: it starts listening, and
+// a second tap (or silence) ends it.
+const HOLD_MS = 350;
 
 /** `auto` is a volume-button start: it begins listening at once, hands free. */
 export function Speak({ auto = false }: { auto?: boolean }) {
@@ -33,6 +36,22 @@ export function Speak({ auto = false }: { auto?: boolean }) {
     return () => { loop.stop(); pulse.setValue(0); };
   }, [phase, reduce]);
   useEffect(() => () => speechIn.stop(), []);
+  // Press and hold: listening starts as the finger goes down and stops when it lifts.
+  const downAt = useRef(0);
+  const startedByThisPress = useRef(false);
+  const pressIn = () => {
+    downAt.current = Date.now();
+    startedByThisPress.current = phase === 'idle';
+    if (startedByThisPress.current) void start();
+  };
+  const pressOut = () => {
+    if (startedByThisPress.current && Date.now() - downAt.current >= HOLD_MS) speechIn.stop();
+  };
+  const press = () => {
+    // A tap that just started listening keeps listening; a tap while listening stops it.
+    if (startedByThisPress.current) { startedByThisPress.current = false; return; }
+    if (phase === 'listening') speechIn.stop();
+  };
   useEffect(() => { if (auto) void start(); }, []);
 
   const offlinePath = async () => {
@@ -70,7 +89,7 @@ export function Speak({ auto = false }: { auto?: boolean }) {
         <T v="body" c={color.muted} style={a.center}>{phase === 'listening' ? t.tapToStop : online ? t.saySomething : model.kind === 'ready' ? t.aiOnPhone : t.noAiOffline}</T>
         <View style={a.micWrap}>
           <Animated.View style={[a.ring, { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 0] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }] }]} />
-          <Pressable accessibilityRole="button" accessibilityLabel={phase === 'listening' ? t.tapToStop : t.tapToTalk} accessibilityState={{ busy: phase === 'thinking' }} onPress={() => { void start(); }} style={a.mic}>
+          <Pressable accessibilityRole="button" accessibilityLabel={phase === 'listening' ? t.tapToStop : t.tapToTalk} accessibilityState={{ busy: phase === 'thinking' }} accessibilityHint={t.talkHint} onPressIn={pressIn} onPressOut={pressOut} onPress={press} style={a.mic}>
             {phase === 'listening' ? <Square size={icon.lg} color={color.ink} strokeWidth={2} /> : <Mic size={icon.xl} color={color.ink} strokeWidth={1.7} />}
           </Pressable>
         </View>

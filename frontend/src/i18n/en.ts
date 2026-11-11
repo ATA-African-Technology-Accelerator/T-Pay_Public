@@ -225,11 +225,12 @@ export const en = {
   needsInternet: 'This needs internet. Connect and try again.',
 
   // Assistant (ACT-15)
-  listening: 'Listening', tapToTalk: 'Tap and talk', tapToStop: 'Tap when you finish',
+  listening: 'Listening', tapToTalk: 'Hold and talk', tapToStop: 'Let go, or tap, when you finish',
+  talkHint: 'Hold the button while you talk, or tap once to start and once to stop.',
   thinking: 'Thinking',
   saySomething: 'Say what you want to do',
   sayYesOrNo: 'Say yes or no, or tap',
-  heardNothing: 'I did not hear anything. Tap the button and try again.',
+  heardNothing: 'I did not hear anything. Hold the button while you talk, and try again.',
   offlineHelp: 'Offline assistance', noAiOffline: 'Simple rules only. No AI runs offline.',
   whatToDo: 'What do you want to do?',
   typeIt: 'Type it', orTap: 'Or tap', checkMoney: 'Check my money',
