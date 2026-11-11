@@ -531,6 +531,25 @@ Response: `{ "data": { "audioBase64": "UklGR...", "audioMimeType": "audio/wav" }
 
 Errors: `AI_UNAVAILABLE` (no Gemini key, the voice model is not available to the key, or Gemini failed or timed out), `VALIDATION_FAILED`.
 
+### 4.22 POST /vaults/from-wallet
+
+Locks money for offline spending straight from the Online wallet. The money is already collected into T-Pay's PayPal account, so there is no PayPal step: the vault is `ACTIVE` at once and the answer is the same as `POST /vaults/{id}/authorize`. Needs a device token and an `Idempotency-Key`.
+
+Request: `{ "amountNgnMinor": 500000, "durationHours": 24 }`, the same rules as `POST /vaults`.
+
+Response `201`: `{ "data": { "vault": { ..., "fundedBy": "WALLET" }, "vaultCertificate": { ... } } }`
+
+| Rule | |
+|---|---|
+| Balance | The Online wallet must hold the amount in both dollars and naira, or `INSUFFICIENT_BALANCE` (422). Nothing changes. |
+| One open vault | `ACTIVE_VAULT_EXISTS` (409) while another vault is open. A PayPal lock started but never approved is replaced. |
+| Once only | The wallet debit (`VAULT_LOCK`) and the vault are written in one transaction, and the database allows one `VAULT_LOCK` and one `VAULT_RETURN` per vault. |
+| Paying a merchant | A voucher settles with no PayPal capture: the merchant's Online wallet is credited (`CREDIT`) from the locked money. |
+| Closing | On melt, or at settle-by, what was not spent goes back to the Online wallet as `VAULT_RETURN`. Nothing is voided at PayPal. |
+| Settle-by | 28 days, the same as a PayPal vault. No hold renewal. |
+
+`VaultView.fundedBy` is `PAYPAL` or `WALLET` on every vault. Ledger entries add two types: `VAULT_LOCK` (money out of the Online wallet into a vault) and `VAULT_RETURN` (unspent money back).
+
 ## 5. Offline messages
 
 These are signed objects carried between phones and later to the backend. They are created and verified only through `shared/`.
