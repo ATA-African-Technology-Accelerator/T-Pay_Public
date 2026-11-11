@@ -12,7 +12,7 @@ const HOURS = [6, 12, 24];
 
 /**
  * Amount entry, in whole naira. Locking is limited only by what the backend allows,
- * because PayPal holds the money: the Main wallet plays no part.
+ * because PayPal holds the money: the Wallet plays no part.
  */
 export function Amount({ mode }: { mode: 'lock' | 'collect' }) {
   const nav = useNav();

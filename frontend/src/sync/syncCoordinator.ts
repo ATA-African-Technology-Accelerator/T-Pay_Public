@@ -22,14 +22,14 @@ const IDLE_LOOK_MS = 20_000;
 const MAX_PAGES = 10;
 // An Add money checkout nobody approved within a day is let go: PayPal has dropped it by then.
 const DEPOSIT_GIVE_UP_MS = 24 * 60 * 60 * 1000;
-// Money that lands in the Main wallet and is worth telling the person about.
+// Money that lands in the Wallet and is worth telling the person about.
 const ARRIVALS: LedgerEntry['type'][] = ['CREDIT', 'DEPOSIT', 'PAYMENT_LINK'];
 
-export type Arrival = { kind: LedgerEntry['type']; amountNgnMinor: number };
+export type Arrival = { kind: LedgerEntry['type'] | 'CASHED_OUT'; amountNgnMinor: number };
 type ArrivalListener = (arrivals: Arrival[]) => void;
 const arrivalListeners = new Set<ArrivalListener>();
 
-/** Called with the money that has just landed in the Main wallet, after a sync. */
+/** Called with the money that has just landed in the Wallet, after a sync. */
 export function onMoneyArrived(listener: ArrivalListener): () => void {
   arrivalListeners.add(listener);
   return () => { arrivalListeners.delete(listener); };
@@ -157,7 +157,9 @@ export async function refreshWallet() {
   // everything would look new.
   if (before) {
     const seen = new Set(before.entries.map(e => e.entryId));
-    const arrived = wallet.entries.filter(e => !seen.has(e.entryId) && ARRIVALS.includes(e.type)).map(e => ({ kind: e.type, amountNgnMinor: e.amountNgnMinor }));
+    const arrived: Arrival[] = wallet.entries
+      .filter(e => !seen.has(e.entryId) && (ARRIVALS.includes(e.type) || (e.type === 'WITHDRAWAL' && e.autoCashOut)))
+      .map(e => ({ kind: e.type === 'WITHDRAWAL' ? 'CASHED_OUT' : e.type, amountNgnMinor: e.amountNgnMinor }));
     if (arrived.length) arrivalListeners.forEach(listener => listener(arrived));
   }
   const items: TransactionView[] = [];

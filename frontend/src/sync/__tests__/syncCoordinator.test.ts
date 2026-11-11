@@ -162,6 +162,18 @@ describe('money that adds itself', () => {
     expect(heard).toEqual([[{ kind: 'CREDIT', amountNgnMinor: 5_000_00 }]]);
   });
 
+  it('announces money T-Pay sent on to PayPal by itself, but not withdrawals the person made', async () => {
+    const heard: unknown[] = [];
+    const off = onMoneyArrived(arrivals => heard.push(arrivals));
+    await mockStore.setMeta(WALLET, wallet([]));
+    mockApi.getActiveWallet.mockResolvedValueOnce(wallet([{ ...entry('led_auto', 'WITHDRAWAL', 2_000_00), autoCashOut: true }, entry('led_mine', 'WITHDRAWAL', 1_000_00)]) as never);
+
+    await syncNow();
+    off();
+
+    expect(heard).toEqual([[{ kind: 'CASHED_OUT', amountNgnMinor: 2_000_00 }]]);
+  });
+
   it('announces nothing on the very first look, when everything would seem new', async () => {
     const heard: unknown[] = [];
     const off = onMoneyArrived(arrivals => heard.push(arrivals));

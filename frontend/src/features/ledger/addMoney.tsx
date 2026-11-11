@@ -27,7 +27,7 @@ type Stage =
   | { kind: 'pending'; amountNgn: number };
 
 /**
- * Add money: the person pays with PayPal and the dollars are captured into the Main wallet.
+ * Add money: the person pays with PayPal and the dollars are captured into the Wallet.
  * The wallet is credited by the backend, once, only after PayPal confirms the capture.
  */
 export function AddMoney() {

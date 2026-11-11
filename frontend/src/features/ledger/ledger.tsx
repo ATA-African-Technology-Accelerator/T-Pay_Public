@@ -21,7 +21,7 @@ import { api } from '../../composition';
 import { withSession } from '../../session/guard';
 import { withdraw } from './walletActivities';
 
-const word = (e: LedgerEntry) => ({ CREDIT: t.ledgerCredit, PAYMENT_LINK: t.ledgerPaymentLink, DEPOSIT: t.ledgerDeposit, WITHDRAWAL: t.ledgerWithdrawal, REVERSAL: t.ledgerReversal, WITHDRAWAL_RETURNED: t.ledgerReturned, VAULT_LOCK: t.ledgerVaultLock, VAULT_RETURN: t.ledgerVaultReturn })[e.type];
+const word = (e: LedgerEntry) => e.type === 'WITHDRAWAL' && e.autoCashOut ? t.ledgerAutoCashOut : ({ CREDIT: t.ledgerCredit, PAYMENT_LINK: t.ledgerPaymentLink, DEPOSIT: t.ledgerDeposit, WITHDRAWAL: t.ledgerWithdrawal, REVERSAL: t.ledgerReversal, WITHDRAWAL_RETURNED: t.ledgerReturned, VAULT_LOCK: t.ledgerVaultLock, VAULT_RETURN: t.ledgerVaultReturn })[e.type];
 const out = (e: LedgerEntry) => e.type === 'WITHDRAWAL' || e.type === 'REVERSAL' || e.type === 'VAULT_LOCK';
 
 /** Anyone with the link can pay this account by PayPal. The link is the same every time. */
@@ -103,7 +103,7 @@ export function Ledger() {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /**
- * ACT-14. Money leaves the Main wallet for a PayPal email: the account's own, or anyone's.
+ * ACT-14. Money leaves the Wallet for a PayPal email: the account's own, or anyone's.
  * The person types an amount in naira; the exchange rate comes with the wallet.
  */
 export function Withdraw() {

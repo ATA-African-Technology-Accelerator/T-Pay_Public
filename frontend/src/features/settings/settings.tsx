@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { ChevronRight, Cpu, Globe, HelpCircle, Lock, ShieldCheck, UserRound } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Switch, View } from 'react-native';
+import { ChevronRight, Cpu, Globe, HelpCircle, Lock, Send, ShieldCheck, UserRound } from 'lucide-react-native';
 import { color, icon, radius, space, touch } from '../../theme/tokens';
 import { Panel, Press, T } from '../../components/ui';
 import { Avatar, CurvedHeader, Screen } from '../../components/shell';
@@ -8,19 +8,41 @@ import { useNav } from '../../nav';
 import { useApp } from '../../state/appState';
 import { languageCodes, languages, t } from '../../i18n';
 import { softwareOnly } from '../../adapters/crypto/deviceSigner';
-import { api } from '../../composition';
+import { api, store } from '../../composition';
 import { profileStore } from '../../session/profileStore';
 import { withSession } from '../../session/guard';
 import { modelNote, useModelState } from './offlineAssistant';
+
+const CASH_OUT = 'ui.autoCashOut';
 
 /** ACT-16. Read from the phone; when online, the backend's copy wins and is saved here. */
 export function SettingsScreen() {
   const nav = useNav();
   const { name, profile, language, online, reload } = useApp();
   const model = useModelState();
+  // Whether money received offline goes on to PayPal by itself. The server holds the choice; the
+  // phone keeps the last answer so it can show it with no network.
+  const [cashOut, setCashOut] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { void store.getMeta<boolean>(CASH_OUT).then(v => { if (v !== null) setCashOut(v); }); }, []);
+  const changeCashOut = async (on: boolean) => {
+    const before = cashOut;
+    setCashOut(on); setSaving(true);
+    try {
+      const saved = await withSession(() => api.updateProfile({ autoCashOut: on }));
+      setCashOut(saved.autoCashOut);
+      await store.setMeta(CASH_OUT, saved.autoCashOut);
+    } catch {
+      setCashOut(before);
+    } finally {
+      setSaving(false);
+    }
+  };
   useEffect(() => {
     if (!online || !profile) return;
     void withSession(() => api.getProfile()).then(async remote => {
+      setCashOut(remote.autoCashOut);
+      await store.setMeta(CASH_OUT, remote.autoCashOut);
       const next = { displayName: remote.displayName, language: profile.language, payoutEmail: remote.payoutEmail };
       if (next.displayName !== profile.displayName || next.payoutEmail !== profile.payoutEmail) {
         await profileStore.save(next);
@@ -53,6 +75,18 @@ export function SettingsScreen() {
         <Row label={t.yourDetails} note={profile?.payoutEmail} Icon={UserRound} onPress={() => nav.go({ name: 'details', edit: true })} />
         <Row label={t.changeLanguage} note={languages[languageCodes.indexOf(language)]} Icon={Globe} onPress={() => nav.go({ name: 'language', edit: true })} />
         <Row label={t.offlineAssistant} note={modelNote(model)} Icon={Cpu} onPress={() => nav.go({ name: 'offlineAi' })} />
+        <View style={a.setting}>
+          <View style={a.rowIcon}><Send size={icon.md} color={color.text} strokeWidth={1.7} /></View>
+          <View style={{ flex: 1, paddingVertical: space.sm }}>
+            <T v="label">{t.autoCashOut}</T>
+            <T v="small" c={color.muted}>{online ? t.autoCashOutNote : t.autoCashOutOffline}</T>
+          </View>
+          <Switch
+            accessibilityLabel={t.autoCashOut} accessibilityHint={t.autoCashOutNote}
+            value={cashOut ?? true} disabled={!online || saving} onValueChange={on => { void changeCashOut(on); }}
+            trackColor={{ false: color.panelHigh, true: color.green }} thumbColor={color.white}
+          />
+        </View>
       </View>
       <View style={a.group}>
         <T v="smallStrong" c={color.muted}>{t.security}</T>

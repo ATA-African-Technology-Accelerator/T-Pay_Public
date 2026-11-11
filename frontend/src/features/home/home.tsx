@@ -70,14 +70,14 @@ function OfflineAiOffer() {
   );
 }
 
-/** One home for everyone. The same person pays from the Offline vault and collects into the Main wallet. */
+/** One home for everyone. The same person pays from the Offline vault and collects into the Wallet. */
 export function HomeScreen() {
   const nav = useNav();
   const { name, offline, active, history, wallet, setWallet, pendingVault, withdrawal, withdrawalOpen, online, lastSyncAt, sync, accountKind, vault: lockedVault } = useApp();
   const business = accountKind === 'business';
   // Home is where people look for news, so it asks for it: right after setup and each unlock.
   React.useEffect(() => { void sync(); }, []);
-  // A business gets paid into the main wallet, so that is the page it opens on, once per visit to the app.
+  // A business gets paid into the Wallet, so that is the page it opens on, once per visit to the app.
   React.useEffect(() => { if (business && !openedOnMain) { openedOnMain = true; setWallet('active'); } }, [business]);
   const lockMoney = () => nav.go({ name: 'amount', mode: 'lock' });
   const pay: HeroAction = { label: t.pay, icon: <ArrowUp {...ic} />, onPress: () => nav.go({ name: 'scan', kind: 'request' }) };

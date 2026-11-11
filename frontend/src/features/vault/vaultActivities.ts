@@ -1,5 +1,5 @@
 // ACT-03, ACT-04, ACT-05 and ACT-12. One open vault at a time; PayPal holds the money,
-// so lock amounts come from PayPal, not from the Main wallet.
+// so lock amounts come from PayPal, not from the Wallet.
 import * as WebBrowser from 'expo-web-browser';
 import { createSpendStatement } from '@tpay/shared/application/use-cases/createSpendStatement';
 import type { MeltVaultResponse, VaultView } from '@tpay/shared/contracts/api';
@@ -95,7 +95,7 @@ export async function completeVault(vaultId: string): Promise<AppVault> {
 }
 
 /**
- * Locks money from the Main wallet: the money is already collected, so there is no PayPal step and
+ * Locks money from the Wallet: the money is already collected, so there is no PayPal step and
  * the vault is ready at once. The key is kept for a retry so a lost answer never locks twice.
  */
 export async function lockFromWallet(amountNgnMinor: number, durationHours: number, idempotencyKey: string): Promise<AppVault> {

@@ -9,7 +9,16 @@ import { t } from '../i18n';
 
 const SHOW_MS = 4500;
 
-function sentence(arrivals: Arrival[]): string {
+function sentence(all: Arrival[]): string {
+  const out = all.filter(a => a.kind === 'CASHED_OUT');
+  const arrivals = all.filter(a => a.kind !== 'CASHED_OUT');
+  const sent = out.length ? t.cashedOut(money(out.reduce((sum, a) => sum + a.amountNgnMinor, 0))) : '';
+  if (!arrivals.length) return sent;
+  const came = received(arrivals);
+  return sent ? `${came}. ${sent}` : came;
+}
+
+function received(arrivals: Arrival[]): string {
   if (arrivals.length > 1) {
     return t.arrivedMany(money(arrivals.reduce((sum, a) => sum + a.amountNgnMinor, 0)), arrivals.length);
   }
@@ -19,7 +28,7 @@ function sentence(arrivals: Arrival[]): string {
   return t.arrivedReceived(money(only.amountNgnMinor));
 }
 
-/** Slides in at the top when money lands in the Main wallet after a sync, then goes by itself. */
+/** Slides in at the top when money lands in the Wallet after a sync, then goes by itself. */
 export function ArrivalBanner() {
   const inset = useInset();
   const reduce = useReduceMotion();
