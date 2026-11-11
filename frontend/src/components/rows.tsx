@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { color, icon, motion, radius, space } from '../theme/tokens';
-import { Press, Rise, Skeleton, T, money, when } from './ui';
+import { OfflineTag, Press, Rise, Skeleton, T, money, when } from './ui';
 import { BagIcon, CoinPlusIcon, HandCoinIcon } from './icons';
 import { Entry, Status, useApp } from '../state/appState';
 import { useNav } from '../nav';
@@ -32,13 +32,14 @@ export function ActivityRows({ rows }: { rows: Entry[] }) {
         return (
           <Rise key={e.id} delay={Math.min(i, 6) * motion.stagger}>
             <Press
-              accessibilityRole="button" accessibilityLabel={`${e.who}, ${money(e.amount)}, ${t.status[e.status]}`} accessibilityHint={t.receipt}
+              accessibilityRole="button" accessibilityLabel={`${e.who}, ${money(e.amount)}, ${t.status[e.status]}${e.voucher ? `, ${t.offlineTag}` : ''}`} accessibilityHint={t.receipt}
               onPress={() => nav.go({ name: 'receipt', id: e.id })} style={r.row}
             >
               <View style={r.mark}><k.Icon size={icon.md} c={k.word} w={1.7} /></View>
               <View style={{ flex: 1 }}>
                 <T v="label" numberOfLines={2}>{e.who}</T>
                 <T v="small" c={color.muted} numberOfLines={1}>{when(e.at)}</T>
+                {e.voucher && <OfflineTag />}
               </View>
               <View style={{ alignItems: 'flex-end', gap: space.hair }}>
                 <T v="label" style={r.nums}>{signed(e)}</T>

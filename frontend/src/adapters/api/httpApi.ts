@@ -51,6 +51,9 @@ export class HttpTPayApi implements ITPayApi {
   authorizeVault(vaultId: string, options: MutationOptions = {}) {
     return this.call<AuthorizeVaultResponse>(`/vaults/${encodeURIComponent(vaultId)}/authorize`, { method: 'POST', body: {}, idempotent: options });
   }
+  lockFromWallet(request: CreateVaultRequest, options: MutationOptions = {}) {
+    return this.call<AuthorizeVaultResponse>('/vaults/from-wallet', { method: 'POST', body: request, idempotent: options });
+  }
   getCurrentVault() { return this.call<CurrentVaultResponse>('/vaults/current'); }
   meltVault(vaultId: string, request: MeltVaultRequest, options: MutationOptions = {}) {
     return this.call<MeltVaultResponse>(`/vaults/${encodeURIComponent(vaultId)}/melt`, { method: 'POST', body: request, idempotent: options });

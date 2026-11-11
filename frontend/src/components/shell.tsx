@@ -68,6 +68,7 @@ export function Screen({ children, head, hero, footer, tabsFor }: {
   const inset = useInset();
   return (
     <View style={l.root}>
+      <Aurora kind="body" />
       {head}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ flexGrow: 1 }, tabsFor && { paddingBottom: 72 + inset.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {hero}
@@ -152,10 +153,10 @@ const l = StyleSheet.create({
   badge: { position: 'absolute', top: 4, right: 3, minWidth: 16, height: 16, borderRadius: radius.sm, backgroundColor: color.amber, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, textAlign: 'center' },
   body: { flexGrow: 1, paddingHorizontal: space.md, paddingTop: space.md, paddingBottom: space.xl, gap: space.md },
-  footer: { paddingHorizontal: space.md, paddingTop: space.sm, gap: space.sm, backgroundColor: color.page },
+  footer: { paddingHorizontal: space.md, paddingTop: space.sm, gap: space.sm },
   section: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 30, marginTop: space.xs },
   tabs: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', backgroundColor: color.page, borderTopWidth: 1, borderTopColor: color.line,
+    position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', backgroundColor: color.sheet, borderTopWidth: 1, borderTopColor: color.line,
     paddingHorizontal: space.xs, paddingTop: space.sm,
   },
   tab: { flex: 1, height: 56, alignItems: 'center', justifyContent: 'center', gap: space.hair },

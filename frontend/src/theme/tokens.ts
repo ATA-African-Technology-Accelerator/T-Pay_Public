@@ -1,31 +1,44 @@
 import { Easing, Platform } from 'react-native';
 
 // Every visual value in the app lives here. Screens never hard-code a colour.
-// Dark wallet direction chosen by the owner on 5 Nov 2026. Page, panels and hero blues are sampled from that reference.
+// Palette "t-payy" chosen by the owner on 11 Nov 2026: navy #000D20 and #000F25, dark brown #160D0E,
+// maroon #290000 and #200000. The hero glow runs navy to maroon under a soft white light. The body is
+// dark reddish (brown with maroon glows), and cards are frosted glass over it: a see-through white fill
+// with a fine light edge. Card icons are blue. Green, amber and coral are kept: paid, waiting and wrong.
 export const color = {
   white: '#FFFFFF',
-  page: '#050608',
-  panel: '#111317',
-  panelHigh: '#1A1E24',
-  line: '#262B33',
+  page: '#160D0E',
+  // Glass: see-through, so the reddish glow behind shows through every card.
+  panel: 'rgba(255,255,255,0.06)',
+  panelHigh: 'rgba(255,255,255,0.11)',
+  line: 'rgba(255,255,255,0.12)',
+  // Solid surfaces that sit over other content (the side menu, the tab bar), where glass would show clutter.
+  sheet: '#1E0B0C',
+  // Icons inside cards.
+  icon: '#7AA2FF',
   text: '#F3F5F9',
-  muted: '#9AA6B8',
+  muted: '#9DA8BA',
   onDark: '#C9D0DD',
   // Text and icons on light fills only, never on the page.
-  ink: '#07090D',
-  blue: '#8FB4F0',
+  ink: '#160D0E',
+  // The accent: selected tabs, links and the active menu row. A light neutral reads on every navy and maroon.
+  blue: '#E4E8F0',
   green: '#6FD98C',
   amber: '#F0B64A',
   coral: '#F58B7C',
-  stage: '#040608',
+  stage: '#000A1A',
+  // The logo's own navy. Only the loading screens use it, so the logo sits on its own background.
+  brand: '#061A42',
   black: '#000000',
 } as const;
 
-// Hero glow stops, deepest first. Only Aurora uses these.
-export const glow = { base: '#0C2137', mid: '#1D436D', bright: '#3265A4', edge: '#6F84BA' } as const;
+// Hero glow stops, deepest first. Only Aurora uses these. The edge is the soft white light at the top.
+export const glow = { base: '#000F25', mid: '#160D0E', bright: '#290000', edge: '#F2EEEE' } as const;
+// The body's glow behind the glass cards: maroon light on the dark brown page, with a hint of navy.
+export const bodyGlow = { a: '#3A0606', b: '#290000', c: '#000F25' } as const;
 
 // Glass controls that sit on the hero glow.
-export const glass = { fill: 'rgba(255,255,255,0.10)', line: 'rgba(255,255,255,0.22)', lineStrong: 'rgba(255,255,255,0.34)', well: 'rgba(5,6,8,0.35)', tint: 'rgba(143,180,240,0.20)' } as const;
+export const glass = { fill: 'rgba(255,255,255,0.10)', line: 'rgba(255,255,255,0.22)', lineStrong: 'rgba(255,255,255,0.34)', well: 'rgba(0,13,32,0.35)', tint: 'rgba(228,232,240,0.16)' } as const;
 
 // 4px grid. The only spacing values in the app.
 export const space = { hair: 2, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 36 } as const;
@@ -74,6 +87,8 @@ export const shadow = {
 export const motion = {
   quick: 150, base: 220, slow: 300, bar: 500, count: 700, hold: 1100, release: 350, stagger: 60,
   sweep: 1500, pulse: 1300, spin: 9000, shake: 60,
+  // One breath of the hero glow: lively, but slow enough that it never pulls the eye from the money.
+  drift: 9000,
   spring: { damping: 20, stiffness: 240, mass: 1 },
   ease: { out: Easing.bezier(0.22, 1, 0.36, 1), inOut: Easing.bezier(0.65, 0, 0.35, 1), linear: Easing.linear },
 } as const;

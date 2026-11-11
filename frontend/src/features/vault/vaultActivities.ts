@@ -91,6 +91,20 @@ export async function completeVault(vaultId: string): Promise<AppVault> {
   const pending = await loadPending();
   const key = pending?.vaultId === vaultId ? pending.authorizeKey : random.uuid();
   const { vault, vaultCertificate } = await withSession(() => api.authorizeVault(vaultId, { idempotencyKey: key }));
+  return keepVault(vault, vaultCertificate);
+}
+
+/**
+ * Locks money from the Online wallet: the money is already collected, so there is no PayPal step and
+ * the vault is ready at once. The key is kept for a retry so a lost answer never locks twice.
+ */
+export async function lockFromWallet(amountNgnMinor: number, durationHours: number, idempotencyKey: string): Promise<AppVault> {
+  const { vault, vaultCertificate } = await withSession(() => api.lockFromWallet({ amountNgnMinor, durationHours }, { idempotencyKey }));
+  // The wallet's new balance arrives with Home's next sync, which runs as soon as Home opens.
+  return keepVault(vault, vaultCertificate);
+}
+
+async function keepVault(vault: VaultView, vaultCertificate: AppVault['certificate']): Promise<AppVault> {
   const local: AppVault = {
     vaultId: vault.vaultId,
     certificate: vaultCertificate,

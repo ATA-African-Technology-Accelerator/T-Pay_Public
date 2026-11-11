@@ -78,7 +78,7 @@ export function OfflineAssistant() {
       )}
       {!wifi && (state.kind === 'absent' || state.kind === 'failed' || state.kind === 'downloading') && (
         <Panel style={s.row}>
-          <Wifi size={icon.md} color={color.amber} strokeWidth={1.8} />
+          <Wifi size={icon.md} color={color.icon} strokeWidth={1.8} />
           <T v="label" style={{ flex: 1 }}>{t.offlineAiWifi}</T>
         </Panel>
       )}

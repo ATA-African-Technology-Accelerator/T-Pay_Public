@@ -8,7 +8,7 @@ import { convertNgnToUsd, convertUsdToNgn } from '@tpay/shared/domain/convertNgn
 import { Money } from '@tpay/shared/shared/domain/Money';
 import { Keypad } from '../../components/keypad';
 import { ConfirmPin } from '../onboarding/lock';
-import { Button, HearIt, Panel, Rise, T, money, sayNaira, usd, when } from '../../components/ui';
+import { Button, HearIt, OfflineTag, Panel, Rise, T, money, sayNaira, usd, when } from '../../components/ui';
 import { CurvedHeader, Screen, Section } from '../../components/shell';
 import { Line } from '../../components/rows';
 import { StatusMark } from '../../components/money';
@@ -21,8 +21,8 @@ import { api } from '../../composition';
 import { withSession } from '../../session/guard';
 import { withdraw } from './walletActivities';
 
-const word = (e: LedgerEntry) => ({ CREDIT: t.ledgerCredit, PAYMENT_LINK: t.ledgerPaymentLink, DEPOSIT: t.ledgerDeposit, WITHDRAWAL: t.ledgerWithdrawal, REVERSAL: t.ledgerReversal, WITHDRAWAL_RETURNED: t.ledgerReturned })[e.type];
-const out = (e: LedgerEntry) => e.type === 'WITHDRAWAL' || e.type === 'REVERSAL';
+const word = (e: LedgerEntry) => ({ CREDIT: t.ledgerCredit, PAYMENT_LINK: t.ledgerPaymentLink, DEPOSIT: t.ledgerDeposit, WITHDRAWAL: t.ledgerWithdrawal, REVERSAL: t.ledgerReversal, WITHDRAWAL_RETURNED: t.ledgerReturned, VAULT_LOCK: t.ledgerVaultLock, VAULT_RETURN: t.ledgerVaultReturn })[e.type];
+const out = (e: LedgerEntry) => e.type === 'WITHDRAWAL' || e.type === 'REVERSAL' || e.type === 'VAULT_LOCK';
 
 /** Anyone with the link can pay this account by PayPal. The link is the same every time. */
 function PayLinkCard() {
@@ -84,10 +84,11 @@ export function Ledger() {
         {active.entries.length === 0 && <T v="body" c={color.muted} style={s.center}>{t.nothingHere}</T>}
         {active.entries.map((e, i) => (
           <Rise key={e.entryId} delay={Math.min(i, 6) * motion.stagger}>
-            <View style={s.entry} accessible accessibilityLabel={`${word(e)}, ${money(e.amountNgnMinor)}`}>
+            <View style={s.entry} accessible accessibilityLabel={`${word(e)}, ${money(e.amountNgnMinor)}${e.type === 'CREDIT' ? `, ${t.offlineTag}` : ''}`}>
               <View style={{ flex: 1 }}>
                 <T v="label">{word(e)}</T>
                 <T v="small" c={color.muted}>{when(e.createdAt)}</T>
+                {e.type === 'CREDIT' && <OfflineTag />}
                 {e.paypalCaptureId && <T v="tiny" c={color.muted} selectable>{e.paypalCaptureId}</T>}
               </View>
               <T v="label" c={out(e) ? color.text : color.green}>{`${out(e) ? '-' : '+'}${money(e.amountNgnMinor)}`}</T>

@@ -25,7 +25,7 @@ const REST: Item[] = [
   { label: t.profile, draw: line(UserRound), to: { name: 'settings' } },
 ];
 const MORE: Item[] = [
-  { label: t.changeLanguage, draw: line(Globe), to: { name: 'language' }, stack: true },
+  { label: t.changeLanguage, draw: line(Globe), to: { name: 'language', edit: true }, stack: true },
   { label: t.lockApp, draw: line(Lock), to: { name: 'lock' } },
   { label: t.help, draw: line(HelpCircle), to: { name: 'help' }, stack: true },
 ];
@@ -82,7 +82,7 @@ export function SideMenu({ open, current, onClose }: { open: boolean; current: R
           </Pressable>
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={m.list} showsVerticalScrollIndicator={false}>
-          {[HOME, ...(business ? SHOP : [VAULT]), ...REST].map(row)}
+          {[HOME, ...(business ? [...SHOP, VAULT] : [VAULT]), ...REST].map(row)}
           <View style={m.rule} />
           {[switchKind, ...MORE].map(row)}
         </ScrollView>
@@ -94,7 +94,7 @@ export function SideMenu({ open, current, onClose }: { open: boolean; current: R
 const m = StyleSheet.create({
   scrim: { backgroundColor: color.black },
   panel: {
-    position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: color.panel, borderTopRightRadius: radius.lg, borderBottomRightRadius: radius.lg,
+    position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: color.sheet, borderTopRightRadius: radius.lg, borderBottomRightRadius: radius.lg,
     paddingHorizontal: space.md,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingBottom: space.lg, paddingHorizontal: space.xs },

@@ -56,7 +56,7 @@ function Row({ item }: { item: StockItem }) {
 
 const s = StyleSheet.create({
   input: { ...type.heading, color: color.text, height: touch.field, paddingHorizontal: space.lg, backgroundColor: color.panelHigh, borderRadius: radius.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, backgroundColor: color.panel, borderRadius: radius.lg, minHeight: touch.row },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, backgroundColor: color.panel, borderWidth: 1, borderColor: color.line, borderRadius: radius.lg, minHeight: touch.row },
   step: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: color.panelHigh, alignItems: 'center', justifyContent: 'center' },
   count: { minWidth: 36, textAlign: 'center', fontVariant: ['tabular-nums'] },
 });

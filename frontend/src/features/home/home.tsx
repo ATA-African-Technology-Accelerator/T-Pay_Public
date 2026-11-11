@@ -13,7 +13,7 @@ import { useModelState } from '../settings/offlineAssistant';
 import { t } from '../../i18n';
 
 const ic = { size: icon.md, color: color.white, strokeWidth: 1.8 };
-const mark = { size: icon.md, color: color.amber, strokeWidth: 1.8 };
+const mark = { size: icon.md, color: color.icon, strokeWidth: 1.8 };
 
 function Rows({ rows }: { rows: Entry[] }) {
   const nav = useNav();
@@ -72,7 +72,7 @@ function OfflineAiOffer() {
 /** One home for everyone. The same person pays from the Offline wallet and collects into the Active wallet. */
 export function HomeScreen() {
   const nav = useNav();
-  const { name, offline, active, history, wallet, setWallet, pendingVault, withdrawal, withdrawalOpen, online, lastSyncAt, sync, accountKind } = useApp();
+  const { name, offline, active, history, wallet, setWallet, pendingVault, withdrawal, withdrawalOpen, online, lastSyncAt, sync, accountKind, vault: lockedVault } = useApp();
   const business = accountKind === 'business';
   // Home is where people look for news, so it asks for it: right after setup and each unlock.
   React.useEffect(() => { void sync(); }, []);
@@ -96,7 +96,9 @@ export function HomeScreen() {
   const pages: WalletPage[] = [
     business ? {
       key: 'offline', name: t.walletOffline, label: t.toCollect, amount: offline.incomingNgn, note: offline.pendingOutNgn ? `${money(offline.pendingOutNgn)} ${t.onTheWay}` : '',
-      actions: [receive, pay, activity], status: t.readyToCollect,
+      // Getting paid comes first, but a business pays suppliers too, so it can still lock money.
+      actions: offline.canSpend ? [receive, pay, vault, activity] : offline.open ? [receive, vault, activity] : [receive, lock, activity],
+      status: t.readyToCollect,
     } : {
       key: 'offline', name: t.walletOffline, label: t.canSpend, amount: offline.leftNgn, note: moving, actions: personalActions,
       status: offline.canSpend ? t.readyOffline : offline.open ? t.spendingEnded : t.noVault,
@@ -115,7 +117,7 @@ export function HomeScreen() {
     : !offline.open
       ? <Notice icon={<Lock {...mark} />} title={t.noVault} note={t.noVaultHint} onPress={lockMoney} />
       : offline.canSpend
-        ? <Notice icon={<Lock {...mark} />} title={`${money(offline.lockedNgn)} ${t.heldByPayPal}`} note={t.spendByDate(when(offline.spendBy))} onPress={() => nav.reset({ name: 'vault' })} />
+        ? <Notice icon={<Lock {...mark} />} title={`${money(offline.lockedNgn)} ${lockedVault?.view?.fundedBy === 'WALLET' ? t.lockedFromWallet : t.heldByPayPal}`} note={t.spendByDate(when(offline.spendBy))} onPress={() => nav.reset({ name: 'vault' })} />
         : <Notice icon={<Lock {...mark} />} title={offline.melted ? t.stillHeld : t.spendingEnded} note={offline.melted && offline.settleBy ? t.releaseByDate(when(offline.releaseAt ?? offline.settleBy)) : t.autoClosing} onPress={() => nav.reset({ name: 'vault' })} />;
   const activeNotice = !active.known
     ? <Notice icon={<WifiOff {...mark} />} title={t.walletActive} note={t.neverUpdated} />
@@ -136,7 +138,7 @@ export function HomeScreen() {
 }
 
 const h = StyleSheet.create({
-  notice: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, backgroundColor: color.panel, borderRadius: radius.lg },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, backgroundColor: color.panel, borderWidth: 1, borderColor: color.line, borderRadius: radius.lg },
   offer: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   noticeMark: { width: 42, height: 42, borderRadius: radius.sm, backgroundColor: color.panelHigh, alignItems: 'center', justifyContent: 'center' },
 });

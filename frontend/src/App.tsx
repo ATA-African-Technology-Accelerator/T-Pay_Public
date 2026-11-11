@@ -11,6 +11,7 @@ import { Signal, Wifi, BatteryFull } from 'lucide-react-native';
 import { color, font, icon, layout, motion, radius, space, shadow } from './theme/tokens';
 import { T, native, useReduceMotion } from './components/ui';
 import { Nav, NavCtx, Route } from './nav';
+import { OPEN_ROUTES, stackAfterReset } from './navStack';
 import { Linking } from 'react-native';
 import { AppStateProvider, type HistoryWords } from './state/appState';
 import { Details, Language, Splash } from './features/onboarding/onboarding';
@@ -44,8 +45,6 @@ import { startSync } from './sync/syncCoordinator';
 
 // Like a bank app: away for longer than this and the PIN is needed again.
 const RELOCK_AFTER_MS = 60_000;
-// Screens that come before unlocking, so returning to them never re-locks.
-const OPEN_ROUTES: Route['name'][] = ['splash', 'language', 'details', 'createPin', 'lock'];
 
 function render(r: Route) {
   switch (r.name) {
@@ -103,7 +102,7 @@ export default function App() {
     reset: r => {
       // Going home ends a payment activity, and with it any Bluetooth link (contract 5.4).
       if (r.name === 'home') { endMerchantSession(); closeLink(); }
-      setStack([{ r, id: ids.current++, dir: 0 }]);
+      setStack(stackAfterReset(r).map(route => ({ r: route, id: ids.current++, dir: 0 })));
     },
     back: () => setStack(s => (s.length > 1 ? [...s.slice(0, -1).slice(0, -1), { ...s[s.length - 2], id: ids.current++, dir: -1 }] : s)),
     openMenu: () => setMenu(true),

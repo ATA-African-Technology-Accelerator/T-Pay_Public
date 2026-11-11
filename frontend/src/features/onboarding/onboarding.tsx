@@ -2,9 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { AlertCircle, Check, Volume2, Wifi } from 'lucide-react-native';
 import { color, glass, icon, motion, radius, space, touch, type } from '../../theme/tokens';
-import { Aurora } from '../../components/aurora';
 import { Button, Panel, Rise, T, native, speak, useReduceMotion } from '../../components/ui';
-import { BagIcon } from '../../components/icons';
 import { CurvedHeader, Screen } from '../../components/shell';
 import { useNav } from '../../nav';
 import { useApp, type AccountKind } from '../../state/appState';
@@ -16,6 +14,8 @@ import { registerDevice } from '../../session/registerDevice';
 import { profileStore } from '../../session/profileStore';
 import { sessionStore } from '../../session/sessionStore';
 import { withSession } from '../../session/guard';
+
+const LOGO = require('../../../assets/brand/splash-logo.png');
 
 /** ACT-01. A phone with a PIN and an identity unlocks; anything less finishes setup. */
 export function Splash() {
@@ -33,21 +33,19 @@ export function Splash() {
     }, 1200);
     return () => { cancelled = true; clearTimeout(id); };
   }, []);
+  // The same logo, size and navy as Android's own splash before it, so the hand-over is seamless.
   return (
-    <View style={o.splash}>
-      <Aurora />
-      <Animated.View style={[o.mark, { opacity: a, transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }]}>
-        <View style={o.logo}><BagIcon size={44} c={color.white} w={1.5} /></View>
-        <T style={o.brand}>T-Pay</T>
-        <T v="heading" c={color.white}>{t.tagline}</T>
-      </Animated.View>
+    <View style={o.splash} accessible accessibilityRole="image" accessibilityLabel={`T-Pay. ${t.tagline}`}>
+      <Animated.Image source={LOGO} resizeMode="contain" style={[o.logoImage, { opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }]} />
     </View>
   );
 }
 
-export function Language({ edit }: { edit?: boolean }) {
+export function Language({ edit: asked }: { edit?: boolean }) {
   const nav = useNav();
-  const { setLanguage, language } = useApp();
+  const { setLanguage, language, session } = useApp();
+  // A phone that already has an account only ever edits it. Setup would register it again.
+  const edit = asked || !!session;
   const [picked, setPicked] = useState<string | null>(edit ? languages[languageCodes.indexOf(language)] ?? null : null);
   const choose = (i: number) => {
     setPicked(languages[i] as string);
@@ -81,9 +79,11 @@ export function Language({ edit }: { edit?: boolean }) {
  * and the PayPal email collected money goes to. Editing re-registers the same key, so
  * the certificate other phones check carries the new name.
  */
-export function Details({ edit }: { edit?: boolean }) {
+export function Details({ edit: asked }: { edit?: boolean }) {
   const nav = useNav();
-  const { draft, setDraft, profile, language, accountKind, setAccountKind } = useApp();
+  const { draft, setDraft, profile, language, accountKind, setAccountKind, session } = useApp();
+  // A phone that already has an account only ever edits it. Setup would register it again.
+  const edit = asked || !!session;
   const [kind, setKind] = useState<AccountKind>(edit ? accountKind : 'personal');
   const [name, setName] = useState(edit ? profile?.displayName ?? '' : draft.displayName);
   const [payout, setPayout] = useState(edit ? profile?.payoutEmail ?? '' : draft.payoutEmail);
@@ -150,7 +150,7 @@ export function Details({ edit }: { edit?: boolean }) {
       </View>
       {busy && slow && (
         <Panel style={o.note}>
-          <Wifi size={icon.md} color={color.amber} strokeWidth={1.7} />
+          <Wifi size={icon.md} color={color.icon} strokeWidth={1.7} />
           <T v="small" style={{ flex: 1 }} accessibilityLiveRegion="polite">{t.wakingUp}</T>
         </Panel>
       )}
@@ -177,10 +177,9 @@ function setupMessage(e: unknown): string {
 }
 
 const o = StyleSheet.create({
-  splash: { flex: 1, backgroundColor: color.page, alignItems: 'center', justifyContent: 'center' },
-  mark: { alignItems: 'center', gap: space.xs },
-  logo: { width: 88, height: 88, borderRadius: radius.pill, borderWidth: 1, borderColor: glass.line, backgroundColor: glass.fill, alignItems: 'center', justifyContent: 'center', marginBottom: space.md },
-  brand: { ...type.moneyL, color: color.white },
+  splash: { flex: 1, backgroundColor: color.brand, alignItems: 'center', justifyContent: 'center' },
+  // Android's splash shows the logo 300 wide; matching it means nothing moves when this screen takes over.
+  logoImage: { width: 300, height: 300 * (2208 / 2400) },
   langRow: { flexDirection: 'row', gap: space.sm },
   lang: { flex: 1, minHeight: touch.row, paddingHorizontal: space.xl, borderRadius: radius.md, backgroundColor: color.panel, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   ear: { width: touch.row, height: touch.row, borderRadius: radius.md, backgroundColor: color.panel, alignItems: 'center', justifyContent: 'center' },

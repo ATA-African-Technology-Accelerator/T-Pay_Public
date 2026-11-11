@@ -12,7 +12,9 @@ import { useApp } from '../../state/appState';
 import { t } from '../../i18n';
 import type { PendingVault } from '../../adapters/storage/localStore';
 import { apiMessage, isCode } from '../errors';
-import { completeVault, meltVault, openApproval, startVault } from './vaultActivities';
+import { completeVault, lockFromWallet, meltVault, openApproval, startVault } from './vaultActivities';
+import { convertNgnToUsd } from '@tpay/shared/domain/convertNgnToUsd';
+import { Money } from '@tpay/shared/shared/domain/Money';
 
 function Problem({ text }: { text: string }) {
   return (
@@ -71,9 +73,15 @@ export function VaultScreen() {
  */
 export function VaultReview({ amount, hours }: { amount: number; hours: number }) {
   const nav = useNav();
+  const { active, online } = useApp();
   const [order, setOrder] = useState<PendingVault | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const key = useRef(randomKey());
+  // The money is already in the Online wallet, so locking from it needs no PayPal step.
+  const need = convertNgnToUsd(Money.fromMinor(amount, 'NGN').getValue(), active.fxRate || '1500.00').getValue().minor;
+  const covered = online && active.known && active.balanceUsd >= need && active.balanceNgn >= amount;
+  const [viaPayPal, setViaPayPal] = useState(!covered);
   const started = useRef(false);
 
   const prepare = async () => {
@@ -84,7 +92,7 @@ export function VaultReview({ amount, hours }: { amount: number; hours: number }
       setProblem(apiMessage(e));
     }
   };
-  useEffect(() => { if (!started.current) { started.current = true; void prepare(); } }, []);
+  useEffect(() => { if (viaPayPal && !started.current) { started.current = true; void prepare(); } }, [viaPayPal]);
 
   const approve = async () => {
     if (!order) return;
@@ -102,43 +110,78 @@ export function VaultReview({ amount, hours }: { amount: number; hours: number }
     }
   };
 
-  const footer = order
-    ? <Button label={busy ? t.approving : t.toPayPal} loading={busy} onPress={() => { void approve(); }} />
-    : problem ? <Button label={t.tryAgain} onPress={() => { void prepare(); }} /> : undefined;
+  const fromWallet = async () => {
+    setBusy(true); setProblem(null);
+    try {
+      await lockFromWallet(amount, hours, key.current);
+      nav.reset({ name: 'vaultActive' });
+    } catch (e) {
+      if (isCode(e, 'ACTIVE_VAULT_EXISTS')) { nav.reset({ name: 'vault' }); return; }
+      setProblem(apiMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const footer = !viaPayPal
+    ? (
+      <View style={{ gap: space.sm }}>
+        <Button label={busy ? t.locking : t.lockFromWallet} loading={busy} onPress={() => { void fromWallet(); }} />
+        <Button kind="quiet" label={t.usePayPalInstead} disabled={busy} onPress={() => setViaPayPal(true)} />
+      </View>
+    )
+    : order
+      ? <Button label={busy ? t.approving : t.toPayPal} loading={busy} onPress={() => { void approve(); }} />
+      : problem ? <Button label={t.tryAgain} onPress={() => { void prepare(); }} /> : undefined;
   return (
     <Screen head={<CurvedHeader back bell={false} title={t.checkVault} />} footer={footer}>
       <Rise>
         <Panel style={v.big}>
           <T v="body" c={color.muted}>{t.amountLock}</T>
           <T v="moneyL" numberOfLines={1} adjustsFontSizeToFit>{money(amount)}</T>
-          {order
-            ? <T v="label">{`${t.paypalHolds} ${usd(order.amountUsdMinor)}`}</T>
-            : !problem && <View style={v.row}><ActivityIndicator color={color.blue} /><T v="small" c={color.muted}>{t.preparing}</T></View>}
+          {!viaPayPal
+            ? <T v="label">{t.fromWalletTitle}</T>
+            : order
+              ? <T v="label">{`${t.paypalHolds} ${usd(order.amountUsdMinor)}`}</T>
+              : !problem && <View style={v.row}><ActivityIndicator color={color.blue} /><T v="small" c={color.muted}>{t.preparing}</T></View>}
         </Panel>
       </Rise>
       {problem && <Problem text={problem} />}
+      {viaPayPal && !covered && active.known && (
+        <Panel style={v.row}>
+          <T v="small" style={{ flex: 1 }}>{t.walletShort(money(active.balanceNgn))}</T>
+          <Button kind="soft" label={t.addMoneyFirst} onPress={() => nav.go({ name: 'addMoney' })} />
+        </Panel>
+      )}
       <Rise delay={motion.stagger * 2}>
         <Panel>
-          {order && <Line label={t.demoRate} value={`${rate(order.fxRate)} ${t.ngnPerUsd}`} />}
+          {!viaPayPal && <Line label={t.walletActive} value={t.fromWalletNote(money(active.balanceNgn - amount))} />}
+          {viaPayPal && order && <Line label={t.demoRate} value={`${rate(order.fxRate)} ${t.ngnPerUsd}`} />}
           <Line label={t.spendWithin} value={`${hours} ${t.hours}`} />
-          <Line label={t.unspentMoney} value={t.unspentReturns} />
+          <Line label={t.unspentMoney} value={viaPayPal ? t.unspentReturns : t.unspentToWallet} />
         </Panel>
       </Rise>
-      <T v="small" c={color.muted} style={v.center}>{t.sandboxNext}</T>
+      {viaPayPal && <T v="small" c={color.muted} style={v.center}>{t.sandboxNext}</T>}
     </Screen>
   );
 }
 
+/** A fresh idempotency key for one lock attempt; a retry of the same attempt reuses it. */
+function randomKey(): string {
+  return `lock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function VaultActive() {
   const nav = useNav();
-  const { offline } = useApp();
+  const { offline, vault } = useApp();
+  const fromWallet = vault?.view?.fundedBy === 'WALLET';
   return (
     <Screen head={<CurvedHeader bell={false} title={t.vaultLocked} />} footer={<Button label={t.done} onPress={() => nav.reset({ name: 'home' })} />}>
       <Rise>
         <Panel style={v.big}>
           <StatusMark status="paid" size={44} big />
           <T v="moneyL" numberOfLines={1} adjustsFontSizeToFit>{money(offline.lockedNgn)}</T>
-          <T v="label">{t.heldByPayPal}</T>
+          <T v="label">{fromWallet ? t.lockedFromWallet : t.heldByPayPal}</T>
           {offline.spendBy && <T v="small" c={color.muted}>{t.spendByDate(when(offline.spendBy))}</T>}
         </Panel>
       </Rise>
@@ -151,7 +194,8 @@ export function VaultActive() {
 /** ACT-12. Unspent money goes back to PayPal; money owed to sellers stays held until it settles. */
 export function Melt() {
   const nav = useNav();
-  const { offline } = useApp();
+  const { offline, vault } = useApp();
+  const backTo = vault?.view?.fundedBy === 'WALLET' ? t.unspentToWallet : t.unspentReturns;
   const [done, setDone] = useState<MeltVaultResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -195,7 +239,7 @@ export function Melt() {
       <Panel>
         <Line label={t.unspent} value={money(offline.leftNgn)} strong />
         <Line label={t.status.pending} value={money(offline.pendingOutNgn)} />
-        <Line label={t.unspentMoney} value={t.unspentReturns} />
+        <Line label={t.unspentMoney} value={backTo} />
       </Panel>
       {problem && <Problem text={problem} />}
       <T v="body" c={color.muted}>{t.closeNote}</T>
