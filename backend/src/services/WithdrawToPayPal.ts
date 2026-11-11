@@ -12,6 +12,11 @@ import { balanceNgn, balanceUsd } from './walletBalance';
 
 
 const CENTS_PER_DOLLAR = 100;
+// A new withdrawal is sent to PayPal straight away by the request that made it. The background job
+// leaves it alone for this long, so the two never send the same payout at the same moment.
+const SUBMIT_GRACE_MS = 2 * 60 * 1000;
+// PayPal's answers that mean "this payout is already being handled", never "it failed".
+const DUPLICATE = /DUPLICATE|ALREADY|SENDER_BATCH_ID|IDEMPOTEN|CONFLICT/i;
 
 
 export interface WithdrawToPayPalDependencies {
@@ -65,7 +70,7 @@ export class WithdrawToPayPal {
       status: 'PENDING',
       paypalBatchId: null,
       attempts: 0,
-      nextAttemptAt: now,
+      nextAttemptAt: new Date(now.getTime() + SUBMIT_GRACE_MS),
       createdAt: now,
       updatedAt: now,
     };
@@ -97,9 +102,15 @@ export class WithdrawToPayPal {
 
 
   private applyPayoutResult(session: WalletSession, withdrawal: Withdrawal, result: PayoutResult): Promise<Withdrawal> {
-    if (result.outcome === 'REJECTED') {
+    // Money only goes back to the wallet when PayPal clearly refused this payout. A refusal that
+    // says the payout already exists means it is on its way: returning the money then would let
+    // the same money be withdrawn twice.
+    if (result.outcome === 'REJECTED' && !DUPLICATE.test(result.reason)) {
       console.error(`PayPal refused ${withdrawal.id}: ${result.reason}`);
       return this.fail(session, withdrawal);
+    }
+    if (result.outcome === 'REJECTED') {
+      console.error(`PayPal says ${withdrawal.id} already exists (${result.reason}); checking again, not refunding`);
     }
     return this.scheduleCheck(
       session,

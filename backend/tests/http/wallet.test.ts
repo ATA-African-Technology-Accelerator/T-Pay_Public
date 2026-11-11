@@ -243,6 +243,45 @@ describe('Active wallet API', () => {
       });
     });
 
+    describe('never pays out twice', () => {
+      beforeEach(async () => {
+        await collect(1);
+      });
+
+      it('leaves a withdrawal that was just sent to PayPal alone, even if the job runs at that moment', async () => {
+        await withdraw(133);
+
+        await fixture.jobs.runOnce();
+
+        expect(fixture.gateway.payouts).toHaveLength(1);
+      });
+
+      it('does not give the money back when PayPal says the payout already exists', async () => {
+        fixture.gateway.plannedPayouts.push({ outcome: 'REJECTED', reason: 'SENDER_BATCH_ID_ALREADY_EXISTS' });
+
+        const response = await withdraw(133);
+
+        expect(response.body.data.status).toBe('PENDING');
+        expect(await wallet()).toMatchObject({ balanceUsdMinor: 0 });
+      });
+
+      it('still gives the money back when PayPal truly refuses', async () => {
+        fixture.gateway.plannedPayouts.push({ outcome: 'REJECTED', reason: 'INSUFFICIENT_FUNDS' });
+
+        const response = await withdraw(133);
+
+        expect(response.body.data.status).toBe('FAILED');
+        expect(await wallet()).toMatchObject({ balanceUsdMinor: 133 });
+      });
+
+      it('cannot be withdrawn again after a payout that PayPal reported as a duplicate', async () => {
+        fixture.gateway.plannedPayouts.push({ outcome: 'REJECTED', reason: 'DUPLICATE_REQUEST_ID' });
+        await withdraw(133);
+
+        expect((await withdraw(133)).status).toBe(422);
+      });
+    });
+
     describe('when PayPal does not answer', () => {
       beforeEach(async () => {
         await collect(1);
