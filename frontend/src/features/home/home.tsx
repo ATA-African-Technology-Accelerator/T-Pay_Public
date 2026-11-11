@@ -41,6 +41,7 @@ function Notice({ icon: glyph, title, note, onPress }: { icon: React.ReactNode; 
 }
 
 const AI_OFFER_DISMISSED = 'ui.aiOfferDismissed';
+let openedOnMain = false;
 
 /**
  * A one-time, optional offer on Home: the offline assistant is a big download, so people see it
@@ -76,6 +77,8 @@ export function HomeScreen() {
   const business = accountKind === 'business';
   // Home is where people look for news, so it asks for it: right after setup and each unlock.
   React.useEffect(() => { void sync(); }, []);
+  // A business gets paid into the main wallet, so that is the page it opens on, once per visit to the app.
+  React.useEffect(() => { if (business && !openedOnMain) { openedOnMain = true; setWallet('active'); } }, [business]);
   const lockMoney = () => nav.go({ name: 'amount', mode: 'lock' });
   const pay: HeroAction = { label: t.pay, icon: <ArrowUp {...ic} />, onPress: () => nav.go({ name: 'scan', kind: 'request' }) };
   const receive: HeroAction = { label: business ? t.getPaid : t.receive, icon: <ArrowDown {...ic} />, onPress: () => nav.go({ name: 'amount', mode: 'collect' }) };
@@ -86,33 +89,28 @@ export function HomeScreen() {
   const withdraw: HeroAction = { label: t.withdraw, icon: <Banknote {...ic} />, onPress: () => nav.go({ name: 'withdraw' }) };
   const received: HeroAction = { label: t.received, icon: <Landmark {...ic} />, onPress: () => nav.go({ name: 'ledger' }) };
 
-  const moving = [
-    offline.pendingOutNgn ? `${money(offline.pendingOutNgn)} ${t.onTheWay}` : '',
-    offline.incomingNgn ? `${money(offline.incomingNgn)} ${t.comingIn}` : '',
-  ].filter(Boolean).join(' · ');
+  // The Offline wallet only locks and sends money. Money people receive lands in the main (Online)
+  // wallet: a payment taken offline shows there as coming in until the phone syncs.
   // Lock money only while no vault is open: the backend allows one (decision 8).
-  const personalActions = offline.canSpend ? [pay, receive, vault, activity] : offline.open ? [receive, vault, activity] : [lock, receive, activity];
-  // A business gets paid first: no money to lock, so the offline wallet shows what is waiting to be collected.
+  const offlineActions = offline.canSpend ? [pay, vault, activity] : offline.open ? [vault, activity] : [lock, activity];
+  const comingIn = active.pendingNgn + offline.incomingNgn;
   const pages: WalletPage[] = [
-    business ? {
-      key: 'offline', name: t.walletOffline, label: t.toCollect, amount: offline.incomingNgn, note: offline.pendingOutNgn ? `${money(offline.pendingOutNgn)} ${t.onTheWay}` : '',
-      // Getting paid comes first, but a business pays suppliers too, so it can still lock money.
-      actions: offline.canSpend ? [receive, pay, vault, activity] : offline.open ? [receive, vault, activity] : [receive, lock, activity],
-      status: t.readyToCollect,
-    } : {
-      key: 'offline', name: t.walletOffline, label: t.canSpend, amount: offline.leftNgn, note: moving, actions: personalActions,
+    {
+      key: 'offline', name: t.walletOffline, label: t.canSpend, amount: offline.leftNgn, actions: offlineActions,
+      note: offline.pendingOutNgn ? `${money(offline.pendingOutNgn)} ${t.onTheWay}` : '',
       status: offline.canSpend ? t.readyOffline : offline.open ? t.spendingEnded : t.noVault,
     },
     {
-      key: 'active', name: t.walletActive, label: t.availableNow, amount: active.balanceNgn, actions: business ? [received, withdraw, addMoney, activity] : [addMoney, withdraw, received, activity],
-      note: active.pendingNgn ? `${money(active.pendingNgn)} ${t.comingIn}` : '',
-      status: active.payoutEmail || t.collected,
+      key: 'active', name: t.walletActive, label: t.availableNow, amount: active.balanceNgn,
+      actions: business ? [receive, received, withdraw, addMoney] : [receive, addMoney, withdraw, received],
+      note: comingIn ? `${money(comingIn)} ${t.comingIn}` : '',
+      status: business ? t.readyToCollect : active.payoutEmail || t.collected,
     },
   ];
 
   const isActive = wallet === 'active';
   const linkNotice = <Notice icon={<Landmark {...mark} />} title={t.shareLinkTitle} note={t.shareLinkNote} onPress={() => nav.go({ name: 'ledger' })} />;
-  const offlineNotice = business ? linkNotice : pendingVault && !offline.open
+  const offlineNotice = pendingVault && !offline.open
     ? <Notice icon={<Lock {...mark} />} title={t.finishLock} note={t.finishLockHint} onPress={() => nav.go({ name: 'vaultReview', amount: pendingVault.amountNgnMinor, hours: pendingVault.durationHours })} />
     : !offline.open
       ? <Notice icon={<Lock {...mark} />} title={t.noVault} note={t.noVaultHint} onPress={lockMoney} />
@@ -123,7 +121,9 @@ export function HomeScreen() {
     ? <Notice icon={<WifiOff {...mark} />} title={t.walletActive} note={t.neverUpdated} />
     : withdrawalOpen
       ? <Notice icon={<Banknote {...mark} />} title={t.withdrawPending} note={t.withdrawalOnWay(withdrawal?.recipientEmail ?? active.payoutEmail)} />
-      : <Notice icon={<Banknote {...mark} />} title={t.withdrawTitle} note={t.withdrawAnyTime} onPress={() => nav.go({ name: 'withdraw' })} />;
+      : business
+        ? linkNotice
+        : <Notice icon={<Banknote {...mark} />} title={t.withdrawTitle} note={t.withdrawAnyTime} onPress={() => nav.go({ name: 'withdraw' })} />;
 
   return (
     <Screen tabsFor="home" hero={<Hero name={name} pages={pages} wallet={wallet} onWallet={setWallet} />}>

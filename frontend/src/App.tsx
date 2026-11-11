@@ -36,6 +36,8 @@ import { Stock } from './features/business/stock';
 import { Budget } from './features/business/budget';
 import { OfflineAssistant } from './features/settings/offlineAssistant';
 import { SideMenu } from './components/menu';
+import { ArrivalBanner } from './components/arrivalBanner';
+import { KeepBluetoothOn } from './features/business/keepBluetoothOn';
 import { api, appLock } from './composition';
 import { config } from './config';
 import { catalogueLanguage, t } from './i18n';
@@ -169,6 +171,8 @@ export default function App() {
             <StatusBar style="light" />
             <Page key={top.id} route={top.r} dir={top.dir} />
             <SideMenu open={menu} current={top.r.name} onClose={() => setMenu(false)} />
+            {!OPEN_ROUTES.includes(top.r.name) && <ArrivalBanner />}
+            <KeepBluetoothOn unlocked={!OPEN_ROUTES.includes(top.r.name)} />
             {web && <DeviceChrome />}
           </View>
         </View>

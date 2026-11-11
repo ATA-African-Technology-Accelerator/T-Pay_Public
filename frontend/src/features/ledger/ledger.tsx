@@ -150,9 +150,11 @@ export function Withdraw() {
     return <ConfirmPin heading={t.sendAmountTo(money(worthKobo), target)} onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void go(); }} />;
   }
 
-  if (sent || withdrawalOpen) {
-    const amount = sent?.amountNgn ?? withdrawal?.amountNgnMinor ?? 0;
-    const where = sent?.to ?? withdrawal?.recipientEmail ?? active.payoutEmail;
+  // Only the send just made shows this result. An older one still on its way never blocks a new send:
+  // it shows as a note on the form instead.
+  if (sent) {
+    const amount = sent.amountNgn;
+    const where = sent.to;
     return (
       <Screen head={<CurvedHeader back bell={false} title={t.sendTitle} />} footer={<Button label={t.done} onPress={() => nav.reset({ name: 'home' })} />}>
         <Rise>
@@ -164,7 +166,7 @@ export function Withdraw() {
           </Panel>
         </Rise>
         <T v="body" c={color.muted} style={s.center}>{t.withdrawPendingNote}</T>
-        <HearIt say={`${t.withdrawPending}. ${sayNaira(amount)}`} />
+        <HearIt auto say={`${t.withdrawPending}. ${sayNaira(amount)}`} />
       </Screen>
     );
   }
@@ -200,6 +202,9 @@ export function Withdraw() {
         {!empty && <Button kind="quiet" label={t.sendAll} onPress={() => setNaira(Math.floor(active.balanceNgn / 100))} />}
       </Panel>
       {other && <T v="small" c={color.amber}>{t.recipientCheck}</T>}
+      {withdrawalOpen && withdrawal && (
+        <T v="small" c={color.muted} style={s.center}>{t.earlierSendOnWay(money(withdrawal.amountNgnMinor), withdrawal.recipientEmail ?? active.payoutEmail)}</T>
+      )}
       {!online && <Problem text={t.needsInternet} />}
       {problem && <Problem text={problem} />}
       <Keypad onKey={press} />

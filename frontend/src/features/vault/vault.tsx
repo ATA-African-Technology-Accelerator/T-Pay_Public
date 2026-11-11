@@ -186,7 +186,7 @@ export function VaultActive() {
         </Panel>
       </Rise>
       <T v="body" c={color.muted} style={v.center}>{t.canGoOffline}</T>
-      <HearIt say={`${t.vaultLocked}. ${sayNaira(offline.lockedNgn)}. ${t.canGoOffline}`} />
+      <HearIt auto say={`${t.vaultLocked}. ${sayNaira(offline.lockedNgn)}. ${t.canGoOffline}`} />
     </Screen>
   );
 }

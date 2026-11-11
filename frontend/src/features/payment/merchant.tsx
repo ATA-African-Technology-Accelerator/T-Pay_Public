@@ -160,7 +160,7 @@ export function Credit({ voucherId, bluetooth, again }: { voucherId: string; blu
         </Rise>
       )}
       <T v="body" c={color.muted} style={s.text}>{t.pendingPaid}</T>
-      <HearIt say={`${t.gotMoney}. ${sayNaira(amount)}. ${t.pendingPaid}`} />
+      <HearIt auto say={`${t.gotMoney}. ${sayNaira(amount)}. ${t.pendingPaid}`} />
     </Screen>
   );
 }

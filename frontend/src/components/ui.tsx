@@ -178,7 +178,9 @@ export function OfflineTag() {
   );
 }
 
-export function HearIt({ say }: { say: string }) {
+/** `auto` also reads it once when the screen opens: for results, so nobody has to tap to hear them. */
+export function HearIt({ say, auto = false }: { say: string; auto?: boolean }) {
+  useEffect(() => { if (auto) void speakNaturally(say); }, [auto]);
   return (
     <Press accessibilityRole="button" accessibilityLabel={t.hearIt} onPress={() => speak(say)} style={s.hear}>
       <Volume2 size={icon.sm} color={color.text} strokeWidth={1.8} />

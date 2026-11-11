@@ -83,7 +83,7 @@ export function AddMoney() {
             <T v="small" c={color.muted} style={s.center}>{done ? t.depositDoneNote : t.depositPendingNote}</T>
           </Panel>
         </Rise>
-        <HearIt say={`${done ? t.depositDone : t.depositPending}. ${sayNaira(stage.amountNgn)}`} />
+        <HearIt auto say={`${done ? t.depositDone : t.depositPending}. ${sayNaira(stage.amountNgn)}`} />
       </Screen>
     );
   }

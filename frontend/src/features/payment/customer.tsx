@@ -160,7 +160,7 @@ export function Delivered({ voucherId }: { voucherId: string }) {
         </Panel>
       </Rise>
       <T v="body" c={color.muted} style={s.text}>{t.settlesItself}</T>
-      <HearIt say={say} />
+      <HearIt auto say={say} />
     </Screen>
   );
 }
