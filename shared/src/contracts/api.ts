@@ -60,7 +60,9 @@ export type TransactionType =
   | 'VOUCHER_REJECTED'
   | 'WITHDRAWAL_REQUESTED'
   | 'WITHDRAWAL_COMPLETED'
-  | 'WITHDRAWAL_FAILED';
+  | 'WITHDRAWAL_FAILED'
+  | 'DEPOSIT_COMPLETED'
+  | 'PAYMENT_LINK_RECEIVED';
 
 export interface TransactionView {
   transactionId: string;
@@ -108,6 +110,8 @@ export interface VaultView {
   spendBy: string;
   settleBy: string;
   paypalAuthorizationId: string;
+  /** Where the locked money came from: a PayPal hold, or the Online wallet. */
+  fundedBy?: 'PAYPAL' | 'WALLET';
 }
 
 
@@ -172,7 +176,7 @@ export interface ListVouchersResponse {
 
 export interface LedgerEntry {
   entryId: string;
-  type: 'CREDIT' | 'WITHDRAWAL' | 'REVERSAL' | 'WITHDRAWAL_RETURNED';
+  type: 'CREDIT' | 'WITHDRAWAL' | 'REVERSAL' | 'WITHDRAWAL_RETURNED' | 'DEPOSIT' | 'PAYMENT_LINK' | 'VAULT_LOCK' | 'VAULT_RETURN';
   amountUsdMinor: number;
   amountNgnMinor: number;
   voucherId: string | null;
@@ -186,12 +190,48 @@ export interface ActiveWalletResponse {
   balanceNgnMinor: number;
   pendingNgnMinor: number;
   payoutEmail: string;
+  // The fixed demo rate, naira per dollar, so the app can turn an amount in naira into dollars.
+  fxRate: string;
   entries: LedgerEntry[];
+}
+
+
+// A public link that lets anyone pay this account by PayPal, with no T-Pay on their side.
+export interface PayLinkResponse {
+  url: string;
+}
+
+
+// Add money: PayPal checkout that captures straight into the Online wallet.
+export interface CreateDepositRequest {
+  amountNgnMinor: number;
+}
+
+
+export interface CreateDepositResponse {
+  depositId: string;
+  amountNgnMinor: number;
+  amountUsdMinor: number;
+  fxRate: string;
+  approvalUrl: string;
+}
+
+
+export interface CompleteDepositResponse {
+  depositId: string;
+  // PENDING means PayPal is still confirming; calling again reads the same capture.
+  status: 'COMPLETED' | 'PENDING';
+  amountNgnMinor: number;
+  amountUsdMinor: number;
+  paypalCaptureId: string | null;
 }
 
 
 export interface WithdrawRequest {
   amountUsdMinor: number;
+  // Where the money goes. Left out, it goes to the account's own payout email. Any PayPal
+  // email works, so people who aren't on T-Pay can be paid.
+  recipientEmail?: string;
 }
 
 
@@ -215,6 +255,19 @@ export interface InterpretRequest {
   audioMimeType: string | null;
   language: Language;
   context: { remainingNgnMinor: number; };
+}
+
+
+export interface SpeakRequest {
+  text: string;
+  language: Language;
+}
+
+
+/** A short spoken clip, as a base64 WAV file. */
+export interface SpeakResponse {
+  audioBase64: string;
+  audioMimeType: 'audio/wav';
 }
 
 

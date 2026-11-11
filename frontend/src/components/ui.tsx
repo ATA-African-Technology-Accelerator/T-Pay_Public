@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, TextProps, View, ViewStyle, StyleProp, useWindowDimensions,
 } from 'react-native';
-import { Volume2 } from 'lucide-react-native';
-import { color, icon, motion, radius, space, touch, type } from '../theme/tokens';
+import { Volume2, WifiOff } from 'lucide-react-native';
+import { color, icon, layout, motion, radius, space, touch, type } from '../theme/tokens';
 import { catalogueLanguage, t } from '../i18n';
 import { speechOut } from '../composition';
 
@@ -49,7 +49,12 @@ export function when(iso: string | null | undefined, withYear = true): string {
   if (Number.isNaN(d.getTime())) return '';
   return `${d.getDate()} ${MONTHS[d.getMonth()]}${withYear ? ` ${d.getFullYear()}` : ''}, ${two(d.getHours())}:${two(d.getMinutes())}`;
 }
-export const useCardW = () => Math.min(useWindowDimensions().width, 390) - space.md * 2;
+/**
+ * The width the app has to work with. A real phone gives the app its whole width, whatever it
+ * is: 360, 411 or a tablet's. Only the web preview is held to a phone-shaped 390.
+ */
+export const useScreenWidth = () => Math.min(useWindowDimensions().width, layout.maxWidth);
+export const useCardW = () => useScreenWidth() - space.md * 2;
 
 export function Card({ w, h, fill, pill, onPill, pillLabel, children, style }: {
   w: number; h: number; fill: string; pill?: React.ReactNode; onPill?(): void; pillLabel?: string; children?: React.ReactNode; style?: StyleProp<ViewStyle>;
@@ -155,6 +160,24 @@ export function speak(text: string) {
   void speechOut.speak(text, catalogueLanguage());
 }
 
+/** The assistant talking: a lifelike voice when online, the phone's voice otherwise. */
+export function speakNaturally(text: string): Promise<void> {
+  return speechOut.speak(text, catalogueLanguage(), true);
+}
+
+/**
+ * Marks money that moved phone to phone with no network, so it reads apart from deposits and
+ * pay-link payments. An icon and a word, never colour alone.
+ */
+export function OfflineTag() {
+  return (
+    <View style={s.tag} accessibilityLabel={t.offlineTag}>
+      <WifiOff size={12} color={color.icon} strokeWidth={2} />
+      <T v="micro" c={color.icon}>{t.offlineTag}</T>
+    </View>
+  );
+}
+
 export function HearIt({ say }: { say: string }) {
   return (
     <Press accessibilityRole="button" accessibilityLabel={t.hearIt} onPress={() => speak(say)} style={s.hear}>
@@ -168,7 +191,7 @@ const s = StyleSheet.create({
   tab: { fontVariant: ['tabular-nums'] },
   card: { borderRadius: radius.lg, overflow: 'hidden' },
   pill: { position: 'absolute', top: space.md, right: space.md, minHeight: 36, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: color.panelHigh, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: space.sm },
-  panel: { backgroundColor: color.panel, borderRadius: radius.lg, padding: space.lg, gap: space.md },
+  panel: { backgroundColor: color.panel, borderWidth: 1, borderColor: color.line, borderRadius: radius.lg, padding: space.lg, gap: space.md },
   btn: { minHeight: touch.button, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingHorizontal: space.xl },
   solid: { backgroundColor: color.text },
   soft: { backgroundColor: color.panelHigh },
@@ -177,5 +200,6 @@ const s = StyleSheet.create({
   skRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   skMark: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: color.panelHigh },
   skLine: { height: space.md, borderRadius: radius.pill, backgroundColor: color.panelHigh },
+  tag: { flexDirection: 'row', alignItems: 'center', gap: space.xs, alignSelf: 'flex-start', paddingHorizontal: space.sm, paddingVertical: space.hair, borderRadius: radius.pill, borderWidth: 1, borderColor: color.line, backgroundColor: color.panel },
   hear: { alignSelf: 'center', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: color.panelHigh },
 });

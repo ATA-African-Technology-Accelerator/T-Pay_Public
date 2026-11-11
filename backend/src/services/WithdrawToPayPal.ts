@@ -27,10 +27,10 @@ export interface WithdrawToPayPalDependencies {
 export class WithdrawToPayPal {
   constructor(private readonly dependencies: WithdrawToPayPalDependencies) {}
 
-  public async execute(device: Device, { amountUsdMinor }: WithdrawRequest): Promise<WithdrawResponse> {
+  public async execute(device: Device, { amountUsdMinor, recipientEmail }: WithdrawRequest): Promise<WithdrawResponse> {
     const { wallet } = this.dependencies;
     const reserved = await wallet.withWalletLock(device.id, (session) =>
-      this.reserve(session, device, amountUsdMinor));
+      this.reserve(session, device, amountUsdMinor, recipientEmail ?? device.payoutEmail));
     const withdrawal = await this.submit(reserved);
     return { withdrawalId: withdrawal.id, status: withdrawal.status, paypalBatchId: withdrawal.paypalBatchId };
   }
@@ -48,7 +48,7 @@ export class WithdrawToPayPal {
   }
 
 
-  private async reserve(session: WalletSession, device: Device, amountUsdMinor: number): Promise<Withdrawal> {
+  private async reserve(session: WalletSession, device: Device, amountUsdMinor: number, receiverEmail: string): Promise<Withdrawal> {
     const { clock, random } = this.dependencies;
     const available = balanceUsd(session.ledger);
     if (amountUsdMinor > available) {
@@ -59,7 +59,7 @@ export class WithdrawToPayPal {
     const withdrawal: Withdrawal = {
       id: `wdr_${random.uuid()}`,
       deviceId: device.id,
-      receiverEmail: device.payoutEmail,
+      receiverEmail,
       amountUsdMinor,
       amountNgnMinor: this.toNgnMinor(amountUsdMinor, available, balanceNgn(session.ledger)),
       status: 'PENDING',
@@ -170,6 +170,7 @@ export class WithdrawToPayPal {
       amountNgnMinor: withdrawal.amountNgnMinor,
       voucherId: null,
       withdrawalId: withdrawal.id,
+      depositId: null,
       paypalCaptureId: null,
       createdAt: clock.now(),
     };

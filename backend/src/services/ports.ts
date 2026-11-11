@@ -62,6 +62,8 @@ export interface Vault {
   declaredTotalUsdMinor: number | null;
   releasedAt: Date | null;
   createdAt: Date;
+  /** PAYPAL when a PayPal hold backs the vault (the default), WALLET when the Online wallet paid for it. */
+  fundedBy?: 'PAYPAL' | 'WALLET';
 }
 
 export interface VaultLock {
@@ -173,8 +175,30 @@ export type PayoutResult =
 
 export type PayoutStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
 
+// Add money: an order that is captured at once, with no hold, once the payer approves it.
+export interface CreateCaptureOrderInput {
+  requestId: string;
+  depositId: string;
+  amountUsdMinor: number;
+  returnUrl: string;
+  cancelUrl: string;
+}
+
+export interface CaptureOrderInput {
+  requestId: string;
+  orderId: string;
+}
+
+export type OrderCaptureResult =
+  | { outcome: 'COMPLETED' | 'PENDING'; captureId: string }
+  | { outcome: 'NOT_APPROVED' }
+  | { outcome: 'BLOCKED'; reason: string }
+  | { outcome: 'RETRY' };
+
 export interface IPaymentGateway {
   createOrder(input: CreateOrderInput): Promise<PaymentOrder>;
+  createCaptureOrder(input: CreateCaptureOrderInput): Promise<PaymentOrder>;
+  captureOrder(input: CaptureOrderInput): Promise<OrderCaptureResult>;
   authorizeOrder(input: AuthorizeOrderInput): Promise<PaymentAuthorization | null>;
   capture(input: CaptureInput): Promise<CaptureResult>;
   findCapture(input: FindCaptureInput): Promise<CaptureResult | null>;
@@ -246,8 +270,11 @@ export interface LedgerRecord {
   amountNgnMinor: number;
   voucherId: string | null;
   withdrawalId: string | null;
+  depositId: string | null;
   paypalCaptureId: string | null;
   createdAt: Date;
+  /** Set on VAULT_LOCK and VAULT_RETURN, the money moving between the Online wallet and a vault. */
+  vaultId?: string | null;
 }
 
 export interface VaultSession {
@@ -301,6 +328,8 @@ export interface AssistantModelRequest {
 // validates before anything reaches a person. Throws AI_UNAVAILABLE when unreachable.
 export interface IAssistantModel {
   interpret(request: AssistantModelRequest): Promise<unknown>;
+  /** Reads a short reply aloud in a natural voice. Returns a WAV file. Throws AI_UNAVAILABLE when unreachable. */
+  speak(request: { text: string; language: Language }): Promise<{ audioBase64: string; audioMimeType: 'audio/wav' }>;
 }
 
 
@@ -324,8 +353,32 @@ export type WithdrawalChanges = Partial<Pick<
   Withdrawal, 'status' | 'paypalBatchId' | 'attempts' | 'nextAttemptAt' | 'updatedAt'
 >>;
 
+export type DepositStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED';
+
+// SELF: a person adding to their own wallet. LINK: someone paying through the pay link.
+export type DepositSource = 'SELF' | 'LINK';
+
+export interface Deposit {
+  id: string;
+  deviceId: string;
+  source: DepositSource;
+  orderId: string;
+  amountUsdMinor: number;
+  amountNgnMinor: number;
+  status: DepositStatus;
+  paypalCaptureId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type DepositChanges = Partial<Pick<Deposit, 'status' | 'paypalCaptureId' | 'updatedAt'>>;
+
 export interface WalletSession {
   readonly ledger: LedgerRecord[];
+  /** Opens a vault in the same transaction as the wallet debit. False when the device already has an open vault. */
+  insertVault(vault: Vault): Promise<boolean>;
+  insertDeposit(deposit: Deposit): Promise<void>;
+  updateDeposit(id: string, changes: DepositChanges): Promise<Deposit>;
   insertWithdrawal(withdrawal: Withdrawal): Promise<void>;
   updateWithdrawal(id: string, changes: WithdrawalChanges): Promise<Withdrawal>;
   addLedgerEntry(entry: LedgerRecord): Promise<void>;
@@ -334,6 +387,10 @@ export interface WalletSession {
 
 export interface IWalletRepository {
   withWalletLock<T>(deviceId: string, work: (session: WalletSession) => Promise<T>): Promise<T>;
+  findDeposit(id: string): Promise<Deposit | null>;
+  /** The device's pay link token, made with `token` on the first call and the same one after. */
+  findOrCreatePayLink(deviceId: string, token: string, now: Date): Promise<string>;
+  findPayLinkOwner(token: string): Promise<string | null>;
   findWithdrawal(id: string): Promise<Withdrawal | null>;
   findDueWithdrawals(now: Date): Promise<Withdrawal[]>;
 }

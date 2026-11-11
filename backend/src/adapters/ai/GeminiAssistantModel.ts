@@ -15,6 +15,13 @@ const RETRY_DELAY_MS = 750;
 // Checked on 10 November 2026: answers in 1 to 5 seconds. gemini-2.5-flash is
 // closed to new keys, and gemini-3.8-flash was answering 503 most of the time.
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
+// The voice model named in Google's speech docs. Not yet tried with this project's key, so
+// it can be changed with GEMINI_TTS_MODEL; the app speaks with the phone's own voice if it fails.
+export const DEFAULT_GEMINI_TTS_MODEL = 'gemini-3.8-flash-tts';
+const VOICE_NAME = 'Kore';
+const SPEECH_TIMEOUT_MS = 10_000;
+// Gemini speech comes back as raw 16-bit mono audio at 24,000 samples a second.
+const PCM_SAMPLE_RATE = 24_000;
 
 const LANGUAGE_NAMES: Record<Language, string> = {
   en: 'English',
@@ -69,6 +76,7 @@ Return only the JSON object.`;
 export interface GeminiConfig {
   apiKey: string | undefined;
   model: string;
+  speechModel?: string;
 }
 
 
@@ -105,6 +113,35 @@ export class GeminiAssistantModel implements IAssistantModel {
   }
 
 
+  public async speak({ text, language }: { text: string; language: Language }): Promise<{ audioBase64: string; audioMimeType: 'audio/wav' }> {
+    if (!this.client) {
+      throw unavailable('GEMINI_API_KEY is not set');
+    }
+    const params: GenerateContentParameters = {
+      model: this.config.speechModel ?? DEFAULT_GEMINI_TTS_MODEL,
+      contents: [{
+        role: 'user',
+        parts: [{ text: `Say this in ${LANGUAGE_NAMES[language]}, warmly and calmly, like a helpful friend: ${text}` }],
+      }],
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE_NAME } } },
+        abortSignal: AbortSignal.timeout(SPEECH_TIMEOUT_MS),
+      },
+    };
+    try {
+      const response = await this.client.models.generateContent(params);
+      const pcm = response.candidates?.[0]?.content?.parts?.find((part) => part.inlineData?.data)?.inlineData?.data;
+      if (!pcm) {
+        throw new Error('no audio in the reply');
+      }
+      return { audioBase64: pcmToWavBase64(pcm), audioMimeType: 'audio/wav' };
+    } catch (error) {
+      throw unavailable(describe(error));
+    }
+  }
+
+
   private async generate(client: GoogleGenAI, params: GenerateContentParameters): Promise<string | undefined> {
     try {
       return (await client.models.generateContent(params)).text;
@@ -120,6 +157,26 @@ export class GeminiAssistantModel implements IAssistantModel {
       }
     }
   }
+}
+
+
+// Wraps raw audio in a 44-byte WAV header so any phone can play it.
+export function pcmToWavBase64(pcmBase64: string): string {
+  const pcm = Buffer.from(pcmBase64, 'base64');
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVEfmt ', 8);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(PCM_SAMPLE_RATE, 24);
+  header.writeUInt32LE(PCM_SAMPLE_RATE * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]).toString('base64');
 }
 
 

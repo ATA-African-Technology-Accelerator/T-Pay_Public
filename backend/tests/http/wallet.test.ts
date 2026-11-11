@@ -11,12 +11,12 @@ describe('Active wallet API', () => {
 
   const wallet = async (device: RegisteredDevice = scenario.payee) =>
     (await scenario.get('/api/wallet', device)).body.data;
-  const withdraw = (amountUsdMinor: number, key: string = randomUUID()) =>
+  const withdraw = (amountUsdMinor: number, key: string = randomUUID(), recipientEmail?: string) =>
     request(fixture.app)
       .post('/api/wallet/withdrawals')
       .set('Authorization', `Bearer ${scenario.payee.deviceToken}`)
       .set('Idempotency-Key', key)
-      .send({ amountUsdMinor });
+      .send(recipientEmail === undefined ? { amountUsdMinor } : { amountUsdMinor, recipientEmail });
   const collect = async (sequence: number) => scenario.submit(await scenario.voucher(sequence));
   const history = async () =>
     (await fixture.transactions.listForDevice(scenario.payee.deviceId, null, 20)).items.map(({ type }) => type);
@@ -41,6 +41,7 @@ describe('Active wallet API', () => {
         balanceNgnMinor: 0,
         pendingNgnMinor: 0,
         payoutEmail: 'merchant-sandbox@example.com',
+        fxRate: '1500.00',
         entries: [],
       });
     });
@@ -53,6 +54,7 @@ describe('Active wallet API', () => {
         balanceNgnMinor: 200_000,
         pendingNgnMinor: 0,
         payoutEmail: 'merchant-sandbox@example.com',
+        fxRate: '1500.00',
         entries: [
           {
             entryId: expect.stringMatching(/^led_/),
@@ -120,6 +122,34 @@ describe('Active wallet API', () => {
           amountUsdMinor: 133,
         },
       ]);
+    });
+
+    it('pays out to any email the person names, such as someone who is not on T-Pay', async () => {
+      await collect(1);
+
+      const response = await withdraw(100, randomUUID(), '  Chidi@Example.com ');
+
+      expect(response.status).toBe(202);
+      expect(fixture.gateway.payouts[0]).toMatchObject({ receiverEmail: 'chidi@example.com', amountUsdMinor: 100 });
+      expect(await wallet()).toMatchObject({ balanceUsdMinor: 33 });
+    });
+
+    it.each(['not-an-email', '', 'a@b', 'x'.repeat(250) + '@example.com'])('refuses the recipient %j', async (email) => {
+      await collect(1);
+
+      expect((await withdraw(100, randomUUID(), email)).status).toBe(400);
+      expect(await wallet()).toMatchObject({ balanceUsdMinor: 133 });
+    });
+
+    it('does not accept the same key for a different recipient', async () => {
+      await collect(1);
+      const key = randomUUID();
+
+      await withdraw(50, key, 'a@example.com');
+      const second = await withdraw(50, key, 'b@example.com');
+
+      expect(second.status).toBe(409);
+      expect(fixture.gateway.payouts).toHaveLength(1);
     });
 
     it('takes the money out of the balance at once', async () => {

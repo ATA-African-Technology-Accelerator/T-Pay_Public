@@ -290,3 +290,25 @@ describe('POST /api/assistant/interpret', () => {
     });
   });
 });
+
+
+describe('POST /api/assistant/speak', () => {
+  it('reads a reply aloud for a registered device', async () => {
+    const fixture = await createApiFixture();
+    const device = await fixture.registerDevice('Mama Nkechi');
+    const speak = (body: object, token = device.deviceToken) =>
+      request(fixture.app).post('/api/assistant/speak').set('Authorization', `Bearer ${token}`).send(body);
+
+    const ok = await speak({ text: 'You wan collect one thousand naira?', language: 'pcm' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.data).toEqual({ audioBase64: 'UklGRg==', audioMimeType: 'audio/wav' });
+    expect(fixture.assistant.spoken).toEqual(['You wan collect one thousand naira?']);
+
+    expect((await speak({ text: 'x'.repeat(301), language: 'en' })).status).toBe(400);
+    expect((await speak({ text: 'hello', language: 'xx' })).status).toBe(400);
+    expect((await speak({ text: 'hello', language: 'en' }, 'bad-token')).status).toBe(401);
+
+    fixture.assistant.unavailable = true;
+    expect((await speak({ text: 'hello', language: 'en' })).status).toBe(503);
+  });
+});

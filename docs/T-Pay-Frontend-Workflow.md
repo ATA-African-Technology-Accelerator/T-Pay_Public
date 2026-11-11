@@ -150,7 +150,9 @@ If delivery fails, resend the same voucher frame, which `encodeFrame` makes iden
 | ACT-11 | Transaction list and detail | Read local data, refresh detail and history if online | `GET /vouchers/{id}`, `GET /transactions` | Shows status and capture ID |
 | ACT-12 | Customer melts the vault | Stop signing, create spend statement, submit | `POST /vaults/{id}/melt` | Released now, or shows scheduled release and blocking voucher |
 | ACT-13 | Active wallet | Read balance and entries | `GET /wallet` | Shows collected money linked to captures |
-| ACT-14 | Withdraw to PayPal | Confirm amount and submit | `POST /wallet/withdrawals` | Pending withdrawal |
+| ACT-14 | Send or withdraw | Choose my PayPal or someone else's email, enter an amount in naira, confirm. The amount is turned into dollars with the wallet's `fxRate`, and the whole balance is sent as exactly the dollars held | `POST /wallet/withdrawals` | Pending withdrawal |
+| ACT-18 | Add money | Enter an amount, open PayPal in the in-app browser, return through `tpay://wallet/return`, then complete. A half-finished checkout is kept, so the link can finish it after the app was closed | `POST /wallet/deposits`, `POST /wallet/deposits/{id}/complete` | Online wallet credited, once |
+| ACT-19 | Get paid by link | Fetch the account's pay link and share or copy it | `GET /wallet/pay-link` | A public page anyone can pay through |
 
 Only a backend response may set `SETTLED`. The phone must never decide this itself.
 

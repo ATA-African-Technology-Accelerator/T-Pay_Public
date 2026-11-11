@@ -18,7 +18,7 @@ export class InMemoryVoucherRepository implements IVoucherRepository {
   private readonly locks = new Map<string, Promise<unknown>>();
 
   constructor(
-    private readonly vaults: InMemoryVaultRepository,
+    public readonly vaults: InMemoryVaultRepository,
     private readonly transactions: InMemoryTransactionRepository,
   ) {}
 
@@ -82,12 +82,14 @@ export class InMemoryVoucherRepository implements IVoucherRepository {
 
 
   public appendLedger(entry: LedgerRecord): void {
-    const exists = this.ledger.some(({ type, voucherId, withdrawalId }) =>
+    const exists = this.ledger.some(({ type, voucherId, withdrawalId, depositId, vaultId }) =>
       type === entry.type
       && ((voucherId !== null && voucherId === entry.voucherId)
-        || (withdrawalId !== null && withdrawalId === entry.withdrawalId)));
+        || (withdrawalId !== null && withdrawalId === entry.withdrawalId)
+        || (depositId !== null && depositId === entry.depositId)
+        || (vaultId != null && vaultId === entry.vaultId)));
     if (!exists) {
-      this.ledger.push(entry);
+      this.ledger.push({ ...entry, vaultId: entry.vaultId ?? null });
     }
   }
 

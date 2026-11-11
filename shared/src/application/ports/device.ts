@@ -63,12 +63,16 @@ export interface RecordedSpeech {
 
 
 export interface ISpeechInput {
+  /** Records until the person stops talking, or taps stop. Throws NO_SPEECH when nothing was said. */
   record(): Promise<RecordedSpeech>;
+  /** Listens for a short spoken answer: yes, no, or neither (null). */
+  listenYesNo(language: Language): Promise<'yes' | 'no' | null>;
   transcribeOffline(language: Language): Promise<string | null>;
 }
 
 
 export interface ISpeechOutput {
   isAvailable(language: Language): Promise<boolean>;
-  speak(text: string, language: Language): Promise<void>;
+  /** `natural` asks for the server's lifelike voice when online; everything else uses the phone's voice. */
+  speak(text: string, language: Language, natural?: boolean): Promise<void>;
 }

@@ -1,17 +1,19 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { ArrowDown, ArrowUp, Banknote, Landmark, Lock, Plus, ReceiptText, WifiOff } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, Banknote, Cpu, Landmark, Lock, Plus, ReceiptText, WifiOff } from 'lucide-react-native';
 import { color, icon, motion, radius, space } from '../../theme/tokens';
-import { Panel, Press, Rise, T, money, when } from '../../components/ui';
+import { Button, Panel, Press, Rise, T, money, when } from '../../components/ui';
 import { Screen, Section } from '../../components/shell';
 import { Hero, type HeroAction, type WalletPage } from '../../components/hero';
 import { ActivityRows } from '../../components/rows';
 import { useNav } from '../../nav';
 import { useApp, type Entry } from '../../state/appState';
+import { store } from '../../composition';
+import { useModelState } from '../settings/offlineAssistant';
 import { t } from '../../i18n';
 
 const ic = { size: icon.md, color: color.white, strokeWidth: 1.8 };
-const mark = { size: icon.md, color: color.amber, strokeWidth: 1.8 };
+const mark = { size: icon.md, color: color.icon, strokeWidth: 1.8 };
 
 function Rows({ rows }: { rows: Entry[] }) {
   const nav = useNav();
@@ -38,18 +40,49 @@ function Notice({ icon: glyph, title, note, onPress }: { icon: React.ReactNode; 
     : <View style={h.notice} accessible>{body}</View>;
 }
 
+const AI_OFFER_DISMISSED = 'ui.aiOfferDismissed';
+
+/**
+ * A one-time, optional offer on Home: the offline assistant is a big download, so people see it
+ * and choose. Only phones that can run it see it, and "Not now" hides it for good (Settings keeps it).
+ */
+function OfflineAiOffer() {
+  const nav = useNav();
+  const model = useModelState();
+  const [dismissed, setDismissed] = React.useState(true);
+  React.useEffect(() => { void store.getMeta<boolean>(AI_OFFER_DISMISSED).then(v => setDismissed(!!v)).catch(() => setDismissed(false)); }, []);
+  if (dismissed || model.kind !== 'absent') return null;
+  return (
+    <Panel>
+      <View style={h.offer}>
+        <View style={h.noticeMark}><Cpu {...mark} /></View>
+        <View style={{ flex: 1 }}>
+          <T v="label">{t.offlineAiOfferTitle}</T>
+          <T v="small" c={color.muted}>{`${t.offlineAiIntro} ${t.offlineAiOptional}`}</T>
+        </View>
+      </View>
+      <View style={h.offer}>
+        <Button style={{ flex: 1 }} kind="quiet" label={t.notNow} onPress={() => { setDismissed(true); void store.setMeta(AI_OFFER_DISMISSED, true); }} />
+        <Button style={{ flex: 1 }} kind="soft" label={t.offlineAiSee} onPress={() => nav.go({ name: 'offlineAi' })} />
+      </View>
+    </Panel>
+  );
+}
+
 /** One home for everyone. The same person pays from the Offline wallet and collects into the Active wallet. */
 export function HomeScreen() {
   const nav = useNav();
-  const { name, offline, active, history, wallet, setWallet, pendingVault, withdrawalOpen, online, lastSyncAt, sync } = useApp();
+  const { name, offline, active, history, wallet, setWallet, pendingVault, withdrawal, withdrawalOpen, online, lastSyncAt, sync, accountKind, vault: lockedVault } = useApp();
+  const business = accountKind === 'business';
   // Home is where people look for news, so it asks for it: right after setup and each unlock.
   React.useEffect(() => { void sync(); }, []);
   const lockMoney = () => nav.go({ name: 'amount', mode: 'lock' });
   const pay: HeroAction = { label: t.pay, icon: <ArrowUp {...ic} />, onPress: () => nav.go({ name: 'scan', kind: 'request' }) };
-  const receive: HeroAction = { label: t.receive, icon: <ArrowDown {...ic} />, onPress: () => nav.go({ name: 'amount', mode: 'collect' }) };
+  const receive: HeroAction = { label: business ? t.getPaid : t.receive, icon: <ArrowDown {...ic} />, onPress: () => nav.go({ name: 'amount', mode: 'collect' }) };
   const lock: HeroAction = { label: t.lockShort, icon: <Plus {...ic} />, onPress: lockMoney };
   const vault: HeroAction = { label: t.vault, icon: <Lock {...ic} />, onPress: () => nav.reset({ name: 'vault' }) };
   const activity: HeroAction = { label: t.activity, icon: <ReceiptText {...ic} />, onPress: () => nav.reset({ name: 'activity' }) };
+  const addMoney: HeroAction = { label: t.depositShort, icon: <Plus {...ic} />, onPress: () => nav.go({ name: 'addMoney' }) };
   const withdraw: HeroAction = { label: t.withdraw, icon: <Banknote {...ic} />, onPress: () => nav.go({ name: 'withdraw' }) };
   const received: HeroAction = { label: t.received, icon: <Landmark {...ic} />, onPress: () => nav.go({ name: 'ledger' }) };
 
@@ -58,37 +91,45 @@ export function HomeScreen() {
     offline.incomingNgn ? `${money(offline.incomingNgn)} ${t.comingIn}` : '',
   ].filter(Boolean).join(' · ');
   // Lock money only while no vault is open: the backend allows one (decision 8).
-  const offlineActions = offline.canSpend ? [pay, receive, vault, activity] : offline.open ? [receive, vault, activity] : [lock, receive, activity];
+  const personalActions = offline.canSpend ? [pay, receive, vault, activity] : offline.open ? [receive, vault, activity] : [lock, receive, activity];
+  // A business gets paid first: no money to lock, so the offline wallet shows what is waiting to be collected.
   const pages: WalletPage[] = [
-    {
-      key: 'offline', name: t.walletOffline, label: t.canSpend, amount: offline.leftNgn, note: moving, actions: offlineActions,
+    business ? {
+      key: 'offline', name: t.walletOffline, label: t.toCollect, amount: offline.incomingNgn, note: offline.pendingOutNgn ? `${money(offline.pendingOutNgn)} ${t.onTheWay}` : '',
+      // Getting paid comes first, but a business pays suppliers too, so it can still lock money.
+      actions: offline.canSpend ? [receive, pay, vault, activity] : offline.open ? [receive, vault, activity] : [receive, lock, activity],
+      status: t.readyToCollect,
+    } : {
+      key: 'offline', name: t.walletOffline, label: t.canSpend, amount: offline.leftNgn, note: moving, actions: personalActions,
       status: offline.canSpend ? t.readyOffline : offline.open ? t.spendingEnded : t.noVault,
     },
     {
-      key: 'active', name: t.walletActive, label: t.availableNow, amount: active.balanceNgn, actions: [withdraw, received, activity],
+      key: 'active', name: t.walletActive, label: t.availableNow, amount: active.balanceNgn, actions: business ? [received, withdraw, addMoney, activity] : [addMoney, withdraw, received, activity],
       note: active.pendingNgn ? `${money(active.pendingNgn)} ${t.comingIn}` : '',
       status: active.payoutEmail || t.collected,
     },
   ];
 
   const isActive = wallet === 'active';
-  const offlineNotice = pendingVault && !offline.open
+  const linkNotice = <Notice icon={<Landmark {...mark} />} title={t.shareLinkTitle} note={t.shareLinkNote} onPress={() => nav.go({ name: 'ledger' })} />;
+  const offlineNotice = business ? linkNotice : pendingVault && !offline.open
     ? <Notice icon={<Lock {...mark} />} title={t.finishLock} note={t.finishLockHint} onPress={() => nav.go({ name: 'vaultReview', amount: pendingVault.amountNgnMinor, hours: pendingVault.durationHours })} />
     : !offline.open
       ? <Notice icon={<Lock {...mark} />} title={t.noVault} note={t.noVaultHint} onPress={lockMoney} />
       : offline.canSpend
-        ? <Notice icon={<Lock {...mark} />} title={`${money(offline.lockedNgn)} ${t.heldByPayPal}`} note={t.spendByDate(when(offline.spendBy))} onPress={() => nav.reset({ name: 'vault' })} />
+        ? <Notice icon={<Lock {...mark} />} title={`${money(offline.lockedNgn)} ${lockedVault?.view?.fundedBy === 'WALLET' ? t.lockedFromWallet : t.heldByPayPal}`} note={t.spendByDate(when(offline.spendBy))} onPress={() => nav.reset({ name: 'vault' })} />
         : <Notice icon={<Lock {...mark} />} title={offline.melted ? t.stillHeld : t.spendingEnded} note={offline.melted && offline.settleBy ? t.releaseByDate(when(offline.releaseAt ?? offline.settleBy)) : t.autoClosing} onPress={() => nav.reset({ name: 'vault' })} />;
   const activeNotice = !active.known
     ? <Notice icon={<WifiOff {...mark} />} title={t.walletActive} note={t.neverUpdated} />
     : withdrawalOpen
-      ? <Notice icon={<Banknote {...mark} />} title={t.withdrawPending} note={t.withdrawalOnWay(active.payoutEmail)} />
+      ? <Notice icon={<Banknote {...mark} />} title={t.withdrawPending} note={t.withdrawalOnWay(withdrawal?.recipientEmail ?? active.payoutEmail)} />
       : <Notice icon={<Banknote {...mark} />} title={t.withdrawTitle} note={t.withdrawAnyTime} onPress={() => nav.go({ name: 'withdraw' })} />;
 
   return (
     <Screen tabsFor="home" hero={<Hero name={name} pages={pages} wallet={wallet} onWallet={setWallet} />}>
       {!online && <Notice icon={<WifiOff {...mark} />} title={t.noNetwork} note={lastSyncAt ? `${t.offlineNow} ${t.updatedAt(when(lastSyncAt, false))}` : t.offlineNow} />}
       <Rise key={wallet}>{isActive ? activeNotice : offlineNotice}</Rise>
+      <OfflineAiOffer />
       <Rise delay={motion.stagger * 2}>
         <Rows key={wallet} rows={isActive ? history.filter(e => e.dir === 'in' || e.dir === 'withdraw') : history} />
       </Rise>
@@ -97,6 +138,7 @@ export function HomeScreen() {
 }
 
 const h = StyleSheet.create({
-  notice: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, backgroundColor: color.panel, borderRadius: radius.lg },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, backgroundColor: color.panel, borderWidth: 1, borderColor: color.line, borderRadius: radius.lg },
+  offer: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   noticeMark: { width: 42, height: 42, borderRadius: radius.sm, backgroundColor: color.panelHigh, alignItems: 'center', justifyContent: 'center' },
 });

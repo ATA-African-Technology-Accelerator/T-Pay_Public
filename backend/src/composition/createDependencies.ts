@@ -1,4 +1,4 @@
-import { DEFAULT_GEMINI_MODEL, GeminiAssistantModel } from '../adapters/ai/GeminiAssistantModel';
+import { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_TTS_MODEL, GeminiAssistantModel } from '../adapters/ai/GeminiAssistantModel';
 import { NodeP256Signer } from '../adapters/crypto/NodeP256Signer';
 import { PayPalGateway } from '../adapters/paypal/PayPalGateway';
 import { createPool, isDatabaseReachable } from '../adapters/persistence/database';
@@ -46,6 +46,7 @@ export function createDependencies(env: NodeJS.ProcessEnv): AppDependencies {
     assistant: new GeminiAssistantModel({
       apiKey: env.GEMINI_API_KEY || undefined,
       model: env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+      speechModel: env.GEMINI_TTS_MODEL || DEFAULT_GEMINI_TTS_MODEL,
     }),
     checkDatabase: () => isDatabaseReachable(pool),
     paypalMode: paypalBaseUrl.includes('sandbox') ? 'sandbox' : 'live',

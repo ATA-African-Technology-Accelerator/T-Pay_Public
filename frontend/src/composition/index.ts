@@ -29,6 +29,11 @@ export const store = new LocalStore(openKv());
 export const connectivity = new NetInfoConnectivity();
 export const nearby = new NearbyTransport(loadNearbyDriver(), loadRadio());
 export const speechIn = new ExpoSpeechInput();
-export const speechOut = new ExpoSpeechOutput();
+// Online, replies are read in a natural voice from the server. Offline, or if that is slow or
+// fails, the phone's own voice reads them.
+export const speechOut = new ExpoSpeechOutput(async (text, language) => {
+  if (!(await connectivity.isOnline())) return null;
+  return (await api.speak({ text, language })).audioBase64;
+});
 /** The offline assistant model. Nothing is downloaded unless the person asks in Settings. */
 export const localModel = loadOnDeviceModel();

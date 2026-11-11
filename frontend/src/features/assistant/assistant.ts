@@ -48,15 +48,26 @@ export function rulesProposal(text: string, language: Language): Proposal {
   return { intent, amountNgnMinor, transcript: text, spokenReply: null, offline: true, onDevice: false, overCapacity: false };
 }
 
+/** The same capacity rule the backend applies to Gemini: paying more than the vault has left is refused. */
+const tooMuch = (intent: AssistantIntent, amountNgnMinor: number | null, remaining: number) =>
+  intent === 'PAY_AMOUNT' && amountNgnMinor !== null && amountNgnMinor > remaining;
+
+const refusedOverCapacity = (base: Proposal, onDevice: boolean): Proposal =>
+  ({ ...base, intent: 'UNKNOWN', amountNgnMinor: null, onDevice, overCapacity: true });
+
 /**
- * Offline: the rules and the phone's model together. The rules are fixed, reviewed code,
- * so whatever they recognise wins; the model only fills what they couldn't read, such as
- * a Yoruba number word. Tested on the real model, a 0.5B model sometimes reverses "pay me"
- * into a payment, and this is what stops that reaching the screen.
+ * Offline, in two steps. First the rules, which answer at once and are fixed, reviewed code.
+ * When they understood both what and how much, that is the answer and the model is never
+ * woken: a small model needs seconds on a phone, so it is kept for what the rules can't read,
+ * such as a Yoruba number word. Whatever the rules did recognise still wins over the model
+ * (tested on the real model: a small one can turn "pay me" into a payment).
  */
 export async function offlineAnswer(text: string, language: Language, remainingNgnMinor: number): Promise<Proposal> {
   const rules = rulesProposal(text, language);
-  if ((await localModel.refresh()).kind !== 'ready') return rules;
+  const understood = rules.intent === 'CHECK_BALANCE' || (rules.intent !== 'UNKNOWN' && rules.amountNgnMinor !== null);
+  if (tooMuch(rules.intent, rules.amountNgnMinor, remainingNgnMinor)) return refusedOverCapacity(rules, false);
+  if (understood || (await localModel.refresh()).kind !== 'ready') return rules;
+
   let model: ReturnType<typeof checkModelProposal>;
   try {
     model = checkModelProposal(await localModel.propose(text, language), Number.MAX_SAFE_INTEGER);
@@ -72,10 +83,9 @@ export async function offlineAnswer(text: string, language: Language, remainingN
   const intent = rules.intent !== 'UNKNOWN' ? rules.intent : model.proposal.intent;
   const amount = intent === 'CHECK_BALANCE' || intent === 'UNKNOWN' ? null : rules.amountNgnMinor ?? model.proposal.amountNgnMinor;
   const usedModel = intent !== rules.intent || amount !== rules.amountNgnMinor;
-  // The same capacity rule the backend applies to Gemini, on the merged answer.
-  if (intent === 'PAY_AMOUNT' && amount !== null && amount > remainingNgnMinor) {
+  if (tooMuch(intent, amount, remainingNgnMinor)) {
     await record('phone', 'REJECTED_OVER_CAPACITY', intent, amount).catch(() => undefined);
-    return { ...rules, intent: 'UNKNOWN', amountNgnMinor: null, onDevice: usedModel, overCapacity: true };
+    return refusedOverCapacity(rules, usedModel);
   }
   await record(usedModel ? 'phone' : 'rules', 'ACCEPTED', intent, amount).catch(() => undefined);
   return { ...rules, intent, amountNgnMinor: amount, onDevice: usedModel };

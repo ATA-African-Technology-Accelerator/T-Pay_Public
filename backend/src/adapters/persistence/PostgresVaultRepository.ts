@@ -19,6 +19,7 @@ export interface VaultRow {
   declared_total_usd_minor: string | null;
   released_at: Date | null;
   created_at: Date;
+  funded_by?: 'PAYPAL' | 'WALLET';
 }
 
 export const toVault = (row: VaultRow): Vault => ({
@@ -38,34 +39,31 @@ export const toVault = (row: VaultRow): Vault => ({
   declaredTotalUsdMinor: row.declared_total_usd_minor === null ? null : Number(row.declared_total_usd_minor),
   releasedAt: row.released_at,
   createdAt: row.created_at,
+  fundedBy: row.funded_by ?? 'PAYPAL',
 });
+
+
+/** Inserts a vault unless the device already has an open one. Shared so the wallet can open a vault in its own transaction. */
+export async function insertVaultRow(db: Pick<pg.Pool, 'query'>, vault: Vault): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `INSERT INTO vaults
+       (id, device_id, status, amount_ngn_minor, authorised_usd_minor, fx_rate, duration_hours,
+        paypal_order_id, paypal_authorization_id, spend_by, settle_by, created_at, funded_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     ON CONFLICT (device_id) WHERE status <> 'CLOSED' DO NOTHING`,
+    [
+      vault.id, vault.deviceId, vault.status, vault.amountNgnMinor, vault.authorisedUsdMinor, vault.fxRate, vault.durationHours,
+      vault.paypalOrderId, vault.paypalAuthorizationId, vault.spendBy, vault.settleBy, vault.createdAt, vault.fundedBy ?? 'PAYPAL',
+    ],
+  );
+  return rowCount === 1;
+}
 
 export class PostgresVaultRepository implements IVaultRepository {
   constructor(private readonly pool: pg.Pool) {}
 
-  public async create(vault: Vault): Promise<boolean> {
-    const { rowCount } = await this.pool.query(
-      `INSERT INTO vaults
-         (id, device_id, status, amount_ngn_minor, authorised_usd_minor, fx_rate, duration_hours,
-          paypal_order_id, paypal_authorization_id, spend_by, settle_by, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       ON CONFLICT (device_id) WHERE status <> 'CLOSED' DO NOTHING`,
-      [
-        vault.id,
-        vault.deviceId,
-        vault.status,
-        vault.amountNgnMinor,
-        vault.authorisedUsdMinor,
-        vault.fxRate,
-        vault.durationHours,
-        vault.paypalOrderId,
-        vault.paypalAuthorizationId,
-        vault.spendBy,
-        vault.settleBy,
-        vault.createdAt,
-      ],
-    );
-    return rowCount === 1;
+  public create(vault: Vault): Promise<boolean> {
+    return insertVaultRow(this.pool, vault);
   }
 
   public async findById(id: string): Promise<Vault | null> {

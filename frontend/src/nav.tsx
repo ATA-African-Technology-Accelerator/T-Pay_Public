@@ -9,8 +9,8 @@ export type Side = 'merchant' | 'customer';
 
 export type Route =
   | { name: 'splash' } | { name: 'language'; edit?: boolean } | { name: 'details'; edit?: boolean } | { name: 'createPin' } | { name: 'lock' }
-  | { name: 'home' } | { name: 'activity' } | { name: 'vault' } | { name: 'speak' } | { name: 'settings' } | { name: 'help' }
-  | { name: 'ledger' } | { name: 'withdraw' } | { name: 'offlineAi' }
+  | { name: 'home' } | { name: 'activity' } | { name: 'vault' } | { name: 'speak'; auto?: boolean } | { name: 'settings' } | { name: 'help' }
+  | { name: 'ledger' } | { name: 'withdraw' } | { name: 'addMoney' } | { name: 'offlineAi' } | { name: 'stock' } | { name: 'budget' }
   | { name: 'receipt'; id: string }
   | { name: 'amount'; mode: 'lock' | 'collect' }
   | { name: 'vaultReview'; amount: number; hours: number } | { name: 'vaultActive' } | { name: 'melt' }
@@ -23,7 +23,7 @@ export type Route =
   | { name: 'delivered'; voucherId: string }
   | { name: 'credit'; voucherId: string; bluetooth: boolean; again?: boolean }
   | { name: 'refusal'; code: PaymentRefusal; side: Side; amount?: number; existingId?: string }
-  | { name: 'proposal'; proposal: Proposal } | { name: 'assist' };
+  | { name: 'proposal'; proposal: Proposal; handsFree?: boolean } | { name: 'assist' };
 
 export type Nav = { go(r: Route): void; reset(r: Route): void; back(): void; openMenu(): void };
 export const NavCtx = createContext<Nav | null>(null);
