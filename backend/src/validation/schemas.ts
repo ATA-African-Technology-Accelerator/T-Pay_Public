@@ -34,7 +34,7 @@ export const updateProfileSchema = z
 
 
 export const listTransactionsQuerySchema = z
-  .object({ since: z.string().regex(/^\d+$/).optional() })
+  .object({ since: z.string().regex(/^\d{1,15}$/).optional() })
   .strict();
 
   
@@ -127,7 +127,7 @@ export const meltVaultSchema = z
 
 export const listVouchersQuerySchema = z
   .object({
-    since: z.string().regex(/^\d+$/).optional(),
+    since: z.string().regex(/^\d{1,15}$/).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
   })
   .strict();

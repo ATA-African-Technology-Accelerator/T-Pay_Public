@@ -40,13 +40,18 @@ const ONES: Record<string, number> = {
 };
 const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
 const SCALES: Record<string, number> = { thousand: 1_000, k: 1_000, million: 1_000_000 };
+// Words bigger than any amount the app allows. Hearing one means "too much", never "one".
+const TOO_BIG = new Set(['billion', 'trillion', 'bn']);
+// A person saying not to pay is not asking to pay.
+const NEGATIONS = new Set(['not', 'dont', 'never', 'cancel', 'stop']);
+const KOBO_PER_NAIRA = 100;
 
 
 export function parseOfflineIntent(text: string, language: Language): OfflineProposal {
   const words = normalise(text);
-  const intent = matchIntent(words, language);
-  const naira = readDigits(words) ?? readWords(words, language);
-  const amountNgnMinor = intent === 'CHECK_BALANCE' || naira === null ? null : naira * 100;
+  const intent = negated(words) ? 'UNKNOWN' : matchIntent(words, language);
+  const kobo = readDigits(words) ?? readWords(words, language);
+  const amountNgnMinor = intent === 'CHECK_BALANCE' ? null : kobo;
   return { intent, amountNgnMinor };
 }
 
@@ -55,12 +60,22 @@ function normalise(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[₦]/g, ' ')
+    // "NGN 500", "N500" and "500naira" are how people type naira.
+    .replace(/\bngn\b/g, ' ')
+    .replace(/\bn(?=\d)/g, ' ')
+    .replace(/(\d)naira\b/g, '$1 naira')
     .replace(/(\d),(?=\d{3}\b)/g, '$1')
     .replace(/(\d)(k)\b/g, '$1 $2')
+    .replace(/don't|don’t/g, 'dont')
     .replace(/[^a-z0-9.\s-]/g, ' ')
     .replace(/-/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
+}
+
+
+function negated(words: string[]): boolean {
+  return words.some((word) => NEGATIONS.has(word)) || words.join(' ').includes('do not');
 }
 
 
@@ -73,36 +88,56 @@ function matchIntent(words: string[], language: Language): AssistantIntent {
 }
 
 
-// "1500", "1,500", "1.5k", "2 thousand". With several numbers, the largest is the
-// money: "sold 3 loaves for 1500" is 1500, not 3.
+// "1500", "1,500", "1 500", "1.5k", "100.50", "2 thousand", in kobo. With several numbers, the
+// largest is the money: "sold 3 loaves for 1500" is 1500, not 3. A number that starts with 0, and
+// the groups straight after it, is a phone or account number, never an amount.
 function readDigits(words: string[]): number | null {
   let best: number | null = null;
-  words.forEach((word, index) => {
-    if (!/^\d+(\.\d+)?$/.test(word)) return;
-    const value = clamp(Math.round(Number(word) * (SCALES[words[index + 1] ?? ''] ?? 1)));
-    if (value !== null && (best === null || value > best)) best = value;
-  });
+  let inPhoneNumber = false;
+  for (let index = 0; index < words.length; index += 1) {
+    let word = words[index] as string;
+    if (!/^\d+(\.\d+)?$/.test(word)) { inPhoneNumber = false; continue; }
+    if (inPhoneNumber || /^0\d/.test(word)) { inPhoneNumber = true; continue; }
+    // "1 000" and "1 500 000": a short number followed by groups of exactly three digits.
+    while (/^\d{1,3}$/.test(word) && /^\d{3}$/.test(words[index + 1] ?? '')) {
+      word += words[index + 1];
+      index += 1;
+    }
+    const scale = SCALES[words[index + 1] ?? ''] ?? 1;
+    if (TOO_BIG.has(words[index + 1] ?? '')) continue;
+    const kobo = clamp(Math.round(Number(word) * scale * KOBO_PER_NAIRA));
+    if (kobo !== null && (best === null || kobo > best)) best = kobo;
+  }
   return best;
 }
 
 
-// English number words, which Pidgin uses too: "one thousand five hundred".
+// English number words, which Pidgin uses too: "one thousand five hundred", "a thousand".
 function readWords(words: string[], language: Language): number | null {
   if (language !== 'en' && language !== 'pcm') return null;
   let total = 0;
   let group = 0;
   let heard = false;
-  for (const word of words) {
-    if (word in ONES) { group += ONES[word] as number; heard = true; }
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index] as string;
+    const next = words[index + 1] ?? '';
+    if (word === 'a' && (next === 'hundred' || next in SCALES)) { group += 1; heard = true; }
+    else if (word in ONES) { group += ONES[word] as number; heard = true; }
     else if (word in TENS) { group += TENS[word] as number; heard = true; }
     else if (word === 'hundred' && heard) { group = (group || 1) * 100; }
-    else if (word in SCALES && heard) { total += (group || 1) * (SCALES[word] as number); group = 0; }
+    else if (word in SCALES && heard) {
+      const scale = SCALES[word] as number;
+      // "one million million": a scale straight after a scale multiplies the whole amount.
+      if (group === 0 && total > 0) total *= scale;
+      else { total += (group || 1) * scale; group = 0; }
+    }
+    else if (TOO_BIG.has(word) && heard) return null;
     else if (word !== 'and' && heard) break;
   }
-  return heard ? clamp(total + group) : null;
+  return heard ? clamp((total + group) * KOBO_PER_NAIRA) : null;
 }
 
 
-function clamp(naira: number): number | null {
-  return Number.isSafeInteger(naira) && naira > 0 && naira <= MAX_NAIRA ? naira : null;
+function clamp(kobo: number): number | null {
+  return Number.isSafeInteger(kobo) && kobo >= KOBO_PER_NAIRA && kobo <= MAX_NAIRA * KOBO_PER_NAIRA ? kobo : null;
 }

@@ -12,10 +12,19 @@ export const MAX_QUANTITY = 100_000;
 /** At or below this many left, an item is shown as running low. */
 export const LOW_STOCK = 3;
 
+// Every change reads the shelf, edits it and writes it back. Two quick taps would otherwise both
+// read the same shelf and one would be lost, so changes wait their turn.
+let queue: Promise<unknown> = Promise.resolve();
+function inTurn<T>(work: () => Promise<T>): Promise<T> {
+  const run = queue.then(work, work);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
 export const stockStore = {
   load: async (): Promise<StockItem[]> => (await store.getMeta<StockItem[]>(STOCK)) ?? [],
   save: (items: StockItem[]) => store.setMeta(STOCK, items),
-  add: async (name: string, quantity: number): Promise<void> => {
+  add: (name: string, quantity: number): Promise<void> => inTurn(async () => {
     const items = await stockStore.load();
     if (items.length >= MAX_ITEMS) return;
     const clean = name.trim().slice(0, 60);
@@ -23,12 +32,12 @@ export const stockStore = {
     if (existing) existing.quantity = Math.min(existing.quantity + quantity, MAX_QUANTITY);
     else items.push({ id: random.uuid(), name: clean, quantity: Math.min(quantity, MAX_QUANTITY) });
     await stockStore.save(items);
-  },
-  change: async (id: string, by: number): Promise<void> => {
+  }),
+  change: (id: string, by: number): Promise<void> => inTurn(async () => {
     const items = await stockStore.load();
     await stockStore.save(items.map(i => (i.id === id ? { ...i, quantity: Math.max(0, Math.min(i.quantity + by, MAX_QUANTITY)) } : i)));
-  },
-  remove: async (id: string): Promise<void> => stockStore.save((await stockStore.load()).filter(i => i.id !== id)),
+  }),
+  remove: (id: string): Promise<void> => inTurn(async () => stockStore.save((await stockStore.load()).filter(i => i.id !== id))),
 };
 
 /** The most a business plans to spend in a month, in kobo. Null until it sets one. */

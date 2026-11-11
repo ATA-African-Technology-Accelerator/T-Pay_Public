@@ -10,7 +10,9 @@ const has = (said: string, word: string) => ` ${said} `.includes(` ${word} `);
 export function readYesNo(transcript: string): 'yes' | 'no' | null {
   const said = clean(transcript);
   if (!said) return null;
-  const yes = YES.some(w => has(said, w));
+  // A negation next to a yes ("not yes", "don't") is never read as a yes.
+  const negated = ['not', 'dont', "don't", 'never'].some(w => has(said, w));
+  const yes = !negated && YES.some(w => has(said, w));
   const no = NO.some(w => has(said, w));
   if (yes === no) return null;
   return yes ? 'yes' : 'no';
