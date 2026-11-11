@@ -550,6 +550,19 @@ Response `201`: `{ "data": { "vault": { ..., "fundedBy": "WALLET" }, "vaultCerti
 
 `VaultView.fundedBy` is `PAYPAL` or `WALLET` on every vault. Ledger entries add two types: `VAULT_LOCK` (money out of the Online wallet into a vault) and `VAULT_RETURN` (unspent money back).
 
+### 4.23 Automatic cash-out of money received offline
+
+The **Wallet** holds the money a person receives; the **Offline vault** holds the money they can send offline. Money received from offline payments goes on to the person's own PayPal (`payoutEmail`) by itself, without any call from the app:
+
+| Rule | |
+|---|---|
+| When | A background job every 30 seconds. Whatever was received offline since the last run becomes **one** payout, so a busy seller is not charged a fee per sale. |
+| What | Money received offline (`CREDIT`, less any `REVERSAL`) less what was already cashed out this way. Never money the person added (`DEPOSIT`) or was paid by link (`PAYMENT_LINK`), and never more than the balance. |
+| Minimum | $1.00. Smaller amounts wait for the next payment. |
+| Payout | The same PayPal Payout as a withdrawal, with the same retries and duplicate protection. Its `WITHDRAWAL` and any `WITHDRAWAL_RETURNED` ledger entries carry `"autoCashOut": true`. |
+| Refused | If PayPal refuses (for example an email with no PayPal account), the money returns to the Wallet and automatic cash-out pauses for that account for 24 hours. |
+| Turning it off | `PATCH /profile` with `{ "autoCashOut": false }`. `GET /profile` returns `autoCashOut` (default `true`). Registering the phone again keeps the choice. |
+
 ## 5. Offline messages
 
 These are signed objects carried between phones and later to the backend. They are created and verified only through `shared/`.

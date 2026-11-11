@@ -16,6 +16,7 @@ const toLedgerEntry = (entry: LedgerRecord): LedgerEntry => ({
   voucherId: entry.voucherId,
   paypalCaptureId: entry.paypalCaptureId,
   createdAt: entry.createdAt.toISOString(),
+  ...(entry.autoCashOut ? { autoCashOut: true } : {}),
 });
 
 

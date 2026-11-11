@@ -32,8 +32,9 @@ export class InMemoryDeviceRepository implements IDeviceRepository {
           keyId: existing.keyId,
           createdAt: existing.createdAt,
           revokedAt: existing.revokedAt ?? device.revokedAt,
+          autoCashOut: device.autoCashOut ?? existing.autoCashOut ?? true,
         }
-      : device;
+      : { ...device, autoCashOut: device.autoCashOut ?? true };
     this.devices.set(device.publicKey, saved);
     return saved;
   }

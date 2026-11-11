@@ -310,6 +310,7 @@ describe.each(implementations)('$name repositories', ({ create }) => {
       nextAttemptAt: null,
       createdAt: NOW,
       updatedAt: NOW,
+      autoCashOut: false,
       ...overrides,
     });
     const entry = (id: string, type: 'WITHDRAWAL' | 'WITHDRAWAL_RETURNED', withdrawalId: string) => ({
@@ -337,7 +338,7 @@ describe.each(implementations)('$name repositories', ({ create }) => {
 
       expect(await repositories.wallet.findWithdrawal('wdr_1')).toEqual(withdrawal('wdr_1'));
       await repositories.wallet.withWalletLock('dev_w1', async ({ ledger }) => {
-        expect(ledger).toEqual([{ ...entry('led_1', 'WITHDRAWAL', 'wdr_1'), vaultId: null }]);
+        expect(ledger).toEqual([{ ...entry('led_1', 'WITHDRAWAL', 'wdr_1'), vaultId: null, autoCashOut: false }]);
       });
     });
 

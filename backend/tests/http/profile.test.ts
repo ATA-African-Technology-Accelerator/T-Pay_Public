@@ -39,6 +39,7 @@ describe('profile', () => {
       displayName: 'Mama Nkechi Provisions',
       language: 'pcm',
       payoutEmail: 'merchant-sandbox@example.com',
+      autoCashOut: true,
       assuranceTier: 'B',
       createdAt: NOW.toISOString(),
     });

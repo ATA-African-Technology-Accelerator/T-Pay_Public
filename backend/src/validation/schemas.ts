@@ -28,6 +28,7 @@ export const updateProfileSchema = z
     displayName: displayName.optional(),
     language: language.optional(),
     payoutEmail: payoutEmail.optional(),
+    autoCashOut: z.boolean().optional(),
   })
   .strict();
 

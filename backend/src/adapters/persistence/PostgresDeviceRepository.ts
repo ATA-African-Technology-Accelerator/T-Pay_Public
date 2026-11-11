@@ -12,6 +12,7 @@ interface DeviceRow {
   payout_email: string;
   created_at: Date;
   revoked_at: Date | null;
+  auto_cash_out?: boolean;
 }
 
 const toDevice = (row: DeviceRow): Device => ({
@@ -24,6 +25,7 @@ const toDevice = (row: DeviceRow): Device => ({
   payoutEmail: row.payout_email,
   createdAt: row.created_at,
   revokedAt: row.revoked_at,
+  autoCashOut: row.auto_cash_out !== false,
 });
 
 export class PostgresDeviceRepository implements IDeviceRepository {
@@ -48,14 +50,15 @@ export class PostgresDeviceRepository implements IDeviceRepository {
   public async save(device: Device): Promise<Device> {
     const { rows } = await this.pool.query<DeviceRow>(
       `INSERT INTO devices
-         (id, key_id, public_key, token_hash, display_name, language, payout_email, created_at, revoked_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         (id, key_id, public_key, token_hash, display_name, language, payout_email, created_at, revoked_at, auto_cash_out)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10, TRUE))
        ON CONFLICT (public_key) DO UPDATE SET
          token_hash = EXCLUDED.token_hash,
          display_name = EXCLUDED.display_name,
          language = EXCLUDED.language,
          payout_email = EXCLUDED.payout_email,
-         revoked_at = COALESCE(devices.revoked_at, EXCLUDED.revoked_at)
+         revoked_at = COALESCE(devices.revoked_at, EXCLUDED.revoked_at),
+         auto_cash_out = COALESCE($10, devices.auto_cash_out)
        RETURNING *`,
       [
         device.id,
@@ -67,6 +70,7 @@ export class PostgresDeviceRepository implements IDeviceRepository {
         device.payoutEmail,
         device.createdAt,
         device.revokedAt,
+        device.autoCashOut ?? null,
       ],
     );
     return toDevice(rows[0] as DeviceRow);

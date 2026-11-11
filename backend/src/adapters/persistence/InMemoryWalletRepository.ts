@@ -26,6 +26,11 @@ export class InMemoryWalletRepository implements IWalletRepository {
   }
 
 
+  public async listDevicesPaidOffline(): Promise<string[]> {
+    return this.vouchers.devicesWithLedgerType('CREDIT');
+  }
+
+
   public async findDeposit(id: string): Promise<Deposit | null> {
     return this.deposits.get(id) ?? null;
   }
@@ -73,7 +78,7 @@ export class InMemoryWalletRepository implements IWalletRepository {
         return updated;
       },
       insertWithdrawal: async (withdrawal) => {
-        withdrawals.set(withdrawal.id, withdrawal);
+        withdrawals.set(withdrawal.id, { ...withdrawal, autoCashOut: withdrawal.autoCashOut === true });
       },
       updateWithdrawal: async (id, changes: WithdrawalChanges) => {
         const updated = { ...(withdrawals.get(id) as Withdrawal), ...changes };

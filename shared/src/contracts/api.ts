@@ -41,6 +41,8 @@ export interface ProfileView {
   displayName: string;
   language: Language;
   payoutEmail: string;
+  /** Money received offline goes on to this PayPal email by itself. On unless turned off. */
+  autoCashOut: boolean;
   assuranceTier: 'B';
   createdAt: string;
 }
@@ -50,6 +52,7 @@ export interface UpdateProfileRequest {
   displayName?: string;
   language?: Language;
   payoutEmail?: string;
+  autoCashOut?: boolean;
 }
 
 export type TransactionType =
@@ -182,6 +185,8 @@ export interface LedgerEntry {
   voucherId: string | null;
   paypalCaptureId: string | null;
   createdAt: string;
+  /** A withdrawal T-Pay made by itself, sending money received offline on to PayPal. */
+  autoCashOut?: boolean;
 }
 
 
