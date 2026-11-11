@@ -62,6 +62,8 @@ export interface Vault {
   declaredTotalUsdMinor: number | null;
   releasedAt: Date | null;
   createdAt: Date;
+  /** PAYPAL when a PayPal hold backs the vault (the default), WALLET when the Online wallet paid for it. */
+  fundedBy?: 'PAYPAL' | 'WALLET';
 }
 
 export interface VaultLock {
@@ -271,6 +273,8 @@ export interface LedgerRecord {
   depositId: string | null;
   paypalCaptureId: string | null;
   createdAt: Date;
+  /** Set on VAULT_LOCK and VAULT_RETURN, the money moving between the Online wallet and a vault. */
+  vaultId?: string | null;
 }
 
 export interface VaultSession {
@@ -371,6 +375,8 @@ export type DepositChanges = Partial<Pick<Deposit, 'status' | 'paypalCaptureId' 
 
 export interface WalletSession {
   readonly ledger: LedgerRecord[];
+  /** Opens a vault in the same transaction as the wallet debit. False when the device already has an open vault. */
+  insertVault(vault: Vault): Promise<boolean>;
   insertDeposit(deposit: Deposit): Promise<void>;
   updateDeposit(id: string, changes: DepositChanges): Promise<Deposit>;
   insertWithdrawal(withdrawal: Withdrawal): Promise<void>;

@@ -110,6 +110,8 @@ export interface VaultView {
   spendBy: string;
   settleBy: string;
   paypalAuthorizationId: string;
+  /** Where the locked money came from: a PayPal hold, or the Online wallet. */
+  fundedBy?: 'PAYPAL' | 'WALLET';
 }
 
 
@@ -174,7 +176,7 @@ export interface ListVouchersResponse {
 
 export interface LedgerEntry {
   entryId: string;
-  type: 'CREDIT' | 'WITHDRAWAL' | 'REVERSAL' | 'WITHDRAWAL_RETURNED' | 'DEPOSIT' | 'PAYMENT_LINK';
+  type: 'CREDIT' | 'WITHDRAWAL' | 'REVERSAL' | 'WITHDRAWAL_RETURNED' | 'DEPOSIT' | 'PAYMENT_LINK' | 'VAULT_LOCK' | 'VAULT_RETURN';
   amountUsdMinor: number;
   amountNgnMinor: number;
   voucherId: string | null;

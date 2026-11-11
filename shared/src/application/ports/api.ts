@@ -26,6 +26,8 @@ export interface ITPayApi {
   updateProfile(request: UpdateProfileRequest): Promise<ProfileView>;
   createVault(request: CreateVaultRequest, options?: MutationOptions): Promise<CreateVaultResponse>;
   authorizeVault(vaultId: string, options?: MutationOptions): Promise<AuthorizeVaultResponse>;
+  /** Locks money from the Online wallet. No PayPal step: the vault is ready at once. */
+  lockFromWallet(request: CreateVaultRequest, options?: MutationOptions): Promise<AuthorizeVaultResponse>;
   getCurrentVault(): Promise<CurrentVaultResponse>;
   meltVault(vaultId: string, request: MeltVaultRequest, options?: MutationOptions): Promise<MeltVaultResponse>;
   submitVoucher(request: SubmitVoucherRequest): Promise<SubmitVoucherResponse>;

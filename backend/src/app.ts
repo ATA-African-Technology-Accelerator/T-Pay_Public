@@ -24,6 +24,7 @@ import { createVaultRouter } from './routes/vault.routes';
 import { createVoucherRouter } from './routes/voucher.routes';
 import { createWalletRouter } from './routes/wallet.routes';
 import { AuthorizeVault } from './services/AuthorizeVault';
+import { LockFromWallet } from './services/LockFromWallet';
 import { CreateVaultOrder } from './services/CreateVaultOrder';
 import { GetActiveWallet } from './services/GetActiveWallet';
 import { GetCurrentVault } from './services/GetCurrentVault';
@@ -94,6 +95,7 @@ export function createApp(dependencies: AppDependencies): Express {
         new AuthorizeVault(dependencies),
         new GetCurrentVault(vaults, vouchers),
         services.meltVault,
+        new LockFromWallet(dependencies),
       ),
       new PayPalReturnController(vaults, services.deposits),
       requireDevice,

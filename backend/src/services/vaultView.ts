@@ -35,5 +35,6 @@ export function toVaultView(vault: Vault, vouchers: Voucher[]): VaultView {
     spendBy: (vault.spendBy as Date).toISOString(),
     settleBy: (vault.settleBy as Date).toISOString(),
     paypalAuthorizationId: vault.paypalAuthorizationId as string,
+    fundedBy: vault.fundedBy ?? 'PAYPAL',
   };
 }

@@ -197,8 +197,8 @@ describe.each(implementations)('$name repositories', ({ create }) => {
       const created = vault('find', 'dev_v1');
 
       expect(await repositories.vaults.create(created)).toBe(true);
-      expect(await repositories.vaults.findById(created.id)).toEqual(created);
-      expect(await repositories.vaults.findOpenForDevice('dev_v1')).toEqual(created);
+      expect(await repositories.vaults.findById(created.id)).toEqual({ ...created, fundedBy: 'PAYPAL' });
+      expect(await repositories.vaults.findOpenForDevice('dev_v1')).toEqual({ ...created, fundedBy: 'PAYPAL' });
     });
 
     it('returns null for an unknown vault', async () => {
@@ -337,7 +337,7 @@ describe.each(implementations)('$name repositories', ({ create }) => {
 
       expect(await repositories.wallet.findWithdrawal('wdr_1')).toEqual(withdrawal('wdr_1'));
       await repositories.wallet.withWalletLock('dev_w1', async ({ ledger }) => {
-        expect(ledger).toEqual([entry('led_1', 'WITHDRAWAL', 'wdr_1')]);
+        expect(ledger).toEqual([{ ...entry('led_1', 'WITHDRAWAL', 'wdr_1'), vaultId: null }]);
       });
     });
 

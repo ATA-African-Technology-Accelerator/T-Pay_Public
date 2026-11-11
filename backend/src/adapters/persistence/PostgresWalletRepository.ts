@@ -4,6 +4,7 @@ import type {
 } from '../../services/ports';
 import { insertLedgerEntry, toLedgerRecord, type LedgerRow } from './ledgerRows';
 import { PostgresTransactionRepository } from './PostgresTransactionRepository';
+import { insertVaultRow } from './PostgresVaultRepository';
 
 
 
@@ -152,6 +153,7 @@ export class PostgresWalletRepository implements IWalletRepository {
 
     return {
       ledger,
+      insertVault: (vault) => insertVaultRow(client, vault),
       insertDeposit: async (deposit) => {
         await client.query(
           `INSERT INTO deposits

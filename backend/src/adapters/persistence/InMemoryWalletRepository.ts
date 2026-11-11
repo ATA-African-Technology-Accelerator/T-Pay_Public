@@ -63,6 +63,7 @@ export class InMemoryWalletRepository implements IWalletRepository {
       get ledger() {
         return vouchers.ledgerFor(deviceId);
       },
+      insertVault: (vault) => vouchers.vaults.create(vault),
       insertDeposit: async (deposit) => {
         deposits.set(deposit.id, deposit);
       },
