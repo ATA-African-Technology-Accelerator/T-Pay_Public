@@ -206,6 +206,7 @@ describe('POST /api/assistant/interpret', () => {
         outcome: 'ACCEPTED',
         intent: 'CREATE_PAYMENT_REQUEST',
         amountNgnMinor: 100_000,
+        modelMs: expect.any(Number),
       }]);
     });
 

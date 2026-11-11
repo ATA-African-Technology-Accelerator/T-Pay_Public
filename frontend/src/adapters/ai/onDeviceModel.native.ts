@@ -4,6 +4,7 @@
 import * as Device from 'expo-device';
 import * as FileSystem from 'expo-file-system/legacy';
 import { TurboModuleRegistry } from 'react-native';
+import { TpayDownload } from '../../../modules/tpay-download';
 import { MODEL_PROPOSAL_SCHEMA } from '@tpay/shared/domain/assistantProposal';
 import type { Language } from '@tpay/shared/contracts/statuses';
 import { MODEL_BYTES, type ModelState, type OnDeviceModel } from './onDeviceModel.types';
@@ -16,13 +17,20 @@ const MODEL_URL = 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolv
 const DIRECTORY = `${FileSystem.documentDirectory}models/`;
 const FINAL = `${DIRECTORY}qwen2.5-0.5b-instruct-q4_k_m.gguf`;
 const PARTIAL = `${FINAL}.part`;
+const FILE_NAME = 'qwen2.5-0.5b-instruct-q4_k_m.gguf';
+// Remembers a download in progress, so it is picked up again after the app was left or closed.
+const JOB = `${DIRECTORY}download.json`;
+const POLL_MS = 1_000;
+type Job = { id: number } | { resume: string };
 // Every GGUF file starts with these four bytes; base64 of "GGUF".
 const GGUF_MAGIC = 'R0dVRg==';
 // The model needs about 1 GB while running; below this the phone would struggle.
 const MIN_MEMORY_BYTES = 2_800_000_000;
 const SPARE_DISK_BYTES = 200_000_000;
-const ANSWER_DEADLINE_MS = 20_000;
-const IDLE_RELEASE_MS = 120_000;
+// The rules have already answered by then, so a slow model only ever delays a little.
+const ANSWER_DEADLINE_MS = 8_000;
+// Loading takes seconds, so the model stays in memory a while between questions.
+const IDLE_RELEASE_MS = 300_000;
 
 const LANGUAGE_NAMES: Record<Language, string> = { en: 'English', pcm: 'Nigerian Pidgin', yo: 'Yoruba', ig: 'Igbo', ha: 'Hausa' };
 
@@ -46,6 +54,8 @@ class LlamaModel implements OnDeviceModel {
   private current: ModelState = { kind: 'absent' };
   private readonly listeners = new Set<(state: ModelState) => void>();
   private task: FileSystem.DownloadResumable | null = null;
+  private poll: ReturnType<typeof setInterval> | null = null;
+  private savedAt = 0;
   private context: Promise<LlamaContext> | null = null;
   private idle: ReturnType<typeof setTimeout> | null = null;
 
@@ -60,22 +70,94 @@ class LlamaModel implements OnDeviceModel {
     if (this.current.kind === 'downloading') return this.current;
     if (!llama()) return this.set({ kind: 'unsupported', reason: 'device' });
     if ((Device.totalMemory ?? 0) < MIN_MEMORY_BYTES) return this.set({ kind: 'unsupported', reason: 'memory' });
-    return this.set((await this.verified()) ? { kind: 'ready' } : { kind: 'absent' });
+    if (await this.verified()) return this.set({ kind: 'ready' });
+    // A download started earlier, perhaps before the app was closed: carry on with it.
+    const job = await loadJob();
+    if (job && 'id' in job && TpayDownload) {
+      this.set({ kind: 'downloading', received: 0, total: MODEL_BYTES });
+      this.watch(job.id);
+      return this.current;
+    }
+    if (job && 'resume' in job && job.resume) {
+      this.set({ kind: 'downloading', received: 0, total: MODEL_BYTES });
+      void this.downloadInApp(job);
+      return this.current;
+    }
+    return this.set({ kind: 'absent' });
   }
 
   async download(): Promise<void> {
     if (this.current.kind === 'downloading' || (await this.refresh()).kind !== 'absent') return;
     if ((await FileSystem.getFreeDiskStorageAsync()) < MODEL_BYTES + SPARE_DISK_BYTES) { this.set({ kind: 'failed', reason: 'space' }); return; }
     await FileSystem.makeDirectoryAsync(DIRECTORY, { intermediates: true }).catch(() => undefined);
-    await FileSystem.deleteAsync(PARTIAL, { idempotent: true });
     this.set({ kind: 'downloading', received: 0, total: MODEL_BYTES });
-    this.task = FileSystem.createDownloadResumable(MODEL_URL, PARTIAL, {}, p => {
+    if (TpayDownload) {
+      try {
+        const id = await TpayDownload.start(MODEL_URL, FILE_NAME, 'T-Pay offline assistant');
+        await saveJob({ id });
+        this.watch(id);
+      } catch {
+        this.set({ kind: 'failed', reason: 'network' });
+      }
+      return;
+    }
+    await this.downloadInApp(await loadJob());
+  }
+
+  /**
+   * Android's DownloadManager does the work, outside the app. This only reads its progress, and
+   * starts reading again whenever the app comes back, however long it was gone.
+   */
+  private watch(id: number) {
+    if (this.poll) clearInterval(this.poll);
+    const tick = async () => {
+      const native = TpayDownload;
+      if (!native) return;
+      const status = await native.status(id).catch(() => null);
+      if (!status || this.current.kind !== 'downloading') return;
+      if (status.state === 'done') {
+        this.stopWatching();
+        const moved = await native.moveTo(id, FILE_NAME, FINAL.replace(/^file:\/\//, '')).catch(() => false);
+        await clearJob();
+        if (moved && (await this.verified())) { this.set({ kind: 'ready' }); return; }
+        await FileSystem.deleteAsync(FINAL, { idempotent: true }).catch(() => undefined);
+        this.set({ kind: 'failed', reason: 'damaged' });
+      } else if (status.state === 'failed' || status.state === 'missing') {
+        this.stopWatching();
+        await native.cancel(id).catch(() => undefined);
+        await clearJob();
+        this.set({ kind: 'failed', reason: 'network' });
+      } else {
+        this.set({ kind: 'downloading', received: status.received, total: status.total > 0 ? status.total : MODEL_BYTES });
+      }
+    };
+    this.poll = setInterval(() => { void tick(); }, POLL_MS);
+    void tick();
+  }
+
+  private stopWatching() {
+    if (this.poll) clearInterval(this.poll);
+    this.poll = null;
+  }
+
+  /**
+   * Without the native module (an older build), the app downloads it itself. What has arrived is
+   * kept and remembered, so leaving the app or losing the network resumes from there, not from zero.
+   */
+  private async downloadInApp(job: Job | null) {
+    const progress = (p: FileSystem.DownloadProgressData) => {
       this.set({ kind: 'downloading', received: p.totalBytesWritten, total: p.totalBytesExpectedToWrite > 0 ? p.totalBytesExpectedToWrite : MODEL_BYTES });
-    });
+      const now = Date.now();
+      if (now - this.savedAt > 5_000 && this.task) { this.savedAt = now; void saveJob({ resume: this.task.savable().resumeData ?? '' }); }
+    };
+    const resumeData = job && 'resume' in job && job.resume ? job.resume : undefined;
+    if (!resumeData) await FileSystem.deleteAsync(PARTIAL, { idempotent: true });
+    this.task = FileSystem.createDownloadResumable(MODEL_URL, PARTIAL, {}, progress, resumeData);
     try {
-      const result = await this.task.downloadAsync();
+      const result = resumeData ? await this.task.resumeAsync() : await this.task.downloadAsync();
       this.task = null;
-      if (!result) return; // cancelled
+      if (!result) return; // paused or cancelled
+      await clearJob();
       if (!(await this.verified(PARTIAL))) {
         await FileSystem.deleteAsync(PARTIAL, { idempotent: true });
         this.set({ kind: 'failed', reason: 'damaged' });
@@ -84,16 +166,23 @@ class LlamaModel implements OnDeviceModel {
       await FileSystem.moveAsync({ from: PARTIAL, to: FINAL });
       this.set({ kind: 'ready' });
     } catch {
+      // Keep what arrived. The next try, or the app coming back, carries on from here.
+      const task = this.task;
       this.task = null;
-      await FileSystem.deleteAsync(PARTIAL, { idempotent: true }).catch(() => undefined);
+      const data = task ? task.savable().resumeData : undefined;
+      if (data) await saveJob({ resume: data }); else await clearJob();
       this.set({ kind: 'failed', reason: 'network' });
     }
   }
 
   async cancel(): Promise<void> {
+    this.stopWatching();
+    const job = await loadJob();
+    if (job && 'id' in job) await TpayDownload?.cancel(job.id).catch(() => undefined);
     const task = this.task;
     this.task = null;
     await task?.cancelAsync().catch(() => undefined);
+    await clearJob();
     await FileSystem.deleteAsync(PARTIAL, { idempotent: true }).catch(() => undefined);
     this.set({ kind: 'absent' });
   }
@@ -132,7 +221,7 @@ class LlamaModel implements OnDeviceModel {
       messages: this.messages(text, language),
       response_format: { type: 'json_schema', json_schema: { strict: true, schema: MODEL_PROPOSAL_SCHEMA as unknown as object } },
       temperature: 0,
-      n_predict: 64,
+      n_predict: 48,
     });
     let timer: ReturnType<typeof setTimeout> | null = null;
     const late = new Promise<never>((_, reject) => {
@@ -185,6 +274,16 @@ class LlamaModel implements OnDeviceModel {
     this.listeners.forEach(l => l(state));
     return state;
   }
+}
+
+async function loadJob(): Promise<Job | null> {
+  try { return JSON.parse(await FileSystem.readAsStringAsync(JOB)) as Job; } catch { return null; }
+}
+async function saveJob(job: Job) {
+  await FileSystem.writeAsStringAsync(JOB, JSON.stringify(job)).catch(() => undefined);
+}
+async function clearJob() {
+  await FileSystem.deleteAsync(JOB, { idempotent: true }).catch(() => undefined);
 }
 
 /** Null when the app was built without llama.rn's native code (Expo Go). */

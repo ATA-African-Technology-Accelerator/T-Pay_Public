@@ -1,4 +1,4 @@
-// ACT-13 and ACT-14. The Active wallet is money collected from customers, held by
+// ACT-13 and ACT-14. The Main wallet is money collected from customers, held by
 // T-Pay and sent to the account's PayPal email on request.
 import * as WebBrowser from 'expo-web-browser';
 import type { CompleteDepositResponse, TransactionView, WithdrawResponse } from '@tpay/shared/contracts/api';
@@ -53,7 +53,7 @@ export async function withdraw(amountUsdMinor: number, amountNgnMinor: number, r
 }
 
 
-// ---- Add money (a PayPal checkout that lands in the Online wallet) ----------------------
+// ---- Add money (a PayPal checkout that lands in the Main wallet) ----------------------
 
 export const DEPOSIT_RETURN = 'tpay://wallet/return';
 

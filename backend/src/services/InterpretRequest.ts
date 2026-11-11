@@ -43,11 +43,14 @@ export class InterpretRequest {
 
   public async execute(device: Device, body: InterpretBody): Promise<InterpretResponse> {
     const input = toInput(body);
+    const started = Date.now();
     const raw = await this.model.interpret({ input, language: body.language });
+    // How long the model took, in the log, so a slow assistant can be told apart from a slow network.
+    const modelMs = Date.now() - started;
 
     const parsed = modelProposalSchema.safeParse(raw);
     if (!parsed.success) {
-      return this.refuse(device, body, input, 'REJECTED_INVALID', input.kind === 'text' ? input.text : '');
+      return this.refuse(device, body, input, 'REJECTED_INVALID', input.kind === 'text' ? input.text : '', null, modelMs);
     }
 
     const { amountNaira, intent, itemName, spokenReply, transcript } = parsed.data;
@@ -56,10 +59,10 @@ export class InterpretRequest {
       : { intent, amountNgnMinor: amountNaira === null ? null : amountNaira * KOBO_PER_NAIRA, itemName };
 
     if (overCapacity(proposal, body.context.remainingNgnMinor)) {
-      return this.refuse(device, body, input, 'REJECTED_OVER_CAPACITY', transcript, proposal);
+      return this.refuse(device, body, input, 'REJECTED_OVER_CAPACITY', transcript, proposal, modelMs);
     }
 
-    log(device, body, input, 'ACCEPTED', proposal);
+    log(device, body, input, 'ACCEPTED', proposal, modelMs);
     return { proposal, transcript, spokenReply, needsConfirmation: true };
   }
 
@@ -71,8 +74,9 @@ export class InterpretRequest {
     outcome: Refusal,
     transcript: string,
     refused: Proposal | null = null,
+    modelMs = 0,
   ): InterpretResponse {
-    log(device, body, input, outcome, refused);
+    log(device, body, input, outcome, refused, modelMs);
     return {
       proposal: NO_PROPOSAL,
       transcript,
@@ -98,7 +102,7 @@ function overCapacity({ amountNgnMinor, intent }: Proposal, remainingNgnMinor: n
 
 // Every AI-assisted action is logged with its proposal and validation result
 // (FR-46). The person's words are personal data, so they are not logged.
-function log(device: Device, body: InterpretBody, input: AssistantInput, outcome: Outcome, proposal: Proposal | null) {
+function log(device: Device, body: InterpretBody, input: AssistantInput, outcome: Outcome, proposal: Proposal | null, modelMs: number) {
   logEvent('assistant.interpret', {
     deviceId: device.id,
     language: body.language,
@@ -106,5 +110,6 @@ function log(device: Device, body: InterpretBody, input: AssistantInput, outcome
     outcome,
     intent: proposal?.intent ?? null,
     amountNgnMinor: proposal?.amountNgnMinor ?? null,
+    modelMs,
   });
 }

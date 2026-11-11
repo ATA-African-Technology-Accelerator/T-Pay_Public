@@ -19,7 +19,7 @@ function sentence(arrivals: Arrival[]): string {
   return t.arrivedReceived(money(only.amountNgnMinor));
 }
 
-/** Slides in at the top when money lands in the Online wallet after a sync, then goes by itself. */
+/** Slides in at the top when money lands in the Main wallet after a sync, then goes by itself. */
 export function ArrivalBanner() {
   const inset = useInset();
   const reduce = useReduceMotion();

@@ -3,7 +3,7 @@ import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Clipboard from 'expo-clipboard';
 import { color, radius, space, touch, type } from '../../theme/tokens';
-import { Button, Card, T, useCardW } from '../../components/ui';
+import { Button, Card, T, speakNaturally, useCardW } from '../../components/ui';
 import { CurvedHeader, Screen } from '../../components/shell';
 import { Steps } from '../../components/money';
 import { useNav, type Route } from '../../nav';
@@ -31,6 +31,8 @@ export function Scan({ route }: { route: ScanRoute }) {
   const copy = COPY[route.kind];
 
   useEffect(() => { if (permission && !permission.granted && permission.canAskAgain) void requestPermission(); }, [permission?.granted]);
+  const handsFree = route.kind === 'request' && route.handsFree === true;
+  useEffect(() => { if (handsFree) void speakNaturally(copy.title); }, []);
 
   const handle = async (frame: string) => {
     if (handling.current || !frame.trim()) return;
@@ -39,7 +41,7 @@ export function Scan({ route }: { route: ScanRoute }) {
     try {
       if (route.kind === 'request') {
         const read = await readRequest(frame);
-        if (read.ok) nav.go({ name: 'review', scanned: read.value, expected: route.expected });
+        if (read.ok) nav.go({ name: 'review', scanned: read.value, expected: route.expected, handsFree });
         else nav.go({ name: 'refusal', code: read.code, side: 'customer' });
       } else if (route.kind === 'voucher') {
         const taken = await takeVoucher(frame, route.open);

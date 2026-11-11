@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, View, useWindowDimensions } from 'react-
 import * as Clipboard from 'expo-clipboard';
 import { Bluetooth, BluetoothOff, Check, Copy } from 'lucide-react-native';
 import { color, icon, motion, space } from '../../theme/tokens';
-import { Button, HearIt, Panel, Rise, T, money, sayNaira } from '../../components/ui';
+import { Button, HearIt, Panel, Rise, T, money, sayNaira, speakNaturally } from '../../components/ui';
 import { CurvedHeader, Screen } from '../../components/shell';
 import { FrameCode, StatusMark, Steps } from '../../components/money';
 import { useNav } from '../../nav';
@@ -70,12 +70,14 @@ export function useMerchantResult() {
 // ---- Screens ---------------------------------------------------------------------
 
 /** ACT-06. Shows the signed request; with Bluetooth the payment arrives with no second scan. */
-export function Request({ amount }: { amount: number }) {
+export function Request({ amount, handsFree = false }: { amount: number; handsFree?: boolean }) {
   const nav = useNav();
   const size = useCodeSize();
   const [open, setOpen] = useState<OpenRequest | null>(session?.amount === amount ? session.open : null);
   const [copied, setCopied] = useState(false);
   useMerchantResult();
+  // Hands free, say what to do next: the payment then arrives, and is announced, by itself.
+  useEffect(() => { if (handsFree) void speakNaturally(`${t.showCustomer}. ${sayNaira(amount)}`); }, []);
 
   useEffect(() => {
     if (open) return;
@@ -100,7 +102,10 @@ export function Request({ amount }: { amount: number }) {
     setTimeout(() => setCopied(false), 1800);
   };
 
-  const footer = open ? <Button label={t.scanVoucherGo} onPress={() => nav.go({ name: 'scan', kind: 'voucher', open })} /> : undefined;
+  // With Bluetooth the payment arrives by itself: the customer's one scan is all it takes, so
+  // scanning their phone is only a fallback. Without Bluetooth it is the way the payment comes in.
+  const scanTheirs = open ? () => nav.go({ name: 'scan', kind: 'voucher', open }) : undefined;
+  const footer = open && !open.sessionCode && scanTheirs ? <Button label={t.scanVoucherGo} onPress={scanTheirs} /> : undefined;
   return (
     <Screen head={<CurvedHeader back bell={false} title={t.showCustomer} />} footer={footer}>
       <Steps at={1} />
@@ -117,6 +122,7 @@ export function Request({ amount }: { amount: number }) {
           <T v="small" c={color.muted} style={{ flexShrink: 1 }}>{open.sessionCode ? t.bluetoothOn : t.bluetoothOff}</T>
         </View>
       )}
+      {open?.sessionCode && scanTheirs && <Button kind="quiet" label={t.scanVoucherGo} onPress={scanTheirs} />}
       {open && (
         <Button kind="quiet" label={copied ? t.copied : t.copyCode} onPress={() => { void copy(); }}
           icon={copied ? <Check size={icon.md} color={color.green} strokeWidth={2} /> : <Copy size={icon.md} color={color.text} strokeWidth={1.8} />} />
@@ -131,7 +137,8 @@ export function Credit({ voucherId, bluetooth, again }: { voucherId: string; blu
   const size = useCodeSize();
   const { vouchers } = useApp();
   const v = vouchers.find(x => x.id === voucherId);
-  const [showCode, setShowCode] = useState(!bluetooth);
+  // The customer never has to scan a receipt. The code is only there if they want to.
+  const [showCode, setShowCode] = useState(false);
   useEffect(() => { if (!again) endMerchantSession(); }, []);
   if (!v) return <Screen head={<CurvedHeader home title={t.gotMoney} />}><T v="body" c={color.muted}>{t.loading}</T></Screen>;
   const amount = v.voucher.payload.amountNgnMinor;
@@ -148,9 +155,9 @@ export function Credit({ voucherId, bluetooth, again }: { voucherId: string; blu
           </View>
         </Panel>
       </Rise>
-      {bluetooth && !showCode && (
+      {!showCode && (
         <Rise delay={motion.stagger * 2}>
-          <View style={s.state}><Bluetooth size={icon.sm} color={color.blue} strokeWidth={1.8} /><T v="label">{t.sentByBluetooth}</T></View>
+          {bluetooth && <View style={s.state}><Bluetooth size={icon.sm} color={color.blue} strokeWidth={1.8} /><T v="label">{t.sentByBluetooth}</T></View>}
           <Button kind="quiet" label={t.showReceiptCode} onPress={() => setShowCode(true)} />
         </Rise>
       )}

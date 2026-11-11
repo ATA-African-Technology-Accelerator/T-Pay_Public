@@ -17,7 +17,9 @@ const RETRY_DELAY_MS = 1_500;
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 // Speech is only worth waiting for briefly: the phone's own voice covers a slow answer.
 const SPEAK_TIMEOUT_MS = 8_000;
-const ASSISTANT_TIMEOUT_MS = 40_000;
+// Gemini answers in a few seconds. Past this, the phone's own assistant answers instead of
+// leaving the person waiting.
+const ASSISTANT_TIMEOUT_MS = 20_000;
 
 /** A refusal from the backend, or `NETWORK` when it couldn't be reached. Screens switch on `code`. */
 export class ApiRequestError extends Error {

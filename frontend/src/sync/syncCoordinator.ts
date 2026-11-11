@@ -22,14 +22,14 @@ const IDLE_LOOK_MS = 20_000;
 const MAX_PAGES = 10;
 // An Add money checkout nobody approved within a day is let go: PayPal has dropped it by then.
 const DEPOSIT_GIVE_UP_MS = 24 * 60 * 60 * 1000;
-// Money that lands in the Online wallet and is worth telling the person about.
+// Money that lands in the Main wallet and is worth telling the person about.
 const ARRIVALS: LedgerEntry['type'][] = ['CREDIT', 'DEPOSIT', 'PAYMENT_LINK'];
 
 export type Arrival = { kind: LedgerEntry['type']; amountNgnMinor: number };
 type ArrivalListener = (arrivals: Arrival[]) => void;
 const arrivalListeners = new Set<ArrivalListener>();
 
-/** Called with the money that has just landed in the Online wallet, after a sync. */
+/** Called with the money that has just landed in the Main wallet, after a sync. */
 export function onMoneyArrived(listener: ArrivalListener): () => void {
   arrivalListeners.add(listener);
   return () => { arrivalListeners.delete(listener); };

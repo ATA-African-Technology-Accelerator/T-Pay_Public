@@ -63,9 +63,9 @@ function render(r: Route) {
     case 'vaultReview': return <VaultReview amount={r.amount} hours={r.hours} />;
     case 'vaultActive': return <VaultActive />;
     case 'melt': return <Melt />;
-    case 'request': return <Request amount={r.amount} />;
+    case 'request': return <Request amount={r.amount} handsFree={r.handsFree} />;
     case 'scan': return <Scan route={r} />;
-    case 'review': return <Review scanned={r.scanned} expected={r.expected} />;
+    case 'review': return <Review scanned={r.scanned} expected={r.expected} handsFree={r.handsFree} />;
     case 'voucher': return <Voucher voucherId={r.voucherId} />;
     case 'delivered': return <Delivered voucherId={r.voucherId} />;
     case 'credit': return <Credit voucherId={r.voucherId} bluetooth={r.bluetooth} again={r.again} />;
@@ -73,8 +73,8 @@ function render(r: Route) {
     case 'ledger': return <Ledger />;
     case 'withdraw': return <Withdraw />;
     case 'addMoney': return <AddMoney />;
-    case 'speak': return <Speak auto={r.auto} />;
-    case 'proposal': return <ProposalScreen proposal={r.proposal} handsFree={r.handsFree} />;
+    case 'speak': return <Speak auto={r.auto} attempt={r.attempt} />;
+    case 'proposal': return <ProposalScreen proposal={r.proposal} handsFree={r.handsFree} attempt={r.attempt} />;
     case 'assist': return <Assist />;
     case 'settings': return <SettingsScreen />;
     case 'help': return <Help />;

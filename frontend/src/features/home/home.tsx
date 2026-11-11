@@ -70,7 +70,7 @@ function OfflineAiOffer() {
   );
 }
 
-/** One home for everyone. The same person pays from the Offline wallet and collects into the Active wallet. */
+/** One home for everyone. The same person pays from the Offline vault and collects into the Main wallet. */
 export function HomeScreen() {
   const nav = useNav();
   const { name, offline, active, history, wallet, setWallet, pendingVault, withdrawal, withdrawalOpen, online, lastSyncAt, sync, accountKind, vault: lockedVault } = useApp();
@@ -89,7 +89,7 @@ export function HomeScreen() {
   const withdraw: HeroAction = { label: t.withdraw, icon: <Banknote {...ic} />, onPress: () => nav.go({ name: 'withdraw' }) };
   const received: HeroAction = { label: t.received, icon: <Landmark {...ic} />, onPress: () => nav.go({ name: 'ledger' }) };
 
-  // The Offline wallet only locks and sends money. Money people receive lands in the main (Online)
+  // The Offline vault only locks and sends money. Money people receive lands in the Main
   // wallet: a payment taken offline shows there as coming in until the phone syncs.
   // Lock money only while no vault is open: the backend allows one (decision 8).
   const offlineActions = offline.canSpend ? [pay, vault, activity] : offline.open ? [vault, activity] : [lock, activity];

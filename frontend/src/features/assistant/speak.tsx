@@ -7,9 +7,9 @@ import { CurvedHeader, Screen, Section } from '../../components/shell';
 import { useNav } from '../../nav';
 import { useApp } from '../../state/appState';
 import { t } from '../../i18n';
-import { localModel, speechIn, speechOut } from '../../composition';
+import { api, localModel, speechIn, speechOut } from '../../composition';
 import { apiMessage } from '../errors';
-import { interpretSpeech, interpretText, offlineAnswer, type Proposal } from './assistant';
+import { interpretSpeech, interpretText, offlineAnswer, rulesProposal, type Proposal } from './assistant';
 import { useModelState } from '../settings/offlineAssistant';
 
 type Phase = 'idle' | 'listening' | 'thinking';
@@ -18,7 +18,7 @@ type Phase = 'idle' | 'listening' | 'thinking';
 const HOLD_MS = 350;
 
 /** `auto` is a volume-button start: it begins listening at once, hands free. */
-export function Speak({ auto = false }: { auto?: boolean }) {
+export function Speak({ auto = false, attempt = 0 }: { auto?: boolean; attempt?: number }) {
   const nav = useNav();
   const reduce = useReduceMotion();
   const { language, offline, online } = useApp();
@@ -27,7 +27,9 @@ export function Speak({ auto = false }: { auto?: boolean }) {
   const pulse = useRef(new Animated.Value(0)).current;
   const model = useModelState();
   // Offline is when the phone's model is used, so load it while the person is still talking.
-  useEffect(() => { if (!online) void localModel.warmUp(); }, [online]);
+  // Online, wake the server while the person is still talking: after a quiet spell it can take
+  // a long time to answer the first request.
+  useEffect(() => { if (online) void api.warmUp(); else void localModel.warmUp(); }, [online]);
 
   useEffect(() => {
     if (phase !== 'listening' || reduce) return;
@@ -58,7 +60,7 @@ export function Speak({ auto = false }: { auto?: boolean }) {
     setPhase('listening');
     const heard = await speechIn.transcribeOffline(language);
     setPhase('idle');
-    if (heard) nav.go({ name: 'proposal', proposal: await offlineAnswer(heard, language, offline.leftNgn), handsFree: true });
+    if (heard) nav.go({ name: 'proposal', proposal: await offlineAnswer(heard, language, offline.leftNgn), handsFree: true, attempt });
     else nav.go({ name: 'assist' });
   };
 
@@ -69,11 +71,21 @@ export function Speak({ auto = false }: { auto?: boolean }) {
     try {
       if (!online) { await offlinePath(); return; }
       setPhase('listening');
+      // English: the phone writes down the words as they are said, and only text is sent.
+      const live = await speechIn.transcribeLive(language);
+      if (live) {
+        if (!live.text) throw new Error('NO_SPEECH');
+        setPhase('thinking');
+        const answer = await interpretText(live.text, language, offline.leftNgn);
+        setPhase('idle');
+        nav.go({ name: 'proposal', proposal: answer, handsFree: true, attempt });
+        return;
+      }
       const recorded = await speechIn.record();
       setPhase('thinking');
       const proposal = await interpretSpeech(recorded, language, offline.leftNgn);
       setPhase('idle');
-      if (proposal) nav.go({ name: 'proposal', proposal, handsFree: true });
+      if (proposal) nav.go({ name: 'proposal', proposal, handsFree: true, attempt });
       else await offlinePath();
     } catch (e) {
       setPhase('idle');
@@ -83,7 +95,7 @@ export function Speak({ auto = false }: { auto?: boolean }) {
 
   const title = phase === 'listening' ? t.listening : phase === 'thinking' ? t.thinking : t.tapToTalk;
   return (
-    <Screen tabsFor="speak" head={<CurvedHeader home title={t.speak} />}>
+    <Screen tabsFor="speak" refreshable={false} head={<CurvedHeader home title={t.speak} />}>
       <View style={a.speak}>
         <T v="hello" style={a.center} accessibilityLiveRegion="polite">{title}</T>
         <T v="body" c={color.muted} style={a.center}>{phase === 'listening' ? t.tapToStop : online ? t.saySomething : model.kind === 'ready' ? t.aiOnPhone : t.noAiOffline}</T>
@@ -115,34 +127,72 @@ function question(p: Proposal, leftNgn: number): string {
   }
 }
 
+// Hands free, a misheard or unclear request is asked again this many times before the screen
+// waits for a tap. More than that and the person is better served by the buttons.
+const RETRIES = 1;
+
 /** The assistant only proposes. A person says yes, and the normal screens do the rest. */
-export function ProposalScreen({ proposal, handsFree = false }: { proposal: Proposal; handsFree?: boolean }) {
+export function ProposalScreen({ proposal: first, handsFree = false, attempt = 0 }: { proposal: Proposal; handsFree?: boolean; attempt?: number }) {
   const nav = useNav();
-  const { offline } = useApp();
-  const { language } = useApp();
+  const { offline, language } = useApp();
+  const [proposal, setProposal] = useState(first);
   const [hearing, setHearing] = useState(false);
   const ask = question(proposal, offline.leftNgn);
 
-  const yes = () => {
-    const amount = proposal.amountNgnMinor;
-    if (proposal.intent === 'CREATE_PAYMENT_REQUEST') nav.go(amount ? { name: 'request', amount } : { name: 'amount', mode: 'collect' });
-    else if (proposal.intent === 'PAY_AMOUNT') nav.go({ name: 'scan', kind: 'request', expected: amount ?? undefined });
+  const go = (p: Proposal) => {
+    const amount = p.amountNgnMinor;
+    if (p.intent === 'CREATE_PAYMENT_REQUEST') nav.go(amount ? { name: 'request', amount, handsFree } : { name: 'amount', mode: 'collect' });
+    else if (p.intent === 'PAY_AMOUNT') nav.go({ name: 'scan', kind: 'request', expected: amount ?? undefined, handsFree });
     else nav.reset({ name: 'home' });
   };
+  const yes = () => go(proposal);
   const actionable = proposal.intent === 'CREATE_PAYMENT_REQUEST' || proposal.intent === 'PAY_AMOUNT' || proposal.intent === 'CHECK_BALANCE';
 
-  // Reads the question aloud and, when the person spoke to start with, listens for a spoken yes or no.
-  // A spoken yes only confirms what was heard. Paying still needs the hold on the payment screen.
+  // Hands free, the whole exchange is spoken: the question is read, and the person answers by voice.
+  // A missing amount is asked for, a balance is just read out, and a misheard answer is asked once
+  // more. A spoken yes only confirms what was heard: paying still needs the hold on the payment screen.
   useEffect(() => {
     let gone = false;
-    void (async () => {
-      await speakNaturally(ask);
-      if (gone || !handsFree || !actionable) return;
+    const listenYesNo = async (): Promise<'yes' | 'no' | null> => {
       setHearing(true);
       const answer = await speechIn.listenYesNo(language);
+      if (!gone) setHearing(false);
+      return answer;
+    };
+    void (async () => {
+      let p = proposal;
+      await speakNaturally(question(p, offline.leftNgn));
+      if (gone || !handsFree) return;
+
+      if (p.intent === 'CHECK_BALANCE') { nav.reset({ name: 'home' }); return; }
+
+      const wantsAmount = (p.intent === 'CREATE_PAYMENT_REQUEST' || p.intent === 'PAY_AMOUNT') && p.amountNgnMinor === null;
+      if (wantsAmount) {
+        setHearing(true);
+        const said = await speechIn.listenPhrase(language);
+        if (gone) return;
+        setHearing(false);
+        const amount = said ? rulesProposal(said, language).amountNgnMinor : null;
+        if (amount === null) return; // the buttons are still there
+        p = { ...p, amountNgnMinor: amount, transcript: `${p.transcript} ${said}`.trim(), spokenReply: null };
+        setProposal(p);
+        await speakNaturally(question(p, offline.leftNgn));
+        if (gone) return;
+      } else if (!actionable || p.overCapacity) {
+        // Not understood: listen again from the start, once.
+        if (attempt < RETRIES) nav.reset({ name: 'speak', auto: true, attempt: attempt + 1 });
+        return;
+      }
+
+      let answer = await listenYesNo();
       if (gone) return;
-      setHearing(false);
-      if (answer === 'yes') yes(); else if (answer === 'no') nav.back();
+      if (answer === null) {
+        await speakNaturally(t.sayYesOrNo);
+        if (gone) return;
+        answer = await listenYesNo();
+        if (gone) return;
+      }
+      if (answer === 'yes') go(p); else if (answer === 'no') nav.back();
     })();
     return () => { gone = true; speechOut.stop(); speechIn.stop(); };
   }, []);
@@ -176,7 +226,7 @@ export function Assist() {
   const nav = useNav();
   const { language, offline, online } = useApp();
   const model = useModelState();
-  useEffect(() => { if (!online) void localModel.warmUp(); }, [online]);
+  useEffect(() => { if (online) void api.warmUp(); else void localModel.warmUp(); }, [online]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);

@@ -66,7 +66,7 @@ export function Ledger() {
   const { active, online } = useApp();
   useEffect(() => { if (online) void refreshWallet().catch(() => undefined); }, []);
   return (
-    <Screen head={<CurvedHeader back bell={false} title={t.walletActive} />} footer={<View style={{ gap: space.sm }}><Button label={t.depositTitle} onPress={() => nav.go({ name: 'addMoney' })} /><Button kind="soft" label={t.sendOrWithdraw} disabled={!active.known || active.balanceUsd <= 0} onPress={() => nav.go({ name: 'withdraw' })} /></View>}>
+    <Screen refreshable head={<CurvedHeader back bell={false} title={t.walletActive} />} footer={<View style={{ gap: space.sm }}><Button label={t.depositTitle} onPress={() => nav.go({ name: 'addMoney' })} /><Button kind="soft" label={t.sendOrWithdraw} disabled={!active.known || active.balanceUsd <= 0} onPress={() => nav.go({ name: 'withdraw' })} /></View>}>
       <Panel style={s.big}>
         <T v="body" c={color.muted}>{t.moneyIn}</T>
         <T v="moneyL" numberOfLines={1} adjustsFontSizeToFit>{money(active.balanceNgn)}</T>
@@ -103,7 +103,7 @@ export function Ledger() {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /**
- * ACT-14. Money leaves the Online wallet for a PayPal email: the account's own, or anyone's.
+ * ACT-14. Money leaves the Main wallet for a PayPal email: the account's own, or anyone's.
  * The person types an amount in naira; the exchange rate comes with the wallet.
  */
 export function Withdraw() {

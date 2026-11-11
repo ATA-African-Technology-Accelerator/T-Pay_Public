@@ -78,7 +78,7 @@ export function VaultReview({ amount, hours }: { amount: number; hours: number }
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const key = useRef(randomKey());
-  // The money is already in the Online wallet, so locking from it needs no PayPal step.
+  // The money is already in the Main wallet, so locking from it needs no PayPal step.
   const need = convertNgnToUsd(Money.fromMinor(amount, 'NGN').getValue(), active.fxRate || '1500.00').getValue().minor;
   const covered = online && active.known && active.balanceUsd >= need && active.balanceNgn >= amount;
   const [viaPayPal, setViaPayPal] = useState(!covered);

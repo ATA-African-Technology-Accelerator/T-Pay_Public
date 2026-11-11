@@ -5,7 +5,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { ActiveWalletResponse, LedgerEntry, TransactionView } from '@tpay/shared/contracts/api';
 import type { Language, VaultStatus, VoucherStatus } from '@tpay/shared/contracts/statuses';
 import type { AppVault, AppVoucher, PendingVault } from '../adapters/storage/localStore';
-import { api, connectivity, store } from '../composition';
+import { api, connectivity, localModel, store } from '../composition';
 import { setCatalogue } from '../i18n';
 import { profileStore, type LocalProfile } from '../session/profileStore';
 import { sessionStore, type DeviceSession } from '../session/sessionStore';
@@ -166,6 +166,9 @@ const EMPTY_ACTIVE: ActiveSummary = { known: false, balanceNgn: 0, balanceUsd: 0
 export function AppStateProvider({ children, words }: { children: React.ReactNode; words: HistoryWords }) {
   const [ready, setReady] = useState(false);
   const [online, setOnline] = useState(true);
+  // The phone's own model answers offline. Loading it takes seconds, so it starts the moment the
+  // network goes, not when the person first asks something.
+  useEffect(() => { if (!online) void localModel.warmUp(); }, [online]);
   const [session, setSession] = useState<DeviceSession | null>(null);
   const [profile, setProfile] = useState<LocalProfile | null>(null);
   const [draft, setDraftState] = useState<Draft>({ displayName: '', payoutEmail: '', language: 'en' });

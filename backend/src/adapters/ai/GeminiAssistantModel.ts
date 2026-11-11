@@ -1,4 +1,4 @@
-import { ApiError as GeminiApiError, GoogleGenAI, type GenerateContentParameters, type Part } from '@google/genai';
+import { ApiError as GeminiApiError, GoogleGenAI, type GenerateContentParameters, type Part, type ThinkingLevel } from '@google/genai';
 import type { Language } from '@tpay/shared/contracts/statuses';
 import { ApiError } from '../../services/ApiError';
 import type { AssistantModelRequest, IAssistantModel } from '../../services/ports';
@@ -7,11 +7,16 @@ import { ASSISTANT_INTENTS } from '../../validation/schemas';
 
 
 
-const REQUEST_TIMEOUT_MS = 15_000;
+// Answers take 1 to 5 seconds. Past this the app's own assistant is quicker than waiting.
+const REQUEST_TIMEOUT_MS = 10_000;
 // Gemini often answers 503 "high demand" for a moment. One quick retry inside
 // the same deadline usually succeeds, so the person isn't sent offline for a blip.
 const OVERLOADED_STATUS = 503;
 const RETRY_DELAY_MS = 750;
+// Classifying one short request needs no reasoning, and thinking was most of the wait:
+// several seconds before the first word. A model that refuses this setting (400) is
+// asked again without it, and never sent it again.
+const BAD_REQUEST_STATUS = 400;
 // Checked on 10 November 2026: answers in 1 to 5 seconds. gemini-2.5-flash is
 // closed to new keys, and gemini-3.8-flash was answering 503 most of the time.
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
@@ -82,6 +87,8 @@ export interface GeminiConfig {
 
 export class GeminiAssistantModel implements IAssistantModel {
   private readonly client: GoogleGenAI | null;
+  /** False once the model has refused a thinking setting. */
+  private skipThinking = true;
 
   constructor(private readonly config: GeminiConfig) {
     this.client = config.apiKey ? new GoogleGenAI({ apiKey: config.apiKey }) : null;
@@ -106,6 +113,7 @@ export class GeminiAssistantModel implements IAssistantModel {
         responseMimeType: 'application/json',
         responseJsonSchema: RESPONSE_SCHEMA,
         temperature: 0,
+        ...(this.skipThinking ? { thinkingConfig: { thinkingLevel: 'MINIMAL' as ThinkingLevel } } : {}),
         abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
     };
@@ -146,6 +154,11 @@ export class GeminiAssistantModel implements IAssistantModel {
     try {
       return (await client.models.generateContent(params)).text;
     } catch (first) {
+      if (this.skipThinking && params.config?.thinkingConfig && isBadRequest(first)) {
+        this.skipThinking = false;
+        const { thinkingConfig: _unused, ...rest } = params.config;
+        return this.generate(client, { ...params, config: rest });
+      }
       if (!isOverloaded(first)) {
         throw unavailable(describe(first));
       }
@@ -177,6 +190,11 @@ export function pcmToWavBase64(pcmBase64: string): string {
   header.write('data', 36);
   header.writeUInt32LE(pcm.length, 40);
   return Buffer.concat([header, pcm]).toString('base64');
+}
+
+
+function isBadRequest(error: unknown): boolean {
+  return error instanceof GeminiApiError && error.status === BAD_REQUEST_STATUS;
 }
 
 

@@ -16,11 +16,14 @@ const VOICE: Record<Language, string> = { en: 'en-NG', pcm: 'en-NG', yo: 'yo-NG'
 const OFFLINE_LOCALE: Partial<Record<Language, string>> = { en: 'en-US', pcm: 'en-US' };
 const MAX_RECORDING_MS = 30_000;
 const LISTEN_FOR_ANSWER_MS = 7_000;
+// A whole request, such as "collect two thousand five hundred naira".
+const LIVE_SENTENCE_MS = 15_000;
 // The phone's recogniser is asked for the person's own language; it simply hears nothing if it has none.
 const ANSWER_LOCALE: Record<Language, string> = { en: 'en-NG', pcm: 'en-NG', yo: 'yo-NG', ig: 'ig-NG', ha: 'ha-NG' };
 // Metering is in decibels, from very quiet (-160) up to 0. Talking near the phone is well above this.
 const SPEECH_DB = -38;
-const QUIET_AFTER_SPEECH_MS = 1_400;
+// Long enough for a breath between words, short enough that the answer doesn't feel late.
+const QUIET_AFTER_SPEECH_MS = 900;
 const WAIT_FOR_SPEECH_MS = 7_000;
 const METER_EVERY_MS = 150;
 
@@ -28,7 +31,7 @@ const METER_EVERY_MS = 150;
 export type CloudVoice = (text: string, language: Language) => Promise<string | null>;
 
 // How long to wait for the server's voice before the phone's own voice reads it instead.
-const CLOUD_WAIT_MS = 3_000;
+const CLOUD_WAIT_MS = 1_500;
 const CACHE_LIMIT = 20;
 // A reply is a sentence. If playback never reports back, carry on after this.
 const MAX_SPEECH_MS = 25_000;
@@ -185,6 +188,36 @@ export class ExpoSpeechInput implements ISpeechInput {
 
   /** Listens for a short answer, and says whether it was a yes, a no, or neither (null). */
   async listenYesNo(language: Language): Promise<'yes' | 'no' | null> {
+    return this.listenShort(language, readYesNo);
+  }
+
+  /** Listens for one short phrase, such as an amount, and returns what was heard, or null. */
+  async listenPhrase(language: Language): Promise<string | null> {
+    return this.listenShort(language, text => (text.trim() ? text.trim() : null), false);
+  }
+
+  /**
+   * English only: the phone's own recogniser, online, turns speech into text while the person is
+   * still talking, so the assistant gets a few words instead of an audio file. That is much quicker
+   * for the model to read. Null when this phone can't, so audio is sent instead; `text` is null
+   * when it listened and heard nothing.
+   */
+  async transcribeLive(language: Language): Promise<{ text: string | null } | null> {
+    if (language !== 'en') return null;
+    try {
+      const module = require('expo-speech-recognition').ExpoSpeechRecognitionModule as typeof import('expo-speech-recognition').ExpoSpeechRecognitionModule;
+      if (!module.isRecognitionAvailable() || !(await module.requestPermissionsAsync()).granted) return null;
+    } catch {
+      return null;
+    }
+    return { text: await this.listenShort(language, text => (text.trim() ? text.trim() : null), false, LIVE_SENTENCE_MS) };
+  }
+
+  /**
+   * The phone's recogniser for a few seconds. `read` turns what was heard into an answer; with
+   * `early`, it stops as soon as one is found instead of waiting for the end of the phrase.
+   */
+  private async listenShort<A>(language: Language, read: (text: string) => A | null, early = true, maxMs = LISTEN_FOR_ANSWER_MS): Promise<A | null> {
     let module: typeof import('expo-speech-recognition').ExpoSpeechRecognitionModule;
     try {
       module = require('expo-speech-recognition').ExpoSpeechRecognitionModule;
@@ -193,13 +226,13 @@ export class ExpoSpeechInput implements ISpeechInput {
     } catch {
       return null;
     }
-    return new Promise<'yes' | 'no' | null>(resolve => {
-      let answer: 'yes' | 'no' | null = null;
+    return new Promise<A | null>(resolve => {
+      let answer: A | null = null;
       let settled = false;
       const done = () => { if (settled) return; settled = true; clearTimeout(timer); subs.forEach(x => x.remove()); resolve(answer); };
-      const timer = setTimeout(() => { module.stop(); done(); }, LISTEN_FOR_ANSWER_MS);
+      const timer = setTimeout(() => { module.stop(); done(); }, maxMs);
       const subs = [
-        module.addListener('result', e => { answer = readYesNo(e.results[0]?.transcript ?? '') ?? answer; if (answer || e.isFinal) { module.stop(); } }),
+        module.addListener('result', e => { answer = read(e.results[0]?.transcript ?? '') ?? answer; if ((early && answer) || e.isFinal) { module.stop(); } }),
         module.addListener('error', done),
         module.addListener('end', done),
       ];
