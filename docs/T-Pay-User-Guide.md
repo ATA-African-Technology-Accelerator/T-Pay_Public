@@ -32,7 +32,7 @@ T-Pay runs on the **PayPal sandbox**. No real money moves.
 
 ## Install and set up
 
-1. **Install the app.** Open the download link on each phone and install the APK. <!-- TODO: add the APK or expo.dev build link. --> Android may ask you to allow installs from this source.
+1. **Install the app.** Open the [download link](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) on each phone and install the APK. Android may ask you to allow installs from this source.
 2. **Choose a language.** English, Nigerian Pidgin, Yoruba, Igbo or Hausa. You can change it later from the menu.
 3. **Enter your name and PayPal email.** The name is what the other person sees when you pay or get paid. The PayPal email is where withdrawals go.
 4. **Create a 4-digit PIN.** The PIN opens the app and confirms anything that moves money. If the phone has a fingerprint reader, you can use that instead of the PIN.
@@ -165,7 +165,7 @@ Open **Profile** from the bottom bar.
 
 ## For judges: test T-Pay in ten minutes
 
-You need two Android phones with T-Pay installed and the sandbox PayPal account. <!-- TODO: add the sandbox account email and password, and the APK link. -->
+You need two Android phones with T-Pay installed from the [download link](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) and the sandbox PayPal account. <!-- TODO: add the sandbox account email and password. -->
 
 1. **Set up both phones** (two minutes). Pick English, enter a name (for example "Ada" and "Bola"), the sandbox PayPal email, and a PIN. Allow the permissions.
 2. **Lock money on Ada's phone.** Offline vault → **Lock** → ₦10,000 → 24 hours → **With PayPal** → approve in the sandbox. Home shows ₦10,000 locked.
