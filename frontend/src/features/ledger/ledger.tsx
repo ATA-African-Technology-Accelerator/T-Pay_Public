@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { AlertCircle, Check, Copy, Link2, Share2 } from 'lucide-react-native';
@@ -8,7 +8,7 @@ import { convertNgnToUsd, convertUsdToNgn } from '@tpay/shared/domain/convertNgn
 import { Money } from '@tpay/shared/shared/domain/Money';
 import { Keypad } from '../../components/keypad';
 import { ConfirmPin } from '../onboarding/lock';
-import { Button, HearIt, OfflineTag, Panel, Rise, T, money, sayNaira, usd, when } from '../../components/ui';
+import { Button, HearIt, OfflineTag, Panel, Rise, T, money, sayNaira, speakNaturally, usd, when } from '../../components/ui';
 import { CurvedHeader, Screen, Section } from '../../components/shell';
 import { Line } from '../../components/rows';
 import { StatusMark } from '../../components/money';
@@ -106,12 +106,12 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
  * ACT-14. Money leaves the Wallet for a PayPal email: the account's own, or anyone's.
  * The person types an amount in naira; the exchange rate comes with the wallet.
  */
-export function Withdraw() {
+export function Withdraw({ prefill, handsFree = false }: { prefill?: number; handsFree?: boolean }) {
   const nav = useNav();
   const { active, withdrawalOpen, withdrawal, online } = useApp();
   const [other, setOther] = useState(false);
   const [email, setEmail] = useState('');
-  const [naira, setNaira] = useState(0);
+  const [naira, setNaira] = useState(prefill ? Math.floor(prefill / 100) : 0);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [sent, setSent] = useState<{ amountNgn: number; to: string } | null>(null);
@@ -145,9 +145,18 @@ export function Withdraw() {
     }
   };
 
+  // Asked by voice, even sending to your own PayPal needs the fingerprint or PIN: a voice nearby
+  // must never be able to move money. The assistant opens it; the person gives it.
+  const spoke = useRef(false);
+  useEffect(() => {
+    if (!handsFree || spoke.current || !ready) return;
+    spoke.current = true;
+    void speakNaturally(t.confirmToWithdraw).then(() => setAsking(true));
+  }, [ready]);
+
   // Sending to someone else asks for the PIN first. Sending to your own PayPal doesn't: the money stays yours.
   if (asking) {
-    return <ConfirmPin heading={t.sendAmountTo(money(worthKobo), target)} onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void go(); }} />;
+    return <ConfirmPin heading={other ? t.sendAmountTo(money(worthKobo), target) : t.withdrawAmount(money(worthKobo))} offerFingerprint={handsFree} onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void go(); }} />;
   }
 
   // Only the send just made shows this result. An older one still on its way never blocks a new send:
