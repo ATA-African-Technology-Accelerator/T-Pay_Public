@@ -224,6 +224,18 @@ const WAKE_QUIET = ['no-speech', 'speech-timeout', 'aborted'];
 const WAKE_FATAL = ['not-allowed', 'service-not-allowed'];
 const wakeLog = (...args: unknown[]) => { if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[wake]', ...args); };
 
+/** What "Hey T-Pay" is doing right now, for the live check in Settings. */
+export interface WakeCheck {
+  state: 'off' | 'listening' | 'restarting' | 'no-permission' | 'no-recogniser';
+  /** 'phone' when it listens on the phone only, 'service' when through the phone's speech service. */
+  mode: 'phone' | 'service' | null;
+  /** The last words it heard, and when. */
+  heard: string | null;
+  heardAt: number | null;
+  /** The last thing that went wrong, in the recogniser's own words. */
+  error: string | null;
+}
+
 export class ExpoSpeechInput implements ISpeechInput {
   private recorder: Recorder | null = null;
   private finish: (() => void) | null = null;
@@ -232,6 +244,20 @@ export class ExpoSpeechInput implements ISpeechInput {
   /** The recogniser said the English speech pack isn't on the phone yet. */
   private wakePackMissing = false;
   private wakeWatchers = new Set<() => void>();
+  private wakeCheck: WakeCheck = { state: 'off', mode: null, heard: null, heardAt: null, error: null };
+  private wakeCheckWatchers = new Set<(c: WakeCheck) => void>();
+
+  /** Follows what "Hey T-Pay" is doing. Calls `watch` at once with the current state. */
+  onWakeCheck(watch: (c: WakeCheck) => void): () => void {
+    this.wakeCheckWatchers.add(watch);
+    watch(this.wakeCheck);
+    return () => { this.wakeCheckWatchers.delete(watch); };
+  }
+
+  private setWakeCheck(change: Partial<WakeCheck>) {
+    this.wakeCheck = { ...this.wakeCheck, ...change };
+    this.wakeCheckWatchers.forEach(w => w(this.wakeCheck));
+  }
 
   /** Called whenever what wakeWordStatus() would say may have changed. */
   onWakeWordStatus(watch: () => void): () => void {
@@ -304,9 +330,9 @@ export class ExpoSpeechInput implements ISpeechInput {
 
     const run = async () => {
       if (stopped) return;
-      if (!(await this.canWakeWord())) { wakeLog('no recogniser on this phone'); return; }
+      if (!(await this.canWakeWord())) { wakeLog('no recogniser on this phone'); this.setWakeCheck({ state: 'no-recogniser', mode: null }); return; }
       const module = await this.recogniser();
-      if (!module || stopped) { wakeLog('no microphone permission'); return; }
+      if (!module || stopped) { wakeLog('no microphone permission'); if (!stopped) this.setWakeCheck({ state: 'no-permission', mode: null }); return; }
       const onDevice = this.wakeWordOnDevice();
 
       const finals: string[] = [];
@@ -327,7 +353,8 @@ export class ExpoSpeechInput implements ISpeechInput {
         this.haltWake = null;
         const instant = Date.now() - startedAt < WAKE_INSTANT_END_MS;
         failures = fault || instant ? failures + 1 : 0;
-        if (!again || stopped) return;
+        if (!again || stopped) { this.setWakeCheck({ state: 'off' }); return; }
+        this.setWakeCheck({ state: 'restarting' });
         const wait = failures ? Math.min(WAKE_RETRY_MS * 2 ** (failures - 1), WAKE_MAX_BACKOFF_MS) : WAKE_RESTART_MS;
         retry = setTimeout(() => { void run(); }, wait);
       };
@@ -341,10 +368,19 @@ export class ExpoSpeechInput implements ISpeechInput {
           const said = e.results[0]?.transcript ?? '';
           if (e.isFinal) { if (said.trim()) finals.push(said.trim()); finals.splice(0, Math.max(0, finals.length - 2)); interim = ''; } else interim = said;
           wakeLog(e.isFinal ? 'final' : 'heard', said);
+          if (said.trim()) this.setWakeCheck({ heard: said.trim(), heardAt: Date.now() });
           // The last two pieces are enough: "hey" and "T-Pay" can land in different ones. The newest
           // piece on its own is checked too, so "T-Pay, collect two thousand" counts when it starts one.
+          // The recogniser's other guesses are checked as well: with an accent the name is often the
+          // second or third guess, not the first.
           const latest = interim || finals[finals.length - 1] || '';
-          const heard = afterWakeWord([...finals, interim].join(' ')) ?? afterWakeWord(latest, { alone: true });
+          const before = finals.slice(0, e.isFinal ? -1 : undefined).join(' ');
+          const guesses = e.results.map(r => r?.transcript ?? '').filter(Boolean);
+          let heard = afterWakeWord([...finals, interim].join(' ')) ?? afterWakeWord(latest, { alone: true });
+          for (const guess of guesses) {
+            if (heard !== null) break;
+            heard = afterWakeWord(`${before} ${guess}`) ?? afterWakeWord(guess, { alone: true });
+          }
           if (heard === null) return;
           rest = heard;
           clearTimeout(settle);
@@ -355,6 +391,7 @@ export class ExpoSpeechInput implements ISpeechInput {
         }),
         module.addListener('error', e => {
           wakeLog('error', e.error, e.message);
+          if (!WAKE_QUIET.includes(e.error)) this.setWakeCheck({ error: `${e.error}${e.message ? `: ${e.message}` : ''}` });
           if (e.error === 'language-not-supported' && onDevice) {
             // No English pack on the phone yet: offer the download, and listen the normal way meanwhile.
             this.wakePackMissing = true;
@@ -369,9 +406,10 @@ export class ExpoSpeechInput implements ISpeechInput {
       ];
       this.haltWake = halt;
       wakeLog('listening', onDevice ? 'on the phone' : 'with the speech service', 'after', failures, 'failures');
+      this.setWakeCheck({ state: 'listening', mode: onDevice ? 'phone' : 'service' });
       try {
         module.start({
-          lang: 'en-US', interimResults: true, continuous: true, maxAlternatives: 1,
+          lang: 'en-US', interimResults: true, continuous: true, maxAlternatives: 3,
           requiresOnDeviceRecognition: onDevice, contextualStrings: WAKE_HINTS,
           androidIntentOptions: { EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 60_000, EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 60_000 },
         });
@@ -386,6 +424,7 @@ export class ExpoSpeechInput implements ISpeechInput {
       stopped = true;
       clearTimeout(retry);
       void this.haltWake?.();
+      this.setWakeCheck({ state: 'off' });
     };
   }
 
