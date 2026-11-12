@@ -12,6 +12,7 @@ import { color, font, icon, layout, motion, radius, space, shadow } from './them
 import { T, native, useReduceMotion } from './components/ui';
 import { Nav, NavCtx, Route } from './nav';
 import { OPEN_ROUTES, stackAfterReset } from './navStack';
+import { useWakeWord } from './features/assistant/useWakeWord';
 import { Linking } from 'react-native';
 import { AppStateProvider, type HistoryWords } from './state/appState';
 import { Details, Language, Splash } from './features/onboarding/onboarding';
@@ -19,7 +20,7 @@ import { CreatePin, Lock } from './features/onboarding/lock';
 import { HomeScreen } from './features/home/home';
 import { Amount } from './features/payment/amount';
 import { Scan } from './features/payment/scan';
-import { Credit, Request, endMerchantSession } from './features/payment/merchant';
+import { Credit, PaidOnline, Request, endMerchantSession } from './features/payment/merchant';
 import { Delivered, Review, Voucher } from './features/payment/customer';
 import { Refusal } from './features/payment/refusal';
 import { closeLink } from './features/payment/link';
@@ -60,20 +61,21 @@ function render(r: Route) {
     case 'receipt': return <Receipt id={r.id} />;
     case 'vault': return <VaultScreen />;
     case 'amount': return <Amount mode={r.mode} prefill={r.prefill} />;
-    case 'vaultReview': return <VaultReview amount={r.amount} hours={r.hours} />;
+    case 'vaultReview': return <VaultReview amount={r.amount} hours={r.hours} handsFree={r.handsFree} />;
     case 'vaultActive': return <VaultActive />;
-    case 'melt': return <Melt />;
+    case 'melt': return <Melt handsFree={r.handsFree} />;
     case 'request': return <Request amount={r.amount} handsFree={r.handsFree} />;
     case 'scan': return <Scan route={r} />;
     case 'review': return <Review scanned={r.scanned} expected={r.expected} handsFree={r.handsFree} />;
     case 'voucher': return <Voucher voucherId={r.voucherId} />;
     case 'delivered': return <Delivered voucherId={r.voucherId} />;
     case 'credit': return <Credit voucherId={r.voucherId} bluetooth={r.bluetooth} again={r.again} />;
+    case 'paidOnline': return <PaidOnline payment={r.payment} />;
     case 'refusal': return <Refusal code={r.code} side={r.side} amount={r.amount} existingId={r.existingId} />;
     case 'ledger': return <Ledger />;
-    case 'withdraw': return <Withdraw />;
-    case 'addMoney': return <AddMoney />;
-    case 'speak': return <Speak auto={r.auto} attempt={r.attempt} />;
+    case 'withdraw': return <Withdraw prefill={r.prefill} handsFree={r.handsFree} />;
+    case 'addMoney': return <AddMoney prefill={r.prefill} handsFree={r.handsFree} />;
+    case 'speak': return <Speak auto={r.auto} attempt={r.attempt} heard={r.heard} followUp={r.followUp} />;
     case 'proposal': return <ProposalScreen proposal={r.proposal} handsFree={r.handsFree} attempt={r.attempt} />;
     case 'assist': return <Assist />;
     case 'settings': return <SettingsScreen />;
@@ -110,6 +112,11 @@ export default function App() {
     openMenu: () => setMenu(true),
   }), []);
   const current = useRef<Route['name']>('splash');
+  // "Hey T-Pay", on every screen of the unlocked app except those that already listen or ask for a PIN.
+  useWakeWord(stack[stack.length - 1]?.r.name ?? 'splash', rest => {
+    setMenu(false);
+    nav.go(rest ? { name: 'speak', heard: rest } : { name: 'speak', auto: true });
+  });
   useEffect(() => startSync(), []);
   // The free server sleeps when idle. Waking it now means setup and the first lock don't wait.
   useEffect(() => { if (!config.sampleOnly) void api.warmUp(); }, []);
