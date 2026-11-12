@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
-import { Activity, ChevronRight, Cpu, Globe, HelpCircle, Lock, Send, ShieldCheck, UserRound } from 'lucide-react-native';
+import { Activity, ChevronRight, Cpu, Globe, HelpCircle, Lock, Mic, Send, ShieldCheck, UserRound } from 'lucide-react-native';
 import { color, icon, radius, space, touch } from '../../theme/tokens';
-import { Panel, Press, T } from '../../components/ui';
+import { Button, Panel, Press, T } from '../../components/ui';
 import { Avatar, CurvedHeader, Screen } from '../../components/shell';
 import { useNav } from '../../nav';
 import { useApp } from '../../state/appState';
 import { languageCodes, languages, t } from '../../i18n';
 import { softwareOnly } from '../../adapters/crypto/deviceSigner';
-import { api, store } from '../../composition';
+import { api, speechIn, store } from '../../composition';
 import { profileStore } from '../../session/profileStore';
 import { withSession } from '../../session/guard';
 import { modelNote, useModelState } from './offlineAssistant';
 import { useHealth } from '../../state/health';
 
 import { CASH_OUT } from '../vault/topUp';
+import { WAKE_PACK_AT, useWakeWordSetting } from '../assistant/useWakeWord';
 
 /** ACT-16. Read from the phone; when online, the backend's copy wins and is saved here. */
 export function SettingsScreen() {
@@ -27,6 +28,21 @@ export function SettingsScreen() {
   // Whether money received offline goes on to PayPal by itself. The server holds the choice; the
   // phone keeps the last answer so it can show it with no network.
   const [cashOut, setCashOut] = useState<boolean | null>(null);
+  // "Hey T-Pay" needs a recogniser that runs on the phone; without one it can't be turned on.
+  const [wakeOn, setWakeOn] = useWakeWordSetting();
+  const [wake, setWake] = useState<'ready' | 'download' | 'unsupported' | 'downloading' | null>(null);
+  useEffect(() => {
+    const check = () => { void speechIn.wakeWordStatus().then(setWake); };
+    check();
+    return speechIn.onWakeWordStatus(check);
+  }, []);
+  const canWake = wake === null ? null : wake !== 'unsupported';
+  const getPack = async () => {
+    setWake('downloading');
+    const ok = await speechIn.downloadWakeWordPack();
+    if (ok) await store.setMeta(WAKE_PACK_AT, new Date().toISOString());
+    setWake(ok ? 'ready' : 'download');
+  };
   const [saving, setSaving] = useState(false);
   useEffect(() => { void store.getMeta<boolean>(CASH_OUT).then(v => { if (v !== null) setCashOut(v); }); }, []);
   const changeCashOut = async (on: boolean) => {
@@ -91,15 +107,30 @@ export function SettingsScreen() {
             trackColor={{ false: color.panelHigh, true: color.green }} thumbColor={color.white}
           />
         </View>
+        <View style={a.setting}>
+          <View style={a.rowIcon}><Mic size={icon.md} color={color.text} strokeWidth={1.7} /></View>
+          <View style={{ flex: 1, paddingVertical: space.sm }}>
+            <T v="label">{t.wakeWord}</T>
+            <T v="small" c={color.muted}>{canWake === false ? t.wakeWordUnavailable : wake === 'download' || wake === 'downloading' ? t.wakeWordNeedsPack : speechIn.wakeWordOnDevice() ? t.wakeWordNote : t.wakeWordNoteOnline}</T>
+            {(wake === 'download' || wake === 'downloading') && (
+              <Button kind="soft" label={wake === 'downloading' ? t.wakeWordDownloading : t.wakeWordDownload} loading={wake === 'downloading'} onPress={() => { void getPack(); }} />
+            )}
+          </View>
+          <Switch
+            accessibilityLabel={t.wakeWord} accessibilityHint={t.wakeWordNote}
+            value={wakeOn && canWake !== false} disabled={canWake === false} onValueChange={on => { void setWakeOn(on); }}
+            trackColor={{ false: color.panelHigh, true: color.green }} thumbColor={color.white}
+          />
+        </View>
       </View>
       <View style={a.group}>
         <T v="smallStrong" c={color.muted}>{t.security}</T>
         <Row label={t.lockApp} Icon={Lock} onPress={() => nav.reset({ name: 'lock' })} />
-        <View style={a.setting} accessible accessibilityLabel={`${t.phoneSecurity}, ${softwareOnly ? t.tierB : t.tierBHardware}`}>
+        <View style={a.setting} accessible accessibilityLabel={`${t.phoneSecurity}, ${softwareOnly ? t.keySoftware : t.keyHardware}`}>
           <View style={a.rowIcon}><ShieldCheck size={icon.md} color={color.green} strokeWidth={1.7} /></View>
           <View style={{ flex: 1 }}>
             <T v="label">{t.phoneSecurity}</T>
-            <T v="small" c={color.muted}>{softwareOnly ? t.tierB : t.tierBHardware}</T>
+            <T v="small" c={color.muted}>{softwareOnly ? t.keySoftware : t.keyHardware}</T>
           </View>
         </View>
       </View>
