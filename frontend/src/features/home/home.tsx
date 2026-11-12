@@ -12,6 +12,7 @@ import { store } from '../../composition';
 import { useModelState } from '../settings/offlineAssistant';
 import { useHealth } from '../../state/health';
 import { useTopUp } from '../vault/topUp';
+import { payHelp } from '../assistant/help';
 import { t } from '../../i18n';
 
 const ic = { size: icon.md, color: color.white, strokeWidth: 1.8 };
@@ -84,7 +85,8 @@ export function HomeScreen() {
   // A business gets paid into the Wallet, so that is the page it opens on, once per visit to the app.
   React.useEffect(() => { if (business && !openedOnMain) { openedOnMain = true; setWallet('active'); } }, [business]);
   const lockMoney = () => nav.go({ name: 'amount', mode: 'lock' });
-  const pay: HeroAction = { label: t.pay, icon: <ArrowUp {...ic} />, onPress: () => nav.go({ name: 'scan', kind: 'request' }) };
+  // Pay is always there. With nothing to pay from, the assistant says why and offers to lock money.
+  const pay: HeroAction = { label: t.pay, icon: <ArrowUp {...ic} />, onPress: () => nav.go(offline.canSpend ? { name: 'scan', kind: 'request' } : payHelp()) };
   const receive: HeroAction = { label: business ? t.getPaid : t.receive, icon: <ArrowDown {...ic} />, onPress: () => nav.go({ name: 'amount', mode: 'collect' }) };
   const lock: HeroAction = { label: t.lockShort, icon: <Plus {...ic} />, onPress: lockMoney };
   const vault: HeroAction = { label: t.vault, icon: <Lock {...ic} />, onPress: () => nav.reset({ name: 'vault' }) };
@@ -97,7 +99,7 @@ export function HomeScreen() {
   // takes is queued, then lands in the Wallet when the phone syncs: a payment not yet settled
   // can still be refused, so it is never spent again offline (see topUp.ts).
   // Lock money only while no vault is open: the backend allows one (decision 8).
-  const offlineActions = offline.canSpend ? [pay, receive, vault, activity] : offline.open ? [receive, vault, activity] : [lock, receive, activity];
+  const offlineActions = offline.open ? [pay, receive, vault, activity] : [pay, lock, receive, activity];
   const topUp = useTopUp();
   const comingIn = active.pendingNgn + offline.incomingNgn;
   const pages: WalletPage[] = [
