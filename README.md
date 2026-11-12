@@ -1,241 +1,392 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="frontend/assets/brand/source/logo-navy.png">
+  <source media="(prefers-color-scheme: light)" srcset="frontend/assets/brand/source/logo-white.png">
+  <img alt="T-Pay" src="frontend/assets/brand/source/logo-white.png" width="200">
+</picture>
+
 # T-Pay
 
-**Offline payments backed by PayPal, for markets where the network fails.**
+**PayPal payments that keep working when the network doesn't.**
 
-A customer locks money into an **Offline vault** while they are online, either from PayPal or from their T-Pay **Wallet**. Later, with no internet at all, they pay a seller phone to phone by QR code or Bluetooth. Each payment is a voucher signed by the customer's own phone, so it can't be forged or spent twice. When either phone reconnects, the backend settles it into the seller's Wallet, and the money goes on to the seller's PayPal by itself. A voice assistant answers in English, Nigerian Pidgin, Yoruba, Igbo and Hausa, with Gemini online and a model on the phone offline.
+Lock money while you are online, then pay or get paid phone to phone with no internet at all, by QR code, Bluetooth or voice.
 
-Built for the PayPal AI Hackathon, November 2026. MIT licensed.
+[Live API](https://t-pay-public.onrender.com/api/health) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
+
+[![Tests](https://img.shields.io/github/actions/workflow/status/OlayiwolaSherrifSalawu/T-Pay_Public/ci.yml?branch=frontend&style=flat-square&label=tests)](https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![App version](https://img.shields.io/badge/app-v1.0.0-blue?style=flat-square)](frontend/app.json)
+[![Status](https://img.shields.io/badge/status-PayPal%20sandbox-orange?style=flat-square)](#roadmap)
+
+<!-- TODO: add a hero screenshot or GIF of the app (for example docs/images/hero.png) and reference it here:
+<img src="docs/images/hero.png" alt="T-Pay on Android: Offline vault, voice assistant and a payment QR" width="820">
+-->
+
+</div>
 
 ---
 
-## How a payment works
+## Contents
+
+- [Overview](#overview)
+- [Key capabilities](#key-capabilities)
+- [Architecture](#architecture)
+- [Technology](#technology)
+- [Built with](#built-with)
+- [Quickstart](#quickstart)
+- [Configuration](#configuration)
+- [Repository layout](#repository-layout)
+- [Testing](#testing)
+- [Security](#security)
+- [Roadmap](#roadmap)
+- [Team](#team)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+In markets across Nigeria, a dropped network means a lost sale: card terminals and transfer apps stop working the moment the signal does. T-Pay lets a customer lock money from PayPal (or their T-Pay Wallet) into an **Offline vault** while they are online, then pay a seller later with **no internet on either phone**. Each payment is a voucher signed by a key that never leaves the customer's phone, so it can't be forged or spent twice. When either phone reconnects, the backend settles the voucher against the PayPal hold and the money reaches the seller's Wallet, and from there their PayPal. A voice assistant in English, Nigerian Pidgin, Yoruba, Igbo and Hausa lets a busy trader do all of this hands-free.
+
+Built for the PayPal AI Hackathon, November 2026. <!-- TODO: link the hackathon page (for example the Devpost listing). -->
+
+## Key capabilities
+
+| Capability | Description |
+| :--- | :--- |
+| **Offline vault** | Lock money from PayPal (an authorisation hold) or straight from the Wallet. One vault at a time, spendable for 6, 12 or 24 hours, held for up to 28 days. |
+| **Pay with no network** | The seller shows a signed payment request as a QR code. The customer scans it and confirms with fingerprint or PIN. The signed voucher goes back over Bluetooth, or as a second QR code. Works in airplane mode. |
+| **Double-spend protection** | Each voucher carries the next sequence number under a vault certificate that states how much is locked. A reused number, or a total above the lock, is refused and the vault is blocked. |
+| **Settlement** | Either phone can submit a voucher when it reconnects. The backend captures it from the PayPal hold and credits the seller's Wallet. Resubmitting returns the stored result, never a second capture. |
+| **Wallet** | Holds money received and added. Add money through PayPal checkout, withdraw to any PayPal email, or share a pay link anyone can pay. Money received offline can go on to the seller's PayPal by itself. |
+| **Hands-free voice assistant** | Say "Hey T-Pay" while the app is open. It takes payments, pays, locks and unlocks money, adds money, withdraws, shares the pay link, keeps stock and budget, and opens any screen, then listens for the next request. |
+| **AI that never moves money** | Clear requests are read on the phone by fixed rules. Gemini reads the rest online, and an optional model runs on the phone offline. Every proposal is checked, and money moves only after the person's fingerprint, PIN or PayPal sign-in. |
+| **Natural voice** | Replies are read by ElevenLabs in English and Pidgin, saved on the phone after the first time, with the phone's own voice as a fallback. |
+| **QR reading on any phone** | The camera uses the phone's built-in reader first. If that finds nothing, T-Pay's own JavaScript decoder reads the code from a still photo. |
+| **Personal and Business accounts** | Business accounts get Stock & Inventory and record sales by voice ("I sold one Coke for 500"). Personal accounts get a monthly Personal Budget. |
+| **Live status** | Money arriving is shown and spoken within seconds. A seller's request screen moves on as soon as the payment arrives, by Bluetooth or through T-Pay. |
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    A["1. Customer locks ₦10,000<br/>from PayPal or their Wallet"] --> B["2. Offline: seller shows a QR<br/>with a signed payment request"]
-    B --> C["3. Customer scans, holds Pay<br/>the phone signs a voucher"]
-    C --> D["4. Voucher reaches the seller<br/>by Bluetooth, or a second QR"]
-    D --> E["5. Either phone comes online<br/>the backend settles it"]
-    E --> F["6. Seller's Wallet is credited<br/>and it goes on to their PayPal"]
-    E --> G["7. Customer closes the vault<br/>unspent money is released"]
+    subgraph Phones["Android phones (Expo / React Native)"]
+        C["Customer app<br/>device key, Offline vault,<br/>SQLite, voice"]
+        S["Seller app<br/>device key, Wallet,<br/>stock, voice"]
+    end
+
+    subgraph Shared["shared/ (runs on phone and server)"]
+        R["Payment rules<br/>signing, certificates,<br/>vouchers, frames, intents"]
+    end
+
+    subgraph Backend["Backend (Node.js, Express)"]
+        API["REST API<br/>/api"]
+        JOBS["Background jobs<br/>settlement, hold renewal,<br/>auto cash-out"]
+        DB[("PostgreSQL")]
+    end
+
+    PP["PayPal<br/>Orders, Payments,<br/>Payouts, Webhooks"]
+    AI["Google Gemini"]
+    EL["ElevenLabs"]
+
+    C <-->|"QR code or Bluetooth<br/>(no internet)"| S
+    C -.->|uses| R
+    S -.->|uses| R
+    API -.->|uses| R
+    C -->|"HTTPS, when online"| API
+    S -->|"HTTPS, when online"| API
+    API --> DB
+    JOBS --> DB
+    API --> PP
+    JOBS --> PP
+    PP -->|webhooks| API
+    API --> AI
+    API --> EL
 ```
 
-| Guarantee | How it is enforced |
+**Lifecycle of an offline payment**
+
+1. **Register.** On first launch the phone creates a P-256 key in secure storage and registers it. The backend returns a device certificate signed by the T-Pay root key.
+2. **Lock.** Online, the customer locks an amount. The backend places a PayPal authorisation hold (or moves Wallet money) and issues a signed vault certificate stating the amount and spending window.
+3. **Request.** Offline, the seller's phone signs a payment request and shows it as a QR code, with a Bluetooth session code when Bluetooth is available.
+4. **Pay.** The customer scans it. The phone checks the seller's certificate against the root public key it ships with, and the customer confirms with fingerprint or PIN. The phone signs a voucher with the next sequence number and counts it against the vault at once.
+5. **Deliver.** The voucher goes to the seller over Bluetooth, which returns a signed receipt, or the seller scans it as a QR code. The seller's phone verifies it fully offline and records it as received, queued.
+6. **Settle.** When either phone is online it submits the voucher. The backend checks the signature, certificate, sequence and running total, captures the amount from the PayPal hold, and credits the seller's Wallet.
+7. **Pay out.** If automatic cash-out is on, the background job batches settled money into one PayPal payout to the seller.
+8. **Close.** The customer closes the vault with fingerprint or PIN. Unspent money is released, either by voiding the rest of the hold or by returning it to the Wallet.
+
+The [API contract](docs/T-Pay-API-Contract.md) is the source of truth for every endpoint and offline message.
+
+## Technology
+
+| Layer | Tools |
 | :--- | :--- |
-| Only the customer can create a payment | Vouchers are signed with a P-256 key that never leaves the customer's phone. The backend checks them against the key the customer registered. |
-| No double spending | The vault certificate states how much is locked, and each voucher has the next sequence number. The phone counts a voucher the moment it signs it. A reused sequence or a total above the lock is refused, and the vault is blocked. |
-| Locked money stays locked | Only a signed payment takes money out of the Offline vault. Closing it needs the PIN or fingerprint and returns only what was never spent. Money already paid stays payable to its holder for up to 28 days. |
-| Money received offline is never re-spent unsettled | It is queued, then lands in the Wallet when it settles. Until then it can still be refused, so it never goes into an Offline vault. |
-| Either side can settle | The seller or the customer can submit a voucher. Resubmitting returns the stored result with no second capture. |
-| AI never moves money | The assistant only proposes. A person confirms on screen, and paying still needs the hold on the Pay button. |
+| **Mobile** | ![React Native](https://img.shields.io/badge/React_Native_0.88-61DAFB?style=flat-square&logo=react&logoColor=black) ![Expo](https://img.shields.io/badge/Expo_SDK_58-000020?style=flat-square&logo=expo&logoColor=white) ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Android](https://img.shields.io/badge/Android-34A853?style=flat-square&logo=android&logoColor=white) ![Kotlin](https://img.shields.io/badge/Kotlin_modules-7F52FF?style=flat-square&logo=kotlin&logoColor=white) |
+| **Device** | ![Bluetooth](https://img.shields.io/badge/Nearby_Connections-0082FC?style=flat-square&logo=bluetooth&logoColor=white) ![Camera](https://img.shields.io/badge/expo--camera_+_ML_Kit-4285F4?style=flat-square&logo=google&logoColor=white) ![jsQR](https://img.shields.io/badge/jsQR-555555?style=flat-square) ![Biometrics](https://img.shields.io/badge/expo--local--authentication-000020?style=flat-square&logo=expo&logoColor=white) ![Secure Store](https://img.shields.io/badge/expo--secure--store-000020?style=flat-square&logo=expo&logoColor=white) ![noble-curves](https://img.shields.io/badge/@noble/curves_(P--256)-555555?style=flat-square) |
+| **Backend** | ![Node.js](https://img.shields.io/badge/Node.js_22-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express_4-000000?style=flat-square&logo=express&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Zod](https://img.shields.io/badge/Zod_4-3E67B1?style=flat-square&logo=zod&logoColor=white) ![tsx](https://img.shields.io/badge/tsx-555555?style=flat-square) |
+| **Data** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_17-4169E1?style=flat-square&logo=postgresql&logoColor=white) ![SQLite](https://img.shields.io/badge/SQLite_(on_phone)-003B57?style=flat-square&logo=sqlite&logoColor=white) |
+| **AI and voice** | ![Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white) ![ElevenLabs](https://img.shields.io/badge/ElevenLabs-000000?style=flat-square&logo=elevenlabs&logoColor=white) ![llama.rn](https://img.shields.io/badge/llama.rn_(on_device)-555555?style=flat-square) ![Speech](https://img.shields.io/badge/expo--speech--recognition-000020?style=flat-square&logo=expo&logoColor=white) |
+| **Payments** | ![PayPal](https://img.shields.io/badge/PayPal_REST_APIs-003087?style=flat-square&logo=paypal&logoColor=white) |
+| **Infrastructure** | ![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white) ![Render](https://img.shields.io/badge/Render-000000?style=flat-square&logo=render&logoColor=white) ![EAS](https://img.shields.io/badge/EAS_Build-000020?style=flat-square&logo=expo&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white) |
+| **Testing** | ![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white) ![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) ![Supertest](https://img.shields.io/badge/Supertest-555555?style=flat-square) ![fast-check](https://img.shields.io/badge/fast--check-555555?style=flat-square) ![Postman](https://img.shields.io/badge/Postman-FF6C37?style=flat-square&logo=postman&logoColor=white) |
 
----
-
-## What is built
-
-| Area | What it does |
-| :--- | :--- |
-| **Two wallets** | The **Offline vault** pays with no network. The **Wallet** holds what you receive and what you add, and you can withdraw it to PayPal. |
-| **Locking money** | From PayPal (an authorisation hold), or straight from the Wallet with no PayPal step. One vault at a time, up to 28 days. |
-| **Paying offline** | Seller's QR, then the customer's signed voucher back by Bluetooth or a second QR. Works in airplane mode. |
-| **Getting paid offline** | **Get paid** works from either wallet. A payment taken offline shows as "received, queued" and lands in the Wallet when it settles. Once settled, the app offers to lock it into a new vault in one tap. |
-| **Automatic cash-out** | Money received offline goes on to your own PayPal by itself, batched into one payout. It's on by default, and you can turn it off in Profile. |
-| **Add money and pay links** | Top up the Wallet through PayPal checkout, or share a link anyone can pay with PayPal, with no T-Pay app needed. |
-| **Personal and Business accounts** | Business opens on the Wallet, keeps Bluetooth on to receive, and adds **Stock** and a monthly **Budget**. Saying "I sold one Coke for 500" records the sale and takes one off the shelf. |
-| **Voice assistant** | Hold the mic and talk, or press the volume button for hands-free. Clear requests are answered on the phone at once. Everything else goes to Gemini online, or to an optional model on the phone offline. Replies are spoken, and so are results and money arriving. |
-| **Security** | PIN and fingerprint unlock, PIN to send money or close a vault, device keys in Android secure storage. |
-| **Live status** | Money arriving shows and is spoken within seconds. Settings shows whether T-Pay and PayPal are up, and Home warns when PayPal is down. |
-
-**Tests:** 852 backend tests in memory, 884 on real Postgres (migrations included) plus 441 API tests on Postgres storage, and 114 app tests. They all run on every push (see `.github/workflows/ci.yml`).
-
----
-
-## PayPal and AI used
-
-**PayPal (sandbox).**
+<details>
+<summary>PayPal products used</summary>
 
 | Product | Used for |
 | :--- | :--- |
 | Orders v2, intent `AUTHORIZE` | Locking an Offline vault with the customer's approval |
-| Payments v2: capture, void and reauthorise | Settling vouchers, releasing holds, and keeping holds guaranteed |
+| Payments v2: capture, void, reauthorise | Settling vouchers, releasing unspent money, keeping holds valid |
 | Orders v2, intent `CAPTURE` | Adding money to the Wallet, and pay links |
 | Payouts | Withdrawals, and automatic cash-out of money received offline |
 | Webhooks | Capture results, refunds, reversals and voids |
 
-**AI.**
+</details>
 
-1. **On the phone first.** Reviewed rules read clear requests ("collect 2k", "how much do I have") instantly, online or offline.
-2. **Gemini online** (`gemini-3.5-flash` through `@google/genai`, backend only). It reads the rest, including sales and Yoruba, Igbo and Hausa numbers, from text or recorded audio, and returns a structured proposal. The backend checks it and refuses any payment above what the vault has left.
-3. **On-device model offline** (optional download, `llama.rn`). It runs only when the rules can't read a request, and its answer goes through the same checks.
-4. **Voice.** Replies use the phone's voice so they start at once. Gemini's voice (`POST /api/assistant/speak`) covers languages the phone has no voice for.
+<details>
+<summary>How the assistant decides</summary>
 
-The model never sees keys, tokens, balances or signed data. Every answer is logged with its outcome, but what the person said isn't logged.
+1. **Rules on the phone first.** Fixed, reviewed rules read clear requests ("collect 2k", "withdraw 5000", "add 10 Coke to stock") at once, online or offline.
+2. **Gemini online** (`gemini-3.5-flash` through `@google/genai`, backend only) reads the rest, from text or recorded audio, and returns a structured proposal that the backend validates with Zod.
+3. **On-device model offline** (optional download, `llama.rn`) runs only when the rules can't read a request. Its answer passes the same checks.
+4. **The app acts, not the model.** Anything that moves no money is done at once. Anything that moves money is asked first, by voice, and then needs the person's fingerprint, PIN or PayPal sign-in.
 
----
+The model never sees keys, tokens, balances or signed data. Each answer is logged with its outcome; what the person said is not logged.
 
-## Repository
+</details>
 
-```text
-backend/    Node, TypeScript, Express API. PayPal, Postgres, Gemini, settlement and background jobs.
-shared/     Payment rules used by both sides: money, signing, certificates, vouchers, frames, intent rules.
-            No dependencies, so it runs unchanged in Node and React Native.
-frontend/   Expo SDK 58 (React Native) Android app.
-docs/       PRD, API contract, backend and frontend workflows (Markdown, Word and PDF).
+## Built with
+
+<p>
+  <a href="https://developer.paypal.com"><img alt="PayPal" src="https://img.shields.io/badge/PayPal-003087?style=for-the-badge&logo=paypal&logoColor=white"></a>
+  <a href="https://ai.google.dev"><img alt="Google Gemini" src="https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white"></a>
+  <a href="https://elevenlabs.io"><img alt="ElevenLabs" src="https://img.shields.io/badge/ElevenLabs-000000?style=for-the-badge&logo=elevenlabs&logoColor=white"></a>
+  <a href="https://expo.dev"><img alt="Expo" src="https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white"></a>
+  <a href="https://render.com"><img alt="Render" src="https://img.shields.io/badge/Render-000000?style=for-the-badge&logo=render&logoColor=white"></a>
+  <a href="https://github.com/ATA-African-Technology-Accelerator"><img alt="African Technology Accelerator" src="https://img.shields.io/badge/African_Technology_Accelerator-0B2F6E?style=for-the-badge"></a>
+</p>
+
+<!-- TODO: add the hackathon badge and link (for example Devpost) once the listing is public. -->
+
+## Quickstart
+
+> [!NOTE]
+> T-Pay runs against the **PayPal sandbox** only. No real money moves.
+
+**Prerequisites**
+
+| Tool | Version | Needed for |
+| :--- | :--- | :--- |
+| Node.js | 22 or later | Backend, app tooling, tests |
+| npm | Bundled with Node | Installing packages |
+| Docker | Docker Desktop or Engine with Compose | Local PostgreSQL |
+| PayPal developer account | Sandbox app credentials | Locking, settling, payouts |
+| Android Studio and JDK | JDK 17 | Building and running the app |
+| Google AI Studio key | Optional | Online assistant |
+| ElevenLabs key | Optional | Natural voice |
+
+**1. Clone**
+
+```bash
+git clone https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public.git
+cd T-Pay_Public
 ```
 
-The [API contract](docs/T-Pay-API-Contract.md) is the source of truth for every endpoint and offline message.
-
----
-
-## Run the backend locally
-
-You need **Node 22 or later**, **Docker** (Docker Desktop on Windows), and a **PayPal developer account** with sandbox app credentials.
+**2. Configure and start the backend**
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
+cp .env.example .env          # Windows: copy .env.example .env
+npm run keys:root             # paste the two printed lines into .env
 ```
 
-On Windows, use `copy .env.example .env` instead of `cp`. Then fill in `backend/.env`:
-
-1. Run `npm run keys:root` and paste the two lines it prints. This is the T-Pay key that signs device and vault certificates.
-2. Set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`, from developer.paypal.com → Apps & Credentials, in sandbox mode.
-3. Optionally set `GEMINI_API_KEY`. A free key comes from aistudio.google.com → Get API key. Without it, the assistant returns `AI_UNAVAILABLE` and the app uses its offline path.
-
-Start the database, create the tables, then run the API:
+Set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` in `backend/.env` (developer.paypal.com → Apps & Credentials, sandbox). Then:
 
 ```bash
-npm run db:up
+npm run db:up                 # PostgreSQL 17 in Docker, on port 5433
 npm run db:migrate
-npm run dev
+npm run dev                   # http://localhost:4000
 ```
 
-Open http://localhost:4000/api/health. It should report `"database": "ok"` and `"paypal": "ok"`.
+Open http://localhost:4000/api/health. It reports `"database": "ok"` and `"paypal": "ok"`.
 
-To check the PayPal sandbox end to end, run `npm run paypal:proof`. You approve one order in the browser, and the script then places a hold, makes two partial captures and releases the rest. If `PAYPAL_PROOF_PAYOUT_EMAIL` is set, it also sends a test payout.
-
-### Environment variables
-
-| Name | Required | Purpose |
-| :--- | :--- | :--- |
-| `DATABASE_URL` | Yes | Postgres connection. Locally, the Docker database on port 5433; in production, Neon. |
-| `ROOT_PRIVATE_KEY`, `ROOT_PUBLIC_KEY` | Yes | Certificate signing key, from `npm run keys:root`. The app ships with the public key. |
-| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Yes | PayPal sandbox app credentials |
-| `PAYPAL_BASE_URL` | Yes | `https://api-m.sandbox.paypal.com` |
-| `PUBLIC_BASE_URL` | Yes | Where PayPal returns the customer after approval. `http://localhost:4000` locally. |
-| `PAYPAL_WEBHOOK_ID` | For webhooks | From the webhook you add in the PayPal app. Until it is set, every webhook is refused. |
-| `GEMINI_API_KEY` | For the assistant | Google AI Studio key |
-| `GEMINI_MODEL` | No | Defaults to `gemini-3.5-flash` |
-| `GEMINI_TTS_MODEL` | No | The voice model for `/api/assistant/speak`. Defaults to `gemini-3.8-flash-tts`. |
-| `FX_RATE` | No | Fixed demo rate, in naira per US dollar. Defaults to `1500.00`. |
-| `PORT` | No | Defaults to `4000` |
-
-### Tests
+**3. Run the app**
 
 ```bash
-npm test
-npm run test:db
-npm run lint
-```
-
-- `npm test` runs every test, using in-memory storage.
-- `npm run test:db` runs the same suite against the Docker Postgres. It needs `npm run db:up` first, and works on Windows, macOS and Linux.
-- `npm run lint` typechecks the backend and `shared/`.
-
-### Try the API by hand
-
-Import [`backend/postman/T-Pay.postman_collection.json`](backend/postman/T-Pay.postman_collection.json) into Postman and set `baseUrl`. Registration, vouchers and spend statements must be signed, so generate their bodies with the helper and paste them in:
-
-```bash
-npm run postman -- device ada
-npm run postman -- voucher ada bola 1 200000
-npm run postman -- statement ada 1 133
-```
-
-Every response carries an `X-Request-Id` header. The same ID appears on that request's lines in the server log.
-
----
-
-## Deploy on Render with Neon
-
-1. Create a **Web Service** from this repository, with root directory `backend`.
-2. Build command: `npm install`. Start command: `npm run db:migrate && npm start`. Running migrations on every start keeps the database in step with the code, and it is safe to repeat.
-3. Add the environment variables above. `DATABASE_URL` is the Neon connection string, `PUBLIC_BASE_URL` is the Render URL, and `PAYPAL_BASE_URL` stays on the sandbox.
-4. In the PayPal app, add a webhook to `https://<your-render-url>/api/webhooks/paypal` for these events, then set `PAYPAL_WEBHOOK_ID`:
-   - `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.PENDING`
-   - `PAYMENT.CAPTURE.DECLINED`, `PAYMENT.CAPTURE.DENIED`
-   - `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`
-   - `PAYMENT.AUTHORIZATION.VOIDED`
-   - `CHECKOUT.PAYMENT-APPROVAL.REVERSED`
-
----
-
-## Run the app
-
-```bash
-cd frontend
+cd ../frontend
 npm install
 cp .env.example .env
 ```
 
-Set `EXPO_PUBLIC_API_URL` to the backend (a phone can't reach `localhost`, so use the Render URL or your laptop's network address) and `EXPO_PUBLIC_ROOT_PUBLIC_KEY` to the public key from `npm run keys:root`.
-
-The app uses native modules (Bluetooth, fingerprint, speech, the on-device model), so it needs a development build, not Expo Go:
+Set `EXPO_PUBLIC_API_URL` to the backend and `EXPO_PUBLIC_ROOT_PUBLIC_KEY` to the public key from `npm run keys:root`. The app uses native modules (Bluetooth, biometrics, speech, the on-device model), so it needs a development build, not Expo Go:
 
 ```bash
-npx expo run:android                              # on a connected phone or emulator
-npx eas build --profile preview --platform android  # an installable APK
+npx expo run:android                                  # phone or emulator
+npx eas build --profile preview --platform android    # installable APK
 ```
 
-`npm test` runs the app tests and `npm run typecheck` checks types.
+> [!TIP]
+> A phone can't reach `localhost`. Point `EXPO_PUBLIC_API_URL` at your laptop's network address or at the hosted backend, https://t-pay-public.onrender.com.
 
----
+<details>
+<summary>Check the PayPal sandbox end to end</summary>
 
-## For judges
+```bash
+cd backend
+npm run paypal:proof
+```
 
-> **To complete before submission.** Fill in the three rows still in italics.
+You approve one order in the browser. The script places a hold, makes two partial captures and releases the rest. If `PAYPAL_PROOF_PAYOUT_EMAIL` is set, it also sends a test payout.
 
-| Item | Link |
-| :--- | :--- |
-| Hosted backend | https://t-pay-public.onrender.com (health check at [`/api/health`](https://t-pay-public.onrender.com/api/health)) |
-| Android APK | *APK link to come* |
-| Demo video | *YouTube link to come* |
-| Sandbox test logins | *Customer and seller PayPal sandbox accounts to come* |
+</details>
 
-The backend runs on Render's free plan, which sleeps when idle. The first request after a while can take up to a minute; after that it answers at once.
+<details>
+<summary>Deploy the backend on Render</summary>
 
-**Demo, on two Android phones:**
+1. Create a **Web Service** from this repository with root directory `backend`.
+2. Build command `npm install`; start command `npm run db:migrate && npm start`. Migrations are safe to repeat.
+3. Add the environment variables below, with `PUBLIC_BASE_URL` set to the Render URL.
+4. In the PayPal app, add a webhook to `https://<your-render-url>/api/webhooks/paypal` for `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.PENDING`, `PAYMENT.CAPTURE.DECLINED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`, `PAYMENT.AUTHORIZATION.VOIDED` and `CHECKOUT.PAYMENT-APPROVAL.REVERSED`, then set `PAYPAL_WEBHOOK_ID`.
 
-1. The customer locks ₦10,000 into the Offline vault, from the Wallet or with a PayPal sandbox approval.
-2. Turn on airplane mode on both phones, then turn Bluetooth back on. The phones can reach each other, but not the internet.
-3. The seller holds the mic and says "Abeg collect one thousand". The app answers at once and shows the payment QR.
-4. The customer scans it, checks the amount, and holds **Pay**. The voucher reaches the seller over Bluetooth. With Bluetooth off, the seller scans a second QR instead.
-5. Both phones show the payment as queued. A payment above what the vault has left is refused, and so is a changed voucher.
-6. Reconnect either phone. The payment settles into the seller's Wallet, and the app says so out loud. With automatic cash-out on, it goes on to the seller's PayPal.
-7. The customer closes the vault with their PIN, and the unspent money is released.
+</details>
 
----
+## Configuration
 
-## Honest limits
+**Backend** (`backend/.env`, template in [`backend/.env.example`](backend/.env.example))
 
-- **Sandbox only.** No live PayPal mode, no real money, and no KYC.
-- **Device keys** are protected by Android secure storage, not a hardware secure element.
-- **Exchange rate:** one fixed demo rate (`FX_RATE`), not a market rate.
-- **Hold limit:** a vault can wait at most 28 days. After that, PayPal ends the hold whatever T-Pay does.
-- **Offline assistant:** the rules always work. Smarter offline answers need the optional model download.
-- **Gemini free tier:** limited requests a minute, and Google may use free-tier prompts to improve its products. Use sandbox data only.
-- **Language review:** a native speaker still needs to check the Yoruba, Igbo and Hausa lines.
-- **Payouts to Nigeria:** PayPal accounts in some countries can't receive payouts. The sandbox doesn't show this.
+| Name | Required | Description |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | Yes | PostgreSQL connection string. Locally `postgres://tpay:tpay@localhost:5433/tpay`. |
+| `ROOT_PRIVATE_KEY` | Yes | Signs device and vault certificates. Generate with `npm run keys:root`. Never leaves the backend. |
+| `ROOT_PUBLIC_KEY` | Yes | The matching public key. The app ships with it. |
+| `PAYPAL_CLIENT_ID` | Yes | PayPal sandbox app client ID |
+| `PAYPAL_CLIENT_SECRET` | Yes | PayPal sandbox app secret |
+| `PAYPAL_BASE_URL` | Yes | `https://api-m.sandbox.paypal.com` |
+| `PUBLIC_BASE_URL` | Yes | Where PayPal returns the person after approval. `http://localhost:4000` locally. |
+| `PAYPAL_WEBHOOK_ID` | For webhooks | ID of the PayPal webhook. Until it is set, every webhook is refused. |
+| `GEMINI_API_KEY` | No | Google AI Studio key. Without it, the app uses its offline assistant. |
+| `GEMINI_MODEL` | No | Defaults to `gemini-3.5-flash` |
+| `GEMINI_TTS_MODEL` | No | Gemini voice for languages ElevenLabs doesn't cover. Defaults to `gemini-3.8-flash-tts`. |
+| `ELEVENLABS_API_KEY` | No | Natural voice for English and Pidgin replies |
+| `ELEVENLABS_VOICE_ID` | No | ElevenLabs voice. Defaults to the premade voice Liam. |
+| `ELEVENLABS_MODEL` | No | Defaults to `eleven_flash_v2_5` |
+| `FX_RATE` | No | Fixed demo rate in naira per US dollar. Defaults to `1500.00`. |
+| `PORT` | No | Defaults to `4000` |
+| `PAYPAL_PROOF_PAYOUT_EMAIL` | No | Sandbox email for the payout step of `npm run paypal:proof` |
+| `TEST_DATABASE_URL` | No | Database for `npm run test:db`. Defaults to the local Docker database. |
 
-## Documents
+**App** (`frontend/.env`, template in [`frontend/.env.example`](frontend/.env.example))
 
-- [Product requirements (PDF)](docs/T-Pay-PRD.pdf) · [Markdown source](docs/T-Pay-PRD.md)
-- [API contract](docs/T-Pay-API-Contract.md)
-- [Backend workflow](docs/T-Pay-Backend-Workflow.md) · [Frontend workflow](docs/T-Pay-Frontend-Workflow.md)
+| Name | Required | Description |
+| :--- | :--- | :--- |
+| `EXPO_PUBLIC_API_URL` | Yes | Backend base URL |
+| `EXPO_PUBLIC_ROOT_PUBLIC_KEY` | Yes | Root public key from `npm run keys:root`, used to verify certificates offline |
 
-In `docs/`, `npm run docx` rebuilds the Word files and `npm run pdf` rebuilds the PRD PDF.
+> [!WARNING]
+> `EXPO_PUBLIC_` values are compiled into the app and are public. Never put a private key or API secret in `frontend/.env`.
+
+## Repository layout
+
+```text
+T-Pay_Public/
+├── backend/                  Node.js + Express API
+│   ├── src/
+│   │   ├── adapters/         PayPal, PostgreSQL, Gemini, ElevenLabs, crypto, clock
+│   │   ├── controllers/      HTTP handlers, one per resource
+│   │   ├── services/         Use cases: register, lock, settle, melt, withdraw, interpret
+│   │   ├── routes/           Express routers under /api
+│   │   ├── middleware/       Device auth, idempotency, rate limits, request log, errors
+│   │   ├── validation/       Zod schemas for every request and model answer
+│   │   └── composition/      Wiring, services and background jobs
+│   ├── migrations/           SQL migrations, applied by npm run db:migrate
+│   ├── scripts/              Root key, migrations, PayPal proof, Postman helper
+│   ├── postman/              Postman collection
+│   └── tests/                Vitest: domain, HTTP, adapters, PostgreSQL
+├── shared/                   Payment rules used by phone and server, no dependencies
+│   └── src/
+│       ├── contracts/        API types, offline frames, messages, refusals
+│       ├── domain/           Signing, certificates, vault capacity, FX, intent rules
+│       └── application/      Use cases: create request, issue voucher, accept voucher
+├── frontend/                 Expo (React Native) Android app
+│   ├── src/
+│   │   ├── features/         Screens: payment, vault, ledger, assistant, business, settings
+│   │   ├── adapters/         API, storage, crypto, Bluetooth, speech, on-device AI
+│   │   ├── sync/             Background sync and settlement submission
+│   │   ├── i18n/             English, Pidgin, Yoruba, Igbo and Hausa text
+│   │   └── components/       Shared UI
+│   ├── modules/              Local native modules: keystore, radio, volume keys, download
+│   └── assets/brand/         Logo, icon and splash
+├── docs/                     PRD, API contract, backend and frontend workflows
+└── .github/workflows/        CI: type checks and tests on every push
+```
+
+## Testing
+
+```bash
+# Backend and shared
+cd backend
+npm run lint        # type checks backend and shared/
+npm test            # every test, in-memory storage
+npm run db:up && npm run test:db   # the same suite on PostgreSQL, migrations included
+
+# App
+cd frontend
+npm run typecheck
+npm test
+```
+
+CI runs all of these on every push and pull request ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). At the time of writing: 908 backend tests and 167 app tests pass.
+
+## Security
+
+- **Keys stay where they belong.** Each phone's signing key is created on the device and kept in Android secure storage; it is never sent anywhere. The root private key lives only in the backend environment.
+- **Every payment is signed and checked twice.** The receiving phone verifies the voucher offline; the backend verifies it again before capturing anything.
+- **People confirm money, not software.** Paying, withdrawing by voice, locking from the Wallet and closing a vault all need the fingerprint or PIN. The assistant never enters a PIN or password.
+- **Secrets never reach the repository.** `.env` files are ignored by git; only `.env.example` templates with empty values are committed.
+- **Requests are protected server-side.** Device-token authentication, idempotency keys on money-moving endpoints, rate limits, and PayPal webhook signature checks.
+- **Personal data is kept out of logs.** What a person says to the assistant is not logged.
+
+To report a vulnerability, please do **not** open a public issue. See [SECURITY.md](SECURITY.md).
+
+## Roadmap
+
+- [x] Offline vault funded from PayPal or the Wallet
+- [x] Offline payments by QR code and Bluetooth, with signed vouchers and receipts
+- [x] Settlement, automatic hold renewal and automatic cash-out
+- [x] Wallet: add money, withdraw, pay links
+- [x] Hands-free voice assistant with "Hey T-Pay", in five languages
+- [x] Natural voice with ElevenLabs
+- [x] Personal Budget and Stock & Inventory
+- [x] CI for backend, shared rules and app
+- [ ] Native-speaker review of Yoruba, Igbo and Hausa text
+- [ ] Public Android APK and demo video
+- [ ] Live PayPal mode, with KYC
+- [ ] Hardware-backed device keys
+- [ ] Market exchange rates instead of a fixed demo rate
+- [ ] Bank transfers
+- [ ] iOS build
+
+## Team
+
+| | Name | Role | GitHub |
+| :---: | :--- | :--- | :--- |
+| <img src="https://github.com/OlayiwolaSherrifSalawu.png" width="56" alt=""> | Olayiwola Salawu | <!-- TODO: role --> | [@OlayiwolaSherrifSalawu](https://github.com/OlayiwolaSherrifSalawu) |
+| <img src="https://github.com/BramTechxxvi.png" width="56" alt=""> | <!-- TODO: full name --> BramTechxxvi | <!-- TODO: role --> | [@BramTechxxvi](https://github.com/BramTechxxvi) |
+| <img src="https://github.com/Maximoi22.png" width="56" alt=""> | Abdulmalik Olajuwon | <!-- TODO: role --> | [@Maximoi22](https://github.com/Maximoi22) |
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md) first.
+
+- Branch from `main-copy` with a short prefixed name: `feat/voice-withdraw`, `fix/merchant-wait`, `docs/readme`.
+- Write commits in the [Conventional Commits](https://www.conventionalcommits.org) style, for example `fix(app): move on when the seller is paid`.
+- Run the type checks and tests above before opening a pull request.
 
 ## License
 
-[MIT](LICENSE) © 2026 T-Pay team
+[MIT](LICENSE) © 2026 ATA (African Technology Accelerator)
+
+<div align="center">
+<sub>T-Pay · Smart payments. Online or off.</sub>
+</div>
