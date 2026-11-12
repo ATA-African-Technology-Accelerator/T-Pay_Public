@@ -2,7 +2,7 @@
 
 **Offline payments backed by PayPal, for markets where the network fails.**
 
-A customer locks money in a PayPal-backed vault while they are online. Later, with no internet at all, they pay a seller phone to phone by QR code or Bluetooth. Each payment is a voucher signed by the customer's own phone, so it can't be forged or spent twice. When either phone reconnects, the backend captures the money from the PayPal hold and credits the seller, who can withdraw to PayPal. A voice assistant built on Gemini lets people ask for payments in English, Nigerian Pidgin, Yoruba, Igbo or Hausa.
+A customer locks money into an **Offline vault** while they are online, either from PayPal or from their T-Pay **Wallet**. Later, with no internet at all, they pay a seller phone to phone by QR code or Bluetooth. Each payment is a voucher signed by the customer's own phone, so it can't be forged or spent twice. When either phone reconnects, the backend settles it into the seller's Wallet, and the money goes on to the seller's PayPal by itself. A voice assistant answers in English, Nigerian Pidgin, Yoruba, Igbo and Hausa, with Gemini online and a model on the phone offline.
 
 Built for the PayPal AI Hackathon, November 2026. MIT licensed.
 
@@ -12,33 +12,41 @@ Built for the PayPal AI Hackathon, November 2026. MIT licensed.
 
 ```mermaid
 flowchart LR
-    A["1. Customer locks ₦10,000<br/>PayPal places a hold"] --> B["2. Offline: seller shows a QR<br/>with a signed payment request"]
-    B --> C["3. Customer scans, taps Pay<br/>phone signs a voucher"]
+    A["1. Customer locks ₦10,000<br/>from PayPal or their Wallet"] --> B["2. Offline: seller shows a QR<br/>with a signed payment request"]
+    B --> C["3. Customer scans, holds Pay<br/>the phone signs a voucher"]
     C --> D["4. Voucher reaches the seller<br/>by Bluetooth, or a second QR"]
-    D --> E["5. Either phone comes online<br/>backend captures from the hold"]
-    E --> F["6. Seller's T-Pay wallet is credited<br/>withdraw to PayPal any time"]
-    E --> G["7. Customer melts the vault<br/>the unspent hold is released"]
+    D --> E["5. Either phone comes online<br/>the backend settles it"]
+    E --> F["6. Seller's Wallet is credited<br/>and it goes on to their PayPal"]
+    E --> G["7. Customer closes the vault<br/>unspent money is released"]
 ```
 
 | Guarantee | How it is enforced |
 | :--- | :--- |
 | Only the customer can create a payment | Vouchers are signed with a P-256 key that never leaves the customer's phone. The backend checks them against the key the customer registered. |
-| No double spending | The money is held by PayPal, the vault certificate states its size, and each voucher has a sequence number. A reused sequence blocks the vault, and so does a total above the hold. |
+| No double spending | The vault certificate states how much is locked, and each voucher has the next sequence number. The phone counts a voucher the moment it signs it. A reused sequence or a total above the lock is refused, and the vault is blocked. |
+| Locked money stays locked | Only a signed payment takes money out of the Offline vault. Closing it needs the PIN or fingerprint and returns only what was never spent. Money already paid stays payable to its holder for up to 28 days. |
+| Money received offline is never re-spent unsettled | It is queued, then lands in the Wallet when it settles. Until then it can still be refused, so it never goes into an Offline vault. |
 | Either side can settle | The seller or the customer can submit a voucher. Resubmitting returns the stored result with no second capture. |
-| Offline sellers still get paid | The hold stays until the customer melts the vault in T-Pay, for up to 28 days. It is renewed every three days, while PayPal still guarantees the money. |
-| AI never moves money | The assistant only proposes. A person confirms on screen, and only the normal signing step can pay. |
+| AI never moves money | The assistant only proposes. A person confirms on screen, and paying still needs the hold on the Pay button. |
 
 ---
 
 ## What is built
 
-| Area | Status |
+| Area | What it does |
 | :--- | :--- |
-| Backend API: devices, vaults, vouchers, settlement, melt, wallet, withdrawals, webhooks, history | Done. 509 tests pass, plus 229 API tests on real Postgres. |
-| PayPal sandbox: Orders, authorisation, capture, void, reauthorisation, Payouts, webhooks | Done. Reauthorisation only becomes possible on day four of a real hold, so it hasn't been proven in the sandbox yet. |
-| Gemini assistant (`POST /api/assistant/interpret`) | Done. Live-checked in all five languages, and with prompt-injection attempts. |
-| Offline payment rules, signing, frames for QR and Bluetooth (`shared/`) | Done and tested |
-| Android app (`frontend/`) | Screens are designed. They still run on sample data and aren't wired to the API yet. |
+| **Two wallets** | The **Offline vault** pays with no network. The **Wallet** holds what you receive and what you add, and you can withdraw it to PayPal. |
+| **Locking money** | From PayPal (an authorisation hold), or straight from the Wallet with no PayPal step. One vault at a time, up to 28 days. |
+| **Paying offline** | Seller's QR, then the customer's signed voucher back by Bluetooth or a second QR. Works in airplane mode. |
+| **Getting paid offline** | **Get paid** works from either wallet. A payment taken offline shows as "received, queued" and lands in the Wallet when it settles. Once settled, the app offers to lock it into a new vault in one tap. |
+| **Automatic cash-out** | Money received offline goes on to your own PayPal by itself, batched into one payout. It's on by default, and you can turn it off in Profile. |
+| **Add money and pay links** | Top up the Wallet through PayPal checkout, or share a link anyone can pay with PayPal, with no T-Pay app needed. |
+| **Personal and Business accounts** | Business opens on the Wallet, keeps Bluetooth on to receive, and adds **Stock** and a monthly **Budget**. Saying "I sold one Coke for 500" records the sale and takes one off the shelf. |
+| **Voice assistant** | Hold the mic and talk, or press the volume button for hands-free. Clear requests are answered on the phone at once. Everything else goes to Gemini online, or to an optional model on the phone offline. Replies are spoken, and so are results and money arriving. |
+| **Security** | PIN and fingerprint unlock, PIN to send money or close a vault, device keys in Android secure storage. |
+| **Live status** | Money arriving shows and is spoken within seconds. Settings shows whether T-Pay and PayPal are up, and Home warns when PayPal is down. |
+
+**Tests:** 852 backend tests in memory, 884 on real Postgres (migrations included) plus 441 API tests on Postgres storage, and 114 app tests. They all run on every push (see `.github/workflows/ci.yml`).
 
 ---
 
@@ -48,29 +56,30 @@ flowchart LR
 
 | Product | Used for |
 | :--- | :--- |
-| Orders v2, intent `AUTHORIZE` | Locking a vault with the customer's approval |
+| Orders v2, intent `AUTHORIZE` | Locking an Offline vault with the customer's approval |
 | Payments v2: capture, void and reauthorise | Settling vouchers, releasing holds, and keeping holds guaranteed |
+| Orders v2, intent `CAPTURE` | Adding money to the Wallet, and pay links |
+| Payouts | Withdrawals, and automatic cash-out of money received offline |
 | Webhooks | Capture results, refunds, reversals and voids |
-| Payouts | Sellers withdrawing their T-Pay balance to PayPal |
 
-**AI.** Google Gemini (`gemini-3.5-flash`), called through `@google/genai` on the backend only:
+**AI.**
 
-1. The app sends what the person said, as text or recorded audio, plus their language.
-2. Gemini returns a structured proposal, such as "collect ₦1,000" or "pay ₦2,000 for an item".
-3. The backend validates that proposal and refuses any payment above what the vault has left.
-4. The app pre-fills its screen and asks the person to confirm.
+1. **On the phone first.** Reviewed rules read clear requests ("collect 2k", "how much do I have") instantly, online or offline.
+2. **Gemini online** (`gemini-3.5-flash` through `@google/genai`, backend only). It reads the rest, including sales and Yoruba, Igbo and Hausa numbers, from text or recorded audio, and returns a structured proposal. The backend checks it and refuses any payment above what the vault has left.
+3. **On-device model offline** (optional download, `llama.rn`). It runs only when the rules can't read a request, and its answer goes through the same checks.
+4. **Voice.** Replies use the phone's voice so they start at once. Gemini's voice (`POST /api/assistant/speak`) covers languages the phone has no voice for.
 
-The model never sees keys, tokens, balances or signed data. Every call is logged with its outcome, but what the person said isn't logged. With no network, the app falls back to a rule-based assistant, which is labelled as offline assistance.
+The model never sees keys, tokens, balances or signed data. Every answer is logged with its outcome, but what the person said isn't logged.
 
 ---
 
 ## Repository
 
 ```text
-backend/    Node, TypeScript, Express API. PayPal, Postgres, Gemini, settlement and jobs.
-shared/     Payment rules used by both sides: money, signing, certificates, vouchers, frames.
+backend/    Node, TypeScript, Express API. PayPal, Postgres, Gemini, settlement and background jobs.
+shared/     Payment rules used by both sides: money, signing, certificates, vouchers, frames, intent rules.
             No dependencies, so it runs unchanged in Node and React Native.
-frontend/   Expo (React Native) Android app.
+frontend/   Expo SDK 58 (React Native) Android app.
 docs/       PRD, API contract, backend and frontend workflows (Markdown, Word and PDF).
 ```
 
@@ -118,6 +127,7 @@ To check the PayPal sandbox end to end, run `npm run paypal:proof`. You approve 
 | `PAYPAL_WEBHOOK_ID` | For webhooks | From the webhook you add in the PayPal app. Until it is set, every webhook is refused. |
 | `GEMINI_API_KEY` | For the assistant | Google AI Studio key |
 | `GEMINI_MODEL` | No | Defaults to `gemini-3.5-flash` |
+| `GEMINI_TTS_MODEL` | No | The voice model for `/api/assistant/speak`. Defaults to `gemini-3.8-flash-tts`. |
 | `FX_RATE` | No | Fixed demo rate, in naira per US dollar. Defaults to `1500.00`. |
 | `PORT` | No | Defaults to `4000` |
 
@@ -166,45 +176,57 @@ Every response carries an `X-Request-Id` header. The same ID appears on that req
 ```bash
 cd frontend
 npm install
-npm start
+cp .env.example .env
 ```
 
-Open it in Expo Go, or build an APK with EAS. The screens currently use sample data from `frontend/src/demo/store.tsx`. That file goes away once the screens are wired to the API.
+Set `EXPO_PUBLIC_API_URL` to the backend (a phone can't reach `localhost`, so use the Render URL or your laptop's network address) and `EXPO_PUBLIC_ROOT_PUBLIC_KEY` to the public key from `npm run keys:root`.
+
+The app uses native modules (Bluetooth, fingerprint, speech, the on-device model), so it needs a development build, not Expo Go:
+
+```bash
+npx expo run:android                              # on a connected phone or emulator
+npx eas build --profile preview --platform android  # an installable APK
+```
+
+`npm test` runs the app tests and `npm run typecheck` checks types.
 
 ---
 
 ## For judges
 
-> **To complete before submission.** Replace each placeholder below.
+> **To complete before submission.** Fill in the three rows still in italics.
 
 | Item | Link |
 | :--- | :--- |
+| Hosted backend | https://t-pay-public.onrender.com (health check at [`/api/health`](https://t-pay-public.onrender.com/api/health)) |
 | Android APK | *APK link to come* |
-| Hosted backend | *Render URL to come* (health check at `/api/health`) |
 | Demo video | *YouTube link to come* |
 | Sandbox test logins | *Customer and seller PayPal sandbox accounts to come* |
 
+The backend runs on Render's free plan, which sleeps when idle. The first request after a while can take up to a minute; after that it answers at once.
+
 **Demo, on two Android phones:**
 
-1. The customer locks a vault with a real PayPal sandbox approval.
+1. The customer locks ₦10,000 into the Offline vault, from the Wallet or with a PayPal sandbox approval.
 2. Turn on airplane mode on both phones, then turn Bluetooth back on. The phones can reach each other, but not the internet.
-3. The seller says "Abeg collect one thousand", or types it, and shows the payment QR.
-4. The customer scans it, checks the amount, and taps **Pay**. The voucher reaches the seller over Bluetooth. With Bluetooth off, the seller scans a second QR instead.
-5. Both phones show the payment as pending. A payment above the vault's remaining amount is refused, and so is a changed voucher.
-6. Reconnect either phone. The voucher settles automatically, and the PayPal capture ID appears on both phones and in the sandbox.
-7. The customer melts the vault, and the unspent hold is released in PayPal.
+3. The seller holds the mic and says "Abeg collect one thousand". The app answers at once and shows the payment QR.
+4. The customer scans it, checks the amount, and holds **Pay**. The voucher reaches the seller over Bluetooth. With Bluetooth off, the seller scans a second QR instead.
+5. Both phones show the payment as queued. A payment above what the vault has left is refused, and so is a changed voucher.
+6. Reconnect either phone. The payment settles into the seller's Wallet, and the app says so out loud. With automatic cash-out on, it goes on to the seller's PayPal.
+7. The customer closes the vault with their PIN, and the unspent money is released.
 
 ---
 
 ## Honest limits
 
 - **Sandbox only.** No live PayPal mode, no real money, and no KYC.
-- **Device keys** are protected by Android secure storage (assurance Tier B), not a hardware secure element.
+- **Device keys** are protected by Android secure storage, not a hardware secure element.
 - **Exchange rate:** one fixed demo rate (`FX_RATE`), not a market rate.
 - **Hold limit:** a vault can wait at most 28 days. After that, PayPal ends the hold whatever T-Pay does.
-- **Offline assistant:** with no network it is rule-based, and it says so.
-- **Gemini free tier:** limited to 5 requests a minute, and Google may use free-tier prompts to improve its products. Use sandbox data only.
-- **Language review:** a native speaker still needs to check the Yoruba, Igbo and Hausa assistant lines.
+- **Offline assistant:** the rules always work. Smarter offline answers need the optional model download.
+- **Gemini free tier:** limited requests a minute, and Google may use free-tier prompts to improve its products. Use sandbox data only.
+- **Language review:** a native speaker still needs to check the Yoruba, Igbo and Hausa lines.
+- **Payouts to Nigeria:** PayPal accounts in some countries can't receive payouts. The sandbox doesn't show this.
 
 ## Documents
 
