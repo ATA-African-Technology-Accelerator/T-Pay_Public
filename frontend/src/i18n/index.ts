@@ -23,8 +23,3 @@ export function setCatalogue(language: Language) {
 
 export const catalogueLanguage = () => current;
 
-/** Lines still in English for a language: what native-speaker review must cover (NFR-07). */
-export function untranslated(language: Language): string[] {
-  const done = catalogues[language];
-  return Object.keys(en).filter(k => !(k in done));
-}
