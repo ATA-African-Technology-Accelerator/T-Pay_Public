@@ -189,7 +189,7 @@ The model never sees keys, tokens, balances or signed data. Each answer is logge
 **1. Clone**
 
 ```bash
-git clone https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public.git
+git clone https://github.com/ATA-African-Technology-Accelerator/T-Pay_Public.git
 cd T-Pay_Public
 ```
 
@@ -388,9 +388,9 @@ To report a vulnerability, please do **not** open a public issue. See [SECURITY.
 
 | | Name | Role | GitHub |
 | :---: | :--- | :--- | :--- |
-| <img src="https://github.com/OlayiwolaSherrifSalawu.png" width="56" alt=""> | Olayiwola Salawu | <!-- TODO: role --> | [@OlayiwolaSherrifSalawu](https://github.com/OlayiwolaSherrifSalawu) |
-| <img src="https://github.com/BramTechxxvi.png" width="56" alt=""> | <!-- TODO: full name --> BramTechxxvi | <!-- TODO: role --> | [@BramTechxxvi](https://github.com/BramTechxxvi) |
-| <img src="https://github.com/Maximoi22.png" width="56" alt=""> | Abdulmalik Olajuwon | <!-- TODO: role --> | [@Maximoi22](https://github.com/Maximoi22) |
+| <img src="https://github.com/OlayiwolaSherrifSalawu.png" width="56" alt=""> | Olayiwola Salawu | <!-- Frontend/backend--> | [@OlayiwolaSherrifSalawu](https://github.com/OlayiwolaSherrifSalawu) |
+| <img src="https://github.com/BramTechxxvi.png" width="56" alt=""> | <!-- TODO: full name --> BramTechxxvi | <!-- Backend/System Architect --> | [@BramTechxxvi](https://github.com/BramTechxxvi) |
+| <img src="https://github.com/Maximoi22.png" width="56" alt=""> | Abdulmalik Olajuwon | <!-- Team Lead --> | [@Maximoi22](https://github.com/Maximoi22) |
 
 ## Contributing
 
