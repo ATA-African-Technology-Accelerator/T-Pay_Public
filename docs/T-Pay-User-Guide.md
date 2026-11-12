@@ -27,7 +27,7 @@ T-Pay runs on the **PayPal sandbox**. No real money moves.
 | :--- | :--- |
 | Two Android phones (Android 8 or later) | One pays, one gets paid. One phone can still lock money, use the Wallet and talk to the assistant. |
 | Bluetooth on both phones | Carries the payment between the phones with no network. Without it, a second QR code does the same job. |
-| A PayPal **sandbox** personal account | Approves the hold when you lock money from PayPal, and receives withdrawals. <!-- TODO: add the sandbox test account emails and passwords for judges here, or in the submission form. --> |
+| A PayPal **sandbox** account | Approves the hold when you lock money from PayPal, and receives withdrawals. The three test logins, and which one not to use in the app, are in [T-Pay test accounts](T-Pay-Test-Accounts.md). |
 | Internet, at the start and at the end | To lock money and to settle. The payment itself needs none. |
 
 ## Install and set up
@@ -165,7 +165,7 @@ Open **Profile** from the bottom bar.
 
 ## For judges: test T-Pay in ten minutes
 
-You need two Android phones with T-Pay installed from the [download link](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) and the sandbox PayPal account. <!-- TODO: add the sandbox account email and password. -->
+You need two Android phones with T-Pay installed from the [download link](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) and the two tester logins from [T-Pay test accounts](T-Pay-Test-Accounts.md): one phone as Personal (Ada, the customer), one as Business (Bola, the seller).
 
 1. **Set up both phones** (two minutes). Pick English, enter a name (for example "Ada" and "Bola"), the sandbox PayPal email, and a PIN. Allow the permissions.
 2. **Lock money on Ada's phone.** Offline vault → **Lock** → ₦10,000 → 24 hours → **With PayPal** → approve in the sandbox. Home shows ₦10,000 locked.
