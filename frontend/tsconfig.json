@@ -1,5 +1,8 @@
 {
   "extends": "expo/tsconfig.base",
-  "compilerOptions": { "strict": true },
-  "include": ["index.ts", "src"]
+  "compilerOptions": {
+    "strict": true,
+    "paths": { "@tpay/shared/*": ["../shared/src/*"] }
+  },
+  "include": ["index.ts", "src", "modules"]
 }

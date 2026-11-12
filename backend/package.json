@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "keys:root": "tsx scripts/generateRootKey.ts",
     "paypal:proof": "tsx scripts/paypalProof.ts",
+    "paypal:proof:more": "tsx scripts/paypalProofMore.ts",
     "postman": "tsx scripts/postmanHelper.ts",
     "db:up": "docker compose up -d --wait",
     "db:migrate": "tsx scripts/migrate.ts",

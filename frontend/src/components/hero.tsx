@@ -1,13 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { color, glass, icon, radius, space, touch } from '../theme/tokens';
-import { Press, RollingMoney, T, speak } from './ui';
+import { Press, RollingMoney, T, sayNaira, speak, useScreenWidth } from './ui';
 import { Aurora } from './aurora';
 import { Eye, EyeOff, HelpCircle, Menu, Volume2 } from 'lucide-react-native';
-import { BellButton, inset } from './shell';
+import { BellButton, useInset } from './shell';
 import { useNav } from '../nav';
-import { Wallet, useStore } from '../demo/store';
-import { t } from '../i18n/en';
+import { Wallet, useApp } from '../state/appState';
+import { t } from '../i18n';
 
 export type HeroAction = { label: string; icon: React.ReactNode; onPress(): void };
 export type WalletPage = { key: Wallet; name: string; status: string; label: string; amount: number; note?: string; actions: HeroAction[] };
@@ -18,7 +18,7 @@ function greeting() {
 }
 
 function Page({ page, width, shown }: { page: WalletPage; width: number; shown: boolean }) {
-  const { hidden, toggleHidden } = useStore();
+  const { hidden, toggleHidden } = useApp();
   const Vis = hidden ? EyeOff : Eye;
   return (
     <View style={[h.page, { width }]} aria-hidden={!shown} importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'}>
@@ -28,7 +28,7 @@ function Page({ page, width, shown }: { page: WalletPage; width: number; shown: 
           <Pressable accessibilityRole="button" accessibilityLabel={hidden ? t.showBalance : t.hideBalance} hitSlop={8} onPress={toggleHidden} style={h.mini}>
             <Vis size={icon.sm} color={color.white} strokeWidth={1.8} />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={`${t.hearIt}: ${page.label}`} hitSlop={8} onPress={() => speak(`${page.label}. ${page.amount} naira`)} style={h.mini}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${t.hearIt}: ${page.label}`} hitSlop={8} onPress={() => speak(`${page.label}. ${sayNaira(page.amount)}`)} style={h.mini}>
             <Volume2 size={icon.sm} color={color.white} strokeWidth={1.8} />
           </Pressable>
         </View>
@@ -54,7 +54,8 @@ function Page({ page, width, shown }: { page: WalletPage; width: number; shown: 
 /** The top of home. Each wallet is a page: swipe between them, or tap a wallet's name. */
 export function Hero({ name, pages, wallet, onWallet }: { name: string; pages: WalletPage[]; wallet: Wallet; onWallet(w: Wallet): void }) {
   const nav = useNav();
-  const width = Math.min(useWindowDimensions().width, 390);
+  const inset = useInset();
+  const width = useScreenWidth();
   const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const index = pages.findIndex(p => p.key === wallet);
   const current = pages[index];
@@ -80,7 +81,7 @@ export function Hero({ name, pages, wallet, onWallet }: { name: string; pages: W
   };
 
   return (
-    <View style={h.hero}>
+    <View style={[h.hero, { paddingTop: inset.top + 2 }]}>
       <Aurora />
       <View style={h.top}>
         <Pressable accessibilityRole="button" accessibilityLabel={t.openMenu} onPress={nav.openMenu} style={h.round}>
@@ -120,7 +121,7 @@ export function Hero({ name, pages, wallet, onWallet }: { name: string; pages: W
 }
 
 const h = StyleSheet.create({
-  hero: { paddingTop: inset.top + 2, paddingBottom: space.md, gap: space.md, overflow: 'hidden', borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
+  hero: { paddingBottom: space.md, gap: space.md, overflow: 'hidden', borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
   top: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.xl },
   switch: { flexDirection: 'row', padding: space.xs, gap: space.xs, marginHorizontal: space.xl, borderRadius: radius.md, backgroundColor: glass.well },
   switchItem: { flex: 1, minHeight: 44, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' },

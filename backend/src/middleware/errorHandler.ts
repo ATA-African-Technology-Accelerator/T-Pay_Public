@@ -29,6 +29,11 @@ export function errorHandler(
     sendError(response, 'VALIDATION_FAILED', 'The request body is not valid JSON');
     return;
   }
+  // Express cannot decode an address with broken % escapes, like /pay/%E0%A4%A. It is not a page.
+  if (error instanceof URIError || (error as { status?: number } | null)?.status === 400 && /decode/i.test(String((error as Error).message))) {
+    sendError(response, 'ROUTE_NOT_FOUND', 'This route does not exist');
+    return;
+  }
   if ((error as { type?: string } | null)?.type === 'entity.too.large') {
     sendError(response, 'VALIDATION_FAILED', 'The request body is too large');
     return;

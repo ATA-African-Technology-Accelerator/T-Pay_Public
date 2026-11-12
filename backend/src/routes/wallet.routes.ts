@@ -12,7 +12,10 @@ export function createWalletRouter(
   const router = Router();
 
   router.get('/wallet', authenticate, wallet.get);
+  router.get('/wallet/pay-link', authenticate, wallet.payLink);
   router.post('/wallet/withdrawals', authenticate, idempotent, wallet.withdraw);
+  router.post('/wallet/deposits', authenticate, idempotent, wallet.createDeposit);
+  router.post('/wallet/deposits/:id/complete', authenticate, idempotent, wallet.completeDeposit);
 
   return router;
 }

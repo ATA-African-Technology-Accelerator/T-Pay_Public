@@ -235,7 +235,7 @@ Priorities decide what survives the deadline. **P0** must work in the demo. **P1
 | FR-01 | On first run a device generates one ECDSA P-256 keypair, with the private key encrypted at rest through the Android Keystore-backed secure store. | Fresh install: a keypair is created once and reused across restarts; the private key never appears in logs, database rows or exported files. | W-08 |
 | FR-02 | The device registers its public key with the backend and receives a device token bound to it. | Registration returns a token and a key identifier; a second registration with the same key returns the existing identity rather than a duplicate. | W-08 |
 | FR-03 | Every voucher names the sending key identifier, and the backend resolves it through a registry that supports revocation. | A voucher signed with a revoked key is rejected with a distinct, surfaced error, and the device is told to re-register. | W-08, G-F01 |
-| FR-04 | The assurance tier of the signing key is recorded per device and shown in the interface. | The demo build displays a software-protected key badge (Tier B); no UI copy, log or pitch material describes it as hardware-backed. | W-08, NFR-02 |
+| FR-04 | The assurance tier of the signing key is recorded per device and shown in the interface. | The demo build shows a Tier B badge. Where the key was created in the Android Keystore, the badge may say the key is kept inside the phone, but no UI copy, log or pitch material claims Tier A or attested hardware, because the backend has no attestation to check. | W-08, NFR-02 |
 | FR-05 | Device identity survives application restart but not reinstallation. | After a restart the device signs with the same key identifier; after reinstalling it registers a new key and the old key is revoked. | W-08 |
 
 #### 3.4.2 Vault
@@ -292,7 +292,7 @@ Priorities decide what survives the deadline. **P0** must work in the demo. **P1
 
 | ID | Requirement | Acceptance criterion | Closes |
 | :--- | :--- | :--- | :--- |
-| FR-31 | Offline intent parsing is rule-based and labelled so. It covers the payment and sale intents through speech where the device supports offline recognition, and through tap or typed input otherwise. | With networking off, the payment and sale flows complete in all five languages through the fallback path; the interface does not claim a language model where none runs. | W-21, G-F11 |
+| FR-31 | Offline intent parsing always has a rule-based path. A person may also choose, after installing, to download a small language model that runs on the phone. When it is present, the rules and the model answer together: whatever the rules recognise wins, and the model only fills what they couldn't read. Every model answer passes the same checks as the online model (FR-32). Each path is labelled as what it is. It covers the payment and sale intents through speech where the device supports offline recognition, and through tap or typed input otherwise. | With networking off, the payment and sale flows complete in all five languages through the fallback path, with or without the model; the interface says "AI on your phone" only when the model answered, and never claims a model where none ran. | W-21, G-F11 |
 | FR-32 | When a network is present, speech and text go to a real model on the backend, which returns a typed proposal. The proposal is validated before it reaches a person, and the person confirms before anything is signed. | Spoken Pidgin, Yoruba, Igbo, Hausa and English requests each produce a valid proposal in the test set; a model response above vault capacity, or one that fails the schema, is rejected before confirmation. | W-21, G-F11 |
 | FR-33 | User-facing strings and spoken text in the payment flow come from a catalogue covering English, Nigerian Pidgin, Yoruba, Igbo and Hausa. | Switching language changes every visible payment-flow string with no untranslated fallback; a native speaker has reviewed the demo lines. | W-21 |
 | FR-34 | Speech output degrades gracefully when no suitable voice is installed. | With no voice for the chosen language, the confirmation is still visible and uses large numerals and icons; the failure is logged, not thrown as an error. | W-21 |
@@ -404,8 +404,8 @@ Only what the Android app needs. Every mutating client endpoint is authenticated
 | GET /vouchers | List vouchers for the calling device with payer or payee view | Read only |
 | GET /vouchers/{id} | Read one voucher including capture identifier | Read only |
 | POST /vaults/{id}/melt | Stop signing, accept the signed spend statement, and release or schedule release of the remaining hold | Keyed on vault |
-| GET /merchants/me/ledger | Read merchant credits, withdrawals and balance | Read only |
-| POST /merchants/me/withdrawals | Pay out a ledger balance through PayPal Payouts | Keyed on client request identifier |
+| GET /wallet | Read the Wallet: collected credits, withdrawals and balance | Read only |
+| POST /wallet/withdrawals | Pay out the Wallet balance through PayPal Payouts | Keyed on `Idempotency-Key` |
 | POST /assistant/interpret | Turn audio or text into a validated, typed proposal | Read only; signs nothing |
 | POST /webhooks/paypal | Receive PayPal events, verified and idempotent | Keyed on event identifier |
 | GET /health | Report liveness and dependency reachability | Read only |
@@ -507,7 +507,7 @@ The concept calls for a secure enclave on both devices. The hackathon build uses
 | **A — hardware-backed** | Android Keystore with StrongBox | Private key never enters application memory; signing is a hardware operation; optional attestation | Nothing about the honesty of the amount being signed |
 | **B — software-protected** | Android with Expo: software key encrypted at rest through `expo-secure-store` | A copy of application storage alone is not enough to sign | The key enters application memory while signing, and an attacker controlling the device can sign |
 
-Tier B is acceptable for this release and must be labelled as such wherever assurance is claimed. The app signs with `@noble/curves`, draws randomness from the platform through `expo-crypto`, and stores the private key with `expo-secure-store`. Reaching Tier A is a native-module task parked until after submission.
+Tier B is acceptable for this release and must be labelled as such wherever assurance is claimed. The release build goes one step further without changing the label: a local native module creates the key inside the Android Keystore, in StrongBox when the phone has it, so the private key never enters application memory and signing is a Keystore operation. It stays Tier B because the backend does not yet verify key attestation, so it can't prove to anyone else where the key lives. Web and development builds fall back to a `@noble/curves` key in `expo-secure-store`. Randomness comes from the platform through `expo-crypto`. Reaching Tier A means adding attestation checks at registration, and stays parked until after submission.
 
 ### 5.2 Signing rules
 

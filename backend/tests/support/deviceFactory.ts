@@ -13,6 +13,7 @@ export const device = (name: string, overrides: Partial<Device> = {}): Device =>
   payoutEmail: 'seller-sandbox@example.com',
   createdAt: new Date('2026-11-06T10:00:00.000Z'),
   revokedAt: null,
+  autoCashOut: true,
   ...overrides,
 });
 

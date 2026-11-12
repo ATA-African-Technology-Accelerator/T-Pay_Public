@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type { AuthorizeVault } from '../services/AuthorizeVault';
 import type { CreateVaultOrder } from '../services/CreateVaultOrder';
 import type { GetCurrentVault } from '../services/GetCurrentVault';
+import type { LockFromWallet } from '../services/LockFromWallet';
 import type { MeltVault } from '../services/MeltVault';
 import type { Device } from '../services/ports';
 import { createVaultSchema, meltVaultSchema, parseBody } from '../validation/schemas';
@@ -12,7 +13,18 @@ export class VaultController {
     private readonly authorizeVault: AuthorizeVault,
     private readonly currentVault: GetCurrentVault,
     private readonly meltVault: MeltVault,
+    private readonly lockFromWallet: LockFromWallet,
   ) {}
+
+  public fromWallet = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const body = parseBody(createVaultSchema, request.body);
+      const data = await this.lockFromWallet.execute(response.locals.device as Device, body);
+      response.status(201).json({ data });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   public create = async (request: Request, response: Response, next: NextFunction) => {
     try {

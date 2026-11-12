@@ -87,25 +87,40 @@ export class AuthorizeVault {
     };
   }
 
-  private async present(device: Device, vault: Vault): Promise<AuthorizeVaultResponse> {
-    const { rootPrivateKey, signer, vouchers } = this.dependencies;
-    const view = toVaultView(vault, await vouchers.listForVault(vault.id));
-    return {
-      vault: view,
-      vaultCertificate: await signMessage(
-        MESSAGE_PREFIX.VAULT_CERTIFICATE,
-        {
-          vaultId: view.vaultId,
-          keyId: device.keyId,
-          authorisedUsdMinor: view.authorisedUsdMinor,
-          amountNgnMinor: view.amountNgnMinor,
-          fxRate: view.fxRate,
-          spendBy: view.spendBy,
-          settleBy: view.settleBy,
-        },
-        rootPrivateKey,
-        signer,
-      ),
-    };
+  private present(device: Device, vault: Vault): Promise<AuthorizeVaultResponse> {
+    return presentVault(this.dependencies, device, vault);
   }
+}
+
+
+/** The vault and the certificate the customer's phone shows merchants, signed by T-Pay's root key. */
+export async function presentVault(
+  { rootPrivateKey, signer, vouchers }: { rootPrivateKey: string; signer: ISigner; vouchers: IVoucherRepository },
+  device: Device,
+  vault: Vault,
+): Promise<AuthorizeVaultResponse> {
+  const view = toVaultView(vault, await vouchers.listForVault(vault.id));
+  return {
+    vault: view,
+    vaultCertificate: await signMessage(
+      MESSAGE_PREFIX.VAULT_CERTIFICATE,
+      {
+        vaultId: view.vaultId,
+        keyId: device.keyId,
+        authorisedUsdMinor: view.authorisedUsdMinor,
+        amountNgnMinor: view.amountNgnMinor,
+        fxRate: view.fxRate,
+        spendBy: view.spendBy,
+        settleBy: view.settleBy,
+      },
+      rootPrivateKey,
+      signer,
+    ),
+  };
+}
+
+
+/** A vault paid from the wallet keeps the same settle-by as a PayPal one, so merchants get the same time. */
+export function walletSettleBy(lockedAt: Date): Date {
+  return new Date(lockedAt.getTime() + PAYPAL_HOLD_MS - HOLD_EXPIRY_MARGIN_MS);
 }

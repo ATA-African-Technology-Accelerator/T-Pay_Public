@@ -15,4 +15,6 @@ const dependencies = createDependencies(process.env);
 createApp(dependencies).listen(port, () => {
   console.log(`T-Pay backend listening on port ${port}`);
   createBackgroundJobs(dependencies).start();
+  // Log in to PayPal now, so the first person to open the app isn't the one who waits for it.
+  void dependencies.gateway.isReachable();
 });

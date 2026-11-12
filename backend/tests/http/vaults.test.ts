@@ -214,6 +214,7 @@ describe('vault API', () => {
         spendBy: new Date(NOW.getTime() + 24 * HOUR_MS).toISOString(),
         settleBy: new Date(NOW.getTime() + 28 * 24 * HOUR_MS).toISOString(),
         paypalAuthorizationId: 'AUTH-ORDER-1',
+        fundedBy: 'PAYPAL',
       });
     });
 

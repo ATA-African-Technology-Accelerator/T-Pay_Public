@@ -399,6 +399,8 @@ describe('voucher API', () => {
             counterpartyName: 'Customer',
             paypalCaptureId: 'CAPTURE-1',
             updatedAt: fixture.time.now.toISOString(),
+            // So the seller's phone, still showing its request, can tell this one was paid.
+            requestNonce: expect.any(String),
           },
         ],
         nextCursor: null,

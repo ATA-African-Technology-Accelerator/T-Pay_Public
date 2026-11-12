@@ -13,6 +13,7 @@ function toProfileView(device: Device): ProfileView {
     displayName: device.displayName,
     language: device.language,
     payoutEmail: device.payoutEmail,
+    autoCashOut: device.autoCashOut !== false,
     assuranceTier: 'B',
     createdAt: device.createdAt.toISOString(),
   };

@@ -1,0 +1,41 @@
+// The only place that creates concrete adapters. Features import what they need from here.
+import { AppLock } from '@tpay/shared/application/use-cases/appLock';
+import { loadOnDeviceModel } from '../adapters/ai/onDeviceModel';
+import { HttpTPayApi } from '../adapters/api/httpApi';
+import { NetInfoConnectivity } from '../adapters/connectivity/netInfoConnectivity';
+import { DeviceSigner } from '../adapters/crypto/deviceSigner';
+import { SecureKeyStore } from '../adapters/crypto/secureKeyStore';
+import { DeviceBiometrics } from '../adapters/device/biometrics';
+import { ExpoSpeechInput, ExpoSpeechOutput } from '../adapters/speech/speech';
+import { openKv } from '../adapters/storage/kv';
+import { LocalStore } from '../adapters/storage/localStore';
+import { SecurePinStore } from '../adapters/storage/securePinStore';
+import { secureRandom, systemClock } from '../adapters/system/system';
+import { loadNearbyDriver } from '../adapters/transport/nearbyDriver';
+import { NearbyTransport } from '../adapters/transport/nearbyTransport';
+import { loadRadio } from '../adapters/transport/radio';
+import { config } from '../config';
+import { sessionStore } from '../session/sessionStore';
+
+export const signer = new DeviceSigner();
+export const keyStore = new SecureKeyStore();
+export const clock = systemClock;
+export const random = secureRandom;
+export const api = new HttpTPayApi(config.apiUrl, sessionStore.token);
+export const biometrics = new DeviceBiometrics();
+export const pinStore = new SecurePinStore();
+export const appLock = new AppLock({ store: pinStore, biometrics, signer, random, clock });
+export const store = new LocalStore(openKv());
+export const connectivity = new NetInfoConnectivity();
+/** Bluetooth and its permissions. Null off Android and in Expo Go. */
+export const radio = loadRadio();
+export const nearby = new NearbyTransport(loadNearbyDriver(), radio);
+export const speechIn = new ExpoSpeechInput();
+// The assistant speaks in the server's natural voice (ElevenLabs), saved on the phone once made.
+// With no network, or a slow one, the phone's own voice reads it instead.
+export const speechOut = new ExpoSpeechOutput(async (text, language) => {
+  if (!(await connectivity.isOnline())) return null;
+  return api.speak({ text, language });
+});
+/** The offline assistant model. Nothing is downloaded unless the person asks in Settings. */
+export const localModel = loadOnDeviceModel();

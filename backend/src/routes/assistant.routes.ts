@@ -13,6 +13,7 @@ export function createAssistantRouter(assistant: AssistantController, authentica
   const router = Router();
 
   router.post('/assistant/interpret', authenticate, assistant.interpret);
+  router.post('/assistant/speak', authenticate, assistant.speak);
 
   return router;
 }

@@ -48,7 +48,7 @@ export class VaultRelease {
   public async release(vault: Vault): Promise<void> {
     const { gateway, vouchers } = this.dependencies;
     const held = await vouchers.listForVault(vault.id);
-    if (settledUsd(held) < vault.authorisedUsdMinor) {
+    if (vault.fundedBy !== 'WALLET' && settledUsd(held) < vault.authorisedUsdMinor) {
       const result = await gateway.voidAuthorization(vault.paypalAuthorizationId as string);
       if (result === 'ALREADY_CAPTURED') {
         console.error(`PayPal would not void the rest of ${vault.id} after its captures`);
@@ -69,6 +69,9 @@ export class VaultRelease {
       }
       await session.updateVault({ status: 'CLOSED', releasedAt: now });
       await this.recordRelease(session, now);
+      if (session.vault.fundedBy === 'WALLET') {
+        await this.returnToWallet(session, now);
+      }
     });
   }
 
@@ -101,6 +104,29 @@ export class VaultRelease {
         occurredAt: now,
       });
     }
+  }
+
+
+  private async returnToWallet({ addLedgerEntry, vault, vouchers }: VaultSession, now: Date): Promise<void> {
+    const settled = vouchers.filter(({ status }) => status === 'SETTLED');
+    const unspentUsd = vault.authorisedUsdMinor - settledUsd(settled);
+    const unspentNgn = vault.amountNgnMinor - settled.reduce((total, voucher) => total + voucher.amountNgnMinor, 0);
+    if (unspentUsd <= 0) {
+      return;
+    }
+    await addLedgerEntry({
+      id: `led_${this.dependencies.random.uuid()}`,
+      deviceId: vault.deviceId,
+      type: 'VAULT_RETURN',
+      amountUsdMinor: unspentUsd,
+      amountNgnMinor: Math.max(unspentNgn, 0),
+      voucherId: null,
+      withdrawalId: null,
+      depositId: null,
+      paypalCaptureId: null,
+      createdAt: now,
+      vaultId: vault.id,
+    });
   }
 
 

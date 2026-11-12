@@ -42,19 +42,22 @@ P0 must work in the demo. P1 follows only after every P0 activity is verified.
 | ACT-10 | Background sync and settlement | Both | Reconnect | `POST /vouchers`, `GET /vouchers` | FR-15, FR-23, FR-24, FR-44 | P0 |
 | ACT-11 | Transaction list and detail | Both | Offline first | `GET /vouchers/{id}`, `GET /transactions` when online | FR-20, FR-22 | P0 |
 | ACT-12 | Melt vault | Customer | Online | `POST /vaults/{id}/melt` | FR-09, FR-39 | P0 |
-| ACT-13 | Active wallet | Both | Online | `GET /wallet` | FR-40 | P0 |
+| ACT-13 | Wallet | Both | Online | `GET /wallet` | FR-40 | P0 |
 | ACT-14 | Withdraw to PayPal | Both | Online | `POST /wallet/withdrawals` | FR-41 | P0 |
-| ACT-15 | Voice assistant | Both | Online, with offline fallback | `POST /assistant/interpret` | FR-31 to FR-34, FR-46 | P0 |
+| ACT-15 | Voice assistant | Both | Online, with offline fallback | `POST /assistant/interpret`, `POST /assistant/speak` | FR-31 to FR-34, FR-46 | P0 |
 | ACT-16 | Settings, profile and device trust | Both | Offline first | `GET /profile`, `PATCH /profile` when online | FR-04, FR-33 | P0 |
 | ACT-17 | Voice sale and stock | Merchant | Offline | None | FR-26, FR-27 | P1 |
+| ACT-18 | Add money to the Wallet | Both | Online | `POST /wallet/deposits`, `POST /wallet/deposits/{id}/complete` | FR-40, FR-41 | P0 |
+| ACT-19 | Get paid by link | Both | Online | `GET /wallet/pay-link`, and the public `/pay/{token}` pages | FR-40 | P1 |
 
-Three endpoints have no screen, and they are the only exceptions:
+Four routes have no screen in the app, and they are the only exceptions:
 
 | Endpoint | Caller | Reason |
 | :--- | :--- | :--- |
 | `GET /paypal/return` | PayPal browser redirect | Returns the user to the app after ACT-05 approval. |
 | `POST /webhooks/paypal` | PayPal | Updates voucher and vault state. |
 | `GET /health` | Render and operators | Reports backend health. |
+| `/pay/{token}` pages | Anyone with a pay link | A public web page, so a person with no T-Pay can pay an account by PayPal (4.20). |
 
 ## 3. Conventions
 
@@ -93,12 +96,12 @@ Called by ACT-02, and again by ACT-01 when the device certificate is near expiry
   "publicKey": "base64url",
   "displayName": "Mama Nkechi Provisions",
   "language": "pcm",
-  "payoutEmail": " `payoutEmail` is required",
+  "payoutEmail": "merchant-sandbox@example.com",
   "proof": "base64url signature over the other fields"
 }
 ```
 
-`payoutEmail` is required for merchants. Response `201` for a new key, `200` for a known key:
+`payoutEmail` is required for every account, because one account can both pay and collect. Response `201` for a new key, `200` for a known key. Registering a known key again issues a new token and a fresh 7-day certificate, which is how ACT-01 renews:
 
 ```json
 {
@@ -285,7 +288,7 @@ Errors: `VOUCHER_NOT_FOUND`.
 
 ### 4.10 GET /wallet
 
-Called by ACT-13. Returns collected money. Vault funds and PayPal account balances aren't included. `pendingNgnMinor` is money still settling. `entries` holds the latest 50, newest first. `type` is `CREDIT`, `WITHDRAWAL`, `REVERSAL` or `WITHDRAWAL_RETURNED`. The balance can go below zero if a payment is reversed after the money was withdrawn.
+Called by ACT-13. Returns collected money. Vault funds and PayPal account balances aren't included. `pendingNgnMinor` is money still settling. `entries` holds the latest 50, newest first. `type` is `CREDIT` (a settled payment), `DEPOSIT` (money the person added), `PAYMENT_LINK` (paid through the pay link), `WITHDRAWAL`, `REVERSAL` or `WITHDRAWAL_RETURNED`. `fxRate` is the fixed demo rate, so the app can turn an amount in naira into dollars. The balance can go below zero if a payment is reversed after the money was withdrawn.
 
 ```json
 {
@@ -294,6 +297,7 @@ Called by ACT-13. Returns collected money. Vault funds and PayPal account balanc
     "balanceNgnMinor": 200000,
     "pendingNgnMinor": 0,
     "payoutEmail": "user-sandbox@example.com",
+    "fxRate": "1500.00",
     "entries": [
       {
         "entryId": "led_1",
@@ -314,8 +318,10 @@ Called by ACT-13. Returns collected money. Vault funds and PayPal account balanc
 Called by ACT-14. Sends collected money to the account's PayPal email. Send `Idempotency-Key`. The balance drops at once. A refused payout returns the money with a `WITHDRAWAL_RETURNED` entry.
 
 ```json
-{ "amountUsdMinor": 133 }
+{ "amountUsdMinor": 133, "recipientEmail": "chidi@example.com" }
 ```
+
+`recipientEmail` is optional. Left out, the money goes to the account's own `payoutEmail`. Any PayPal email works, so a person who is not on T-Pay can be paid; PayPal emails someone with no PayPal account a link to claim it. The email is checked and lower-cased, and the same `Idempotency-Key` with a different recipient is an `IDEMPOTENCY_CONFLICT`.
 
 Response `202`:
 
@@ -356,7 +362,7 @@ Response `200`:
 }
 ```
 
-Allowed intents are `CREATE_PAYMENT_REQUEST`, `PAY_AMOUNT`, `RECORD_SALE`, `CHECK_BALANCE` and `UNKNOWN`. A proposal only pre-fills a screen. A person must confirm it, and only the normal signing activity can sign.
+Allowed intents are `CREATE_PAYMENT_REQUEST`, `PAY_AMOUNT`, `RECORD_SALE`, `CHECK_BALANCE`, `HELP` and `UNKNOWN`. `HELP` is a question about the app ("how do I pay?", "why can't I see the send button?"). It adds `helpTopic`: `PAY`, `GET_PAID`, `LOCK`, `WITHDRAW`, `SAFETY` or `WHAT_CAN_YOU_DO` (used when the model names none). The app answers it in its own reviewed words, using what the phone knows, such as whether a vault is open. It never reads out the model's `spokenReply` for `HELP`. A proposal only pre-fills a screen. A person must confirm it, and only the normal signing activity can sign.
 
 | Rule | Detail |
 | :--- | :--- |
@@ -365,7 +371,7 @@ Allowed intents are `CREATE_PAYMENT_REQUEST`, `PAY_AMOUNT`, `RECORD_SALE`, `CHEC
 | `audioBase64` | Standard base64, at most 1,400,000 characters, which is about a minute of compressed speech. This route alone accepts a body up to 2 MB. |
 | `audioMimeType` | Required with audio, otherwise null: `audio/wav`, `audio/x-wav`, `audio/mp3`, `audio/mpeg`, `audio/aac`, `audio/mp4`, `audio/m4a`, `audio/x-m4a`, `audio/ogg`, `audio/webm`, `audio/flac`, `audio/aiff` or `audio/3gpp` |
 | What the model sees | Only the words or audio, and the language. Never `context`, tokens, keys or vault data. |
-| `amountNgnMinor` | In kobo. Null when no amount was said, so the screen asks for one. Always null for `CHECK_BALANCE` and `UNKNOWN`. |
+| `amountNgnMinor` | In kobo. Null when no amount was said, so the screen asks for one. Always null for `CHECK_BALANCE`, `HELP` and `UNKNOWN`. |
 | Capacity | A `PAY_AMOUNT` above `context.remainingNgnMinor` is refused |
 
 **Refused answers.** If the model's answer breaks the schema, or proposes a payment above capacity, the response is still `200`, but the proposal is `{ "intent": "UNKNOWN", "amountNgnMinor": null, "itemName": null }`. In that case `spokenReply` is a fixed backend line in the request's language, never the model's words. It says either that the request wasn't understood or that the amount is more than the vault has left. The app treats it like any `UNKNOWN` proposal: it shows and speaks the reply and offers typed input.
@@ -373,6 +379,16 @@ Allowed intents are `CREATE_PAYMENT_REQUEST`, `PAY_AMOUNT`, `RECORD_SALE`, `CHEC
 Every call is logged with its proposal and outcome: `ACCEPTED`, `REJECTED_INVALID` or `REJECTED_OVER_CAPACITY`. What the person said is not logged.
 
 Errors: `AI_UNAVAILABLE` (no Gemini key is set, or Gemini failed or timed out), `VALIDATION_FAILED`.
+
+**Answered on the phone first.** Before calling this route, the app runs the same reviewed rules it uses offline (`shared/src/domain/offlineIntent.ts`). When they read a request in full, the app answers at once and does not call this route:
+
+| Read in full | Example |
+| :--- | :--- |
+| `CREATE_PAYMENT_REQUEST` or `PAY_AMOUNT` with an amount | "collect 2k", "make I pay five hundred" |
+| `CHECK_BALANCE` | "how much do I have" |
+| `HELP` with a clear topic | "how do I pay", "wetin be offline vault", "is my money safe" |
+
+Everything else comes here: a sale (only the model names the item), a request with no amount, and number words the rules don't know, such as Yoruba, Igbo and Hausa ones. The phone applies the same capacity refusal as this route, and logs its answer with the source `rules`. The person still confirms every proposal.
 
 ### 4.13 POST /webhooks/paypal
 
@@ -439,11 +455,136 @@ Called by ACT-11. Query: `since` is an optional cursor. Returns the permanent hi
 }
 ```
 
-Types are `VAULT_LOCKED`, `VAULT_RELEASED`, `VOUCHER_SUBMITTED`, `VOUCHER_SETTLED`, `VOUCHER_REJECTED`, `WITHDRAWAL_REQUESTED`, `WITHDRAWAL_COMPLETED` and `WITHDRAWAL_FAILED`.
+Types are `VAULT_LOCKED`, `VAULT_RELEASED`, `VOUCHER_SUBMITTED`, `VOUCHER_SETTLED`, `VOUCHER_REJECTED`, `WITHDRAWAL_REQUESTED`, `WITHDRAWAL_COMPLETED`, `WITHDRAWAL_FAILED`, `DEPOSIT_COMPLETED` and `PAYMENT_LINK_RECEIVED`.
 
 
 
 
+
+### 4.18 POST /wallet/deposits
+
+Called by ACT-18. Starts a PayPal checkout that is captured straight into the Wallet, with no hold. Send `Idempotency-Key`.
+
+```json
+{ "amountNgnMinor": 1500000 }
+```
+
+Response `201`:
+
+```json
+{
+  "data": {
+    "depositId": "dep_123",
+    "amountNgnMinor": 1500000,
+    "amountUsdMinor": 1000,
+    "fxRate": "1500.00",
+    "approvalUrl": "https://www.sandbox.paypal.com/..."
+  }
+}
+```
+
+The smallest deposit is $1 and the largest is the vault maximum. The app opens `approvalUrl` in the in-app browser. PayPal sends the payer to `GET /paypal/return?depositId=…&outcome=…`, which redirects to `tpay://wallet/return?depositId=dep_123&outcome=approved`, or `cancelled`, which also cancels the deposit. Nothing is credited yet.
+
+Errors: `VALIDATION_FAILED`, `IDEMPOTENCY_CONFLICT`, `PAYPAL_UNAVAILABLE`.
+
+### 4.19 POST /wallet/deposits/{id}/complete
+
+Called by ACT-18 after the payer returns `approved`. Captures the order and credits the Wallet. Send `Idempotency-Key`. The body is empty. Repeating it is safe: the wallet is credited once, enforced inside the wallet lock and by a database constraint.
+
+```json
+{
+  "data": {
+    "depositId": "dep_123",
+    "status": "COMPLETED",
+    "amountNgnMinor": 1500000,
+    "amountUsdMinor": 1000,
+    "paypalCaptureId": "SANDBOX-CAPTURE"
+  }
+}
+```
+
+`200` when `COMPLETED`. `202` with `PENDING` while PayPal is still confirming the capture, in which case nothing is credited yet and calling again reads the same capture. The transaction history gets `DEPOSIT_COMPLETED`.
+
+Errors: `VAULT_NOT_FOUND` (not this device's deposit), `ORDER_NOT_APPROVED` (not approved in PayPal yet, or cancelled), `IDEMPOTENCY_CONFLICT`, `PAYPAL_UNAVAILABLE`.
+
+### 4.20 GET /wallet/pay-link and the public pay pages
+
+Called by ACT-19. Returns this account's pay link. It is the same link every time, with an unguessable 22-character token.
+
+```json
+{ "data": { "url": "https://t-pay-public.onrender.com/pay/Xk3Jx9QmZaB7rT2pLw0cEa" } }
+```
+
+The link opens a public page, with no sign-in, on the backend itself:
+
+| Route | What it does |
+| :--- | :--- |
+| `GET /pay/{token}` | Shows who will be paid, by display name only (never the email), and asks for an amount in dollars, from $1 to $500 |
+| `POST /pay/{token}` | Makes a PayPal order and sends the payer to PayPal. Limited to 10 submits a minute per address. |
+| `GET /pay/{token}/return` | PayPal sends the payer back here. If PayPal's order token matches, the order is captured and the owner is credited, once. The payer sees a thank-you page. |
+
+The credit appears in the owner's wallet as `PAYMENT_LINK`, and in the history as `PAYMENT_LINK_RECEIVED`. Every page escapes names, loads nothing from elsewhere, and can't be shown inside another site, using a strict content security policy.
+
+### 4.21 POST /assistant/speak
+
+Reads a short reply aloud in a natural voice, so the assistant does not sound like a screen reader. It needs a device token. Making the audio takes a few seconds, so the app reads replies with the phone's own voice, which starts at once. It asks this route only for a language the phone has no voice for (usually Yoruba, Igbo and Hausa), and plays a clip it already has for the same sentence. It gives up after 8 seconds or on any error.
+
+Request: `{ "text": "You wan collect one thousand naira?", "language": "pcm" }`
+
+Response: `{ "data": { "audioBase64": "UklGR...", "audioMimeType": "audio/wav" } }`
+
+| Field | Rule |
+|---|---|
+| `text` | 1 to 300 characters. A longer text is refused with `VALIDATION_FAILED` so one request cannot run up a large bill. |
+| `language` | `en`, `pcm`, `yo`, `ig` or `ha`. The voice is asked to speak that language. |
+| Audio | A mono, 16-bit, 24,000 Hz WAV file made by Gemini. The model comes from `GEMINI_TTS_MODEL` (default `gemini-3.8-flash-tts`). |
+
+Errors: `AI_UNAVAILABLE` (no Gemini key, the voice model is not available to the key, or Gemini failed or timed out), `VALIDATION_FAILED`.
+
+### 4.22 POST /vaults/from-wallet
+
+Locks money for offline spending straight from the Wallet. The money is already collected into T-Pay's PayPal account, so there is no PayPal step: the vault is `ACTIVE` at once and the answer is the same as `POST /vaults/{id}/authorize`. Needs a device token and an `Idempotency-Key`.
+
+Request: `{ "amountNgnMinor": 500000, "durationHours": 24 }`, the same rules as `POST /vaults`.
+
+Response `201`: `{ "data": { "vault": { ..., "fundedBy": "WALLET" }, "vaultCertificate": { ... } } }`
+
+| Rule | |
+|---|---|
+| Balance | The Wallet must hold the amount in both dollars and naira, or `INSUFFICIENT_BALANCE` (422). Nothing changes. |
+| One open vault | `ACTIVE_VAULT_EXISTS` (409) while another vault is open. A PayPal lock started but never approved is replaced. |
+| Once only | The wallet debit (`VAULT_LOCK`) and the vault are written in one transaction, and the database allows one `VAULT_LOCK` and one `VAULT_RETURN` per vault. |
+| Paying a merchant | A voucher settles with no PayPal capture: the merchant's Wallet is credited (`CREDIT`) from the locked money. |
+| Closing | On melt, or at settle-by, what was not spent goes back to the Wallet as `VAULT_RETURN`. Nothing is voided at PayPal. |
+| Settle-by | 28 days, the same as a PayPal vault. No hold renewal. |
+
+`VaultView.fundedBy` is `PAYPAL` or `WALLET` on every vault. Ledger entries add two types: `VAULT_LOCK` (money out of the Wallet into a vault) and `VAULT_RETURN` (unspent money back).
+
+### 4.23 Automatic cash-out of money received offline
+
+The **Wallet** holds the money a person receives; the **Offline vault** holds the money they can send offline. Money received from offline payments goes on to the person's own PayPal (`payoutEmail`) by itself, without any call from the app:
+
+| Rule | |
+|---|---|
+| When | A background job every 30 seconds. Whatever was received offline since the last run becomes **one** payout, so a busy seller is not charged a fee per sale. |
+| What | Money received offline (`CREDIT`, less any `REVERSAL`) less what was already cashed out this way. Never money the person added (`DEPOSIT`) or was paid by link (`PAYMENT_LINK`), and never more than the balance. |
+| Minimum | $1.00. Smaller amounts wait for the next payment. |
+| Payout | The same PayPal Payout as a withdrawal, with the same retries and duplicate protection. Its `WITHDRAWAL` and any `WITHDRAWAL_RETURNED` ledger entries carry `"autoCashOut": true`. |
+| Refused | If PayPal refuses (for example an email with no PayPal account), the money returns to the Wallet and automatic cash-out pauses for that account for 24 hours. |
+| Turning it off | `PATCH /profile` with `{ "autoCashOut": false }`. `GET /profile` returns `autoCashOut` (default `true`). Registering the phone again keeps the choice. |
+
+### 4.24 Receiving money with the Offline vault
+
+No new endpoint: this records how the app uses the routes above.
+
+| Rule | |
+| :--- | :--- |
+| Sending | Only the Offline vault pays offline. Each voucher has the next sequence number, and the phone counts it against the vault as soon as it is signed, settled or not. The server refuses a reused sequence (`REJECTED_CONFLICT`) or an overspend (`REJECTED_OVERSPEND`), and blocks the vault. |
+| Receiving | Either wallet's **Get paid** screen takes payments offline. A received voucher is queued on the phone (shown as "received, queued") and settles into the **Wallet** as a `CREDIT` on the next sync (`POST /vouchers`). It never goes into the Offline vault, and it is never spent again offline: until it settles it can still be refused. |
+| Locking it again | Once received money has settled, it is ordinary Wallet money. With no vault open, the app offers to lock it into a new Offline vault in one tap (`POST /vaults/from-wallet`). The offer counts only settled payments since the last lock, never more than the balance, and only when automatic cash-out (4.23) is off. |
+| Closing | `POST /vaults/{id}/melt` asks for the PIN or fingerprint first. It returns only what was never spent. Every voucher already signed stays payable to its holder until settle-by. |
+
+Why receiving goes to the Wallet: a PayPal hold belongs to the payer's order and can't be moved to another person, and passing on money that hasn't settled would let one refused payment spoil every payment after it.
 
 ## 5. Offline messages
 
@@ -517,6 +658,27 @@ Phones exchange three frames. Build and read them only with `encodeFrame` and `d
 | Fallback | Keep the voucher scanner open while hosting. | If Bluetooth is refused, is off, or isn't connected within 8 seconds of tapping **Pay**, show the voucher QR instead. |
 
 Bluetooth never blocks a payment, and the backend never knows which transport carried a voucher. `POST /vouchers` is unchanged.
+
+**Pairing.** Both phones use Nearby Connections with the point-to-point strategy and the app's package name as the service ID. Each frame travels as one UTF-8 bytes payload, exactly the text of the QR. The session code itself is never broadcast. Both phones derive two 16-character tags from it:
+
+| Tag | Value | Used as |
+| :--- | :--- | :--- |
+| Advertise | First 16 characters of base64url(SHA-256(`TPAY-NEARBY-V1\nADVERTISE\n<sessionCode>`)) | The merchant's advertised endpoint name |
+| Join | The same with `JOIN` in place of `ADVERTISE` | The customer's endpoint name when it connects |
+
+The merchant accepts a connection only from an endpoint named with the join tag and rejects every other. A phone that overhears the advertised tag can't make the join tag without the code, which only travels inside the QR the customer scanned. So it can't take the customer's place.
+
+**Shared rules for each step.** Build and check every message only with these functions from `shared/`:
+
+| Step | Function |
+| :--- | :--- |
+| ACT-06 | `createPaymentRequest`. A request lives 15 minutes and is refused with `INVALID_CERTIFICATE` when the merchant's certificate has expired |
+| ACT-07, before signing | `reviewPaymentRequest`: the merchant's name, the amount in naira and dollars, or the refusal, with no signature yet |
+| ACT-07, on Pay | `issueVoucher` |
+| ACT-08 | `acceptVoucher` |
+| ACT-09 | `acceptReceipt`: the receipt must be signed by the merchant in the request and cover exactly this voucher |
+| ACT-12 | `createSpendStatement`, which refuses sequences that are not exactly 1 to n |
+| ACT-15 offline | `parseOfflineIntent`. English and Pidgin phrases for now, plus digits in every language. With the optional on-phone model, its answer is checked by `checkModelProposal` with the same intent, amount and capacity rules as `POST /assistant/interpret`, and the rules win where they recognise something |
 
 
 

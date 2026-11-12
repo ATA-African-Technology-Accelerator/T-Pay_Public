@@ -12,6 +12,7 @@ export function createVaultRouter(
 
   router.get('/paypal/return', paypalReturn.handle);
   router.post('/vaults', authenticate, idempotent, vaults.create);
+  router.post('/vaults/from-wallet', authenticate, idempotent, vaults.fromWallet);
   router.get('/vaults/current', authenticate, vaults.current);
   router.post('/vaults/:id/authorize', authenticate, idempotent, vaults.authorize);
   router.post('/vaults/:id/melt', authenticate, idempotent, vaults.melt);
