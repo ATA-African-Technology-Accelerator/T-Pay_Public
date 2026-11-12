@@ -14,7 +14,6 @@
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/metro-runtime": "~58.0.17",
     "@noble/curves": "^2.4.0",
-    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "12.0.1",
     "expo": "^58.0.0",
     "expo-asset": "~58.0.20",
@@ -35,6 +34,8 @@
     "expo-sqlite": "~58.0.15",
     "expo-status-bar": "~58.0.4",
     "expo-web-browser": "~58.0.7",
+    "jpeg-js": "0.4.4",
+    "jsqr": "1.4.0",
     "llama.rn": "0.12.9",
     "lucide-react-native": "^1.69.0",
     "react": "19.3.0",
@@ -48,7 +49,6 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
-    "@testing-library/react-native": "^14.1.0",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
     "jest": "^30.5.2",
@@ -83,9 +83,6 @@
         },
         "modulePaths": [
           "<rootDir>/node_modules"
-        ],
-        "modulePathIgnorePatterns": [
-          "<rootDir>/web-prototype"
         ]
       },
       {
@@ -99,9 +96,6 @@
         },
         "modulePaths": [
           "<rootDir>/node_modules"
-        ],
-        "modulePathIgnorePatterns": [
-          "<rootDir>/web-prototype"
         ],
         "transformIgnorePatterns": [
           "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|@noble/.*|lucide-react-native|react-native-svg|react-native-qrcode-svg)"
