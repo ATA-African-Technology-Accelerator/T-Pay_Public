@@ -105,3 +105,25 @@ it('backs off when the recogniser keeps stopping at once, but never gives up', a
   expect(mockModule.starts).toBeGreaterThan(early); // and tried again later
   stop();
 });
+
+it('wakes when the name is only in the recogniser\'s second guess', async () => {
+  const onWake = jest.fn();
+  const stop = new ExpoSpeechInput().startWakeWord(onWake);
+  await flush();
+  emit('result', { isFinal: true, results: [{ transcript: 'hey they pay collect' }, { transcript: 'hey T-Pay collect' }] });
+  jest.advanceTimersByTime(1_300);
+  await flush();
+  expect(onWake).toHaveBeenCalledWith('collect');
+  stop();
+});
+
+it('reports what it is doing, for the check in Settings', async () => {
+  const input = new ExpoSpeechInput();
+  const seen: string[] = [];
+  input.onWakeCheck(c => seen.push(`${c.state}:${c.heard ?? ''}`));
+  const stop = input.startWakeWord(jest.fn());
+  await flush();
+  emit('result', { isFinal: false, results: [{ transcript: 'good morning' }] });
+  stop();
+  expect(seen).toEqual(expect.arrayContaining(['listening:', 'listening:good morning', 'off:good morning']));
+});
