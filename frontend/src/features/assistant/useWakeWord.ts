@@ -40,11 +40,17 @@ export function useWakeWord(route: Route['name'], onWake: (rest: string) => void
     const off = store.onChange(load);
     return () => { alive = false; off(); };
   }, []);
-  const [front, setFront] = useState(AppState.currentState === 'active');
+  // In front unless Android says otherwise. On a cold start of a release build the first reading is
+  // often "background" (JavaScript runs before the screen is shown) and the one "active" event can
+  // fire before anyone is listening, which left the wake word off for good. So read it again once
+  // subscribed, and count anything but background as in front.
+  const inFront = (state: string | null | undefined) => state !== 'background';
+  const [front, setFront] = useState(inFront(AppState.currentState));
   const latest = useRef(onWake);
   latest.current = onWake;
   useEffect(() => {
-    const sub = AppState.addEventListener('change', state => setFront(state === 'active'));
+    const sub = AppState.addEventListener('change', state => setFront(inFront(state)));
+    setFront(inFront(AppState.currentState));
     return () => sub.remove();
   }, []);
 
