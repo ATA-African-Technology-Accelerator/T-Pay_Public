@@ -177,13 +177,25 @@ export const speakSchema = z
 // handle more reliably than kobo, and are converted by the backend.
 const MAX_SPOKEN_LENGTH = 300;
 const MAX_ITEM_LENGTH = 80;
-export const ASSISTANT_INTENTS = ['CREATE_PAYMENT_REQUEST', 'PAY_AMOUNT', 'RECORD_SALE', 'CHECK_BALANCE', 'UNKNOWN'] as const;
+export const ASSISTANT_INTENTS = [
+  'CREATE_PAYMENT_REQUEST', 'PAY_AMOUNT', 'RECORD_SALE', 'CHECK_BALANCE', 'HELP',
+  'LOCK_MONEY', 'UNLOCK_MONEY', 'ADD_MONEY', 'WITHDRAW', 'SHARE_PAY_LINK',
+  'ADD_STOCK', 'CHECK_STOCK', 'SET_BUDGET', 'CHECK_BUDGET', 'OPEN_SCREEN', 'UNKNOWN',
+] as const;
+export const ASSISTANT_SCREENS = ['HOME', 'ACTIVITY', 'WALLET', 'VAULT', 'STOCK', 'BUDGET', 'SETTINGS', 'HELP'] as const;
+const MAX_STOCK_QUANTITY = 100_000;
+export const HELP_TOPICS = ['PAY', 'GET_PAID', 'LOCK', 'WITHDRAW', 'SAFETY', 'WHAT_CAN_YOU_DO'] as const;
 
 export const modelProposalSchema = z
   .object({
     intent: z.enum(ASSISTANT_INTENTS),
     amountNaira: z.number().int().positive().max(MAX_VAULT_NGN_MINOR / 100).nullable(),
     itemName: z.string().trim().min(1).max(MAX_ITEM_LENGTH).nullable(),
+    // Older answers, and every intent but HELP, have none.
+    helpTopic: z.enum(HELP_TOPICS).nullable().default(null),
+    // Only ADD_STOCK has a quantity, and only OPEN_SCREEN a screen. Older answers have neither.
+    quantity: z.number().int().positive().max(MAX_STOCK_QUANTITY).nullable().default(null),
+    screen: z.enum(ASSISTANT_SCREENS).nullable().default(null),
     transcript: z.string().trim().max(MAX_UTTERANCE_LENGTH),
     spokenReply: z.string().trim().min(1).max(MAX_SPOKEN_LENGTH),
   })
