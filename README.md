@@ -12,7 +12,7 @@
 
 Lock money while you are online, then pay or get paid phone to phone with no internet at all, by QR code, Bluetooth or voice.
 
-[Download the app](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) · [Live API](https://t-pay-public.onrender.com/api/health) · [User guide](docs/T-Pay-User-Guide.md) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
+[Website](https://t-paypublic-website.vercel.app/) · [Download the app](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) · [Live API](https://t-pay-public.onrender.com/api/health) · [User guide](docs/T-Pay-User-Guide.md) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/OlayiwolaSherrifSalawu/T-Pay_Public/ci.yml?branch=frontend&style=flat-square&label=tests)](https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -29,6 +29,7 @@ Lock money while you are online, then pay or get paid phone to phone with no int
 
 ## Contents
 
+- [Try T-Pay](#try-t-pay)
 - [Overview](#overview)
 - [Key capabilities](#key-capabilities)
 - [Architecture](#architecture)
@@ -44,6 +45,18 @@ Lock money while you are online, then pay or get paid phone to phone with no int
 - [Team](#team)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Try T-Pay
+
+| | Link |
+| :--- | :--- |
+| **Website** | [t-paypublic-website.vercel.app](https://t-paypublic-website.vercel.app/) |
+| **Android app** | [Download the build from Expo](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) |
+| **Live API** | [t-pay-public.onrender.com/api/health](https://t-pay-public.onrender.com/api/health) |
+| **User guide** | [docs/T-Pay-User-Guide.md](docs/T-Pay-User-Guide.md), with a ten-minute test script for judges |
+
+> [!NOTE]
+> The API runs on Render's free plan and sleeps when idle. The first request after a quiet spell can take up to a minute.
 
 ## Overview
 
@@ -378,6 +391,7 @@ To report a vulnerability, please do **not** open a public issue. See [SECURITY.
 - [x] CI for backend, shared rules and app
 - [ ] Native-speaker review of Yoruba, Igbo and Hausa text
 - [x] Public Android build
+- [x] Landing page
 - [ ] Demo video
 - [ ] Live PayPal mode, with KYC
 - [ ] Hardware-backed device keys
