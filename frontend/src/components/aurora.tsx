@@ -20,12 +20,12 @@ const LIGHTS: Light[] = [
   { color: glow.edge, opacity: 0.55, cx: 88, cy: -8, rx: 72, ry: 62, period: motion.drift * 1.6, faintest: 0.7, swell: 1.08 },
 ];
 
-// Behind the body's glass cards: maroon lights that pulse slower than the hero's, so the page feels
-// warm and alive without competing with it.
+// Behind the body's glass cards: maroon lights that pulse across the whole screen, so the page feels
+// warm and alive. They swing further than the hero's lights, because the reds are dark.
 const BODY_LIGHTS: Light[] = [
-  { color: bodyGlow.a, opacity: 0.9, cx: 90, cy: 25, rx: 75, ry: 40, period: motion.drift * 1.4, faintest: 0.55, swell: 1.1 },
-  { color: bodyGlow.b, opacity: 1, cx: 5, cy: 70, rx: 85, ry: 45, period: motion.drift * 1.8, faintest: 0.5, swell: 1.12 },
-  { color: bodyGlow.c, opacity: 0.6, cx: 60, cy: 105, rx: 80, ry: 35, period: motion.drift * 2.1, faintest: 0.5, swell: 1.08 },
+  { color: bodyGlow.a, opacity: 1, cx: 90, cy: 22, rx: 85, ry: 45, period: motion.drift * 1.2, faintest: 0.25, swell: 1.2 },
+  { color: bodyGlow.b, opacity: 1, cx: 5, cy: 68, rx: 95, ry: 50, period: motion.drift * 1.5, faintest: 0.2, swell: 1.22 },
+  { color: bodyGlow.c, opacity: 0.9, cx: 60, cy: 105, rx: 90, ry: 40, period: motion.drift * 1.8, faintest: 0.3, swell: 1.15 },
 ];
 
 /**

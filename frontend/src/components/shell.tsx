@@ -1,5 +1,5 @@
-import React from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { ArrowLeft, Bell, Mic, ReceiptText } from 'lucide-react-native';
@@ -62,15 +62,28 @@ export function Avatar({ name, size = 46, tone = color.panelHigh }: { name: stri
   );
 }
 
-export function Screen({ children, head, hero, footer, tabsFor }: {
-  children: React.ReactNode; head?: React.ReactNode; hero?: React.ReactNode; tabsFor?: Route['name']; footer?: React.ReactNode;
+/**
+ * `refreshable` lets the person pull the screen down to sync with the backend and reload what
+ * the phone shows. The main tabs are refreshable unless they say otherwise.
+ */
+export function Screen({ children, head, hero, footer, tabsFor, refreshable = !!tabsFor }: {
+  children: React.ReactNode; head?: React.ReactNode; hero?: React.ReactNode; tabsFor?: Route['name']; footer?: React.ReactNode; refreshable?: boolean;
 }) {
   const inset = useInset();
+  const { sync, reload } = useApp();
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    void sync().catch(() => undefined).then(() => reload()).catch(() => undefined).finally(() => setRefreshing(false));
+  }, [sync, reload]);
   return (
     <View style={l.root}>
       <Aurora kind="body" />
       {head}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ flexGrow: 1 }, tabsFor && { paddingBottom: 72 + inset.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }} contentContainerStyle={[{ flexGrow: 1 }, tabsFor && { paddingBottom: 72 + inset.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+        refreshControl={refreshable ? <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={color.text} colors={[color.ink]} progressBackgroundColor={color.text} /> : undefined}
+      >
         {hero}
         <View style={l.body}>{children}</View>
       </ScrollView>

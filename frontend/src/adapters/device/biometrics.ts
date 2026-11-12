@@ -18,6 +18,7 @@ export class DeviceBiometrics implements IBiometricUnlock {
       // The PIN is the fallback, inside the app; don't hand over to the phone's own passcode.
       disableDeviceFallback: true,
     });
+    if (!result.success) console.warn('Fingerprint not accepted', result.error, 'warning' in result ? result.warning : '');
     return result.success;
   }
 }

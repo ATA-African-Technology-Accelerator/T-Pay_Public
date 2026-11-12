@@ -1,26 +1,73 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { ChevronRight, Cpu, Globe, HelpCircle, Lock, ShieldCheck, UserRound } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Switch, View } from 'react-native';
+import { Activity, ChevronRight, Cpu, Globe, HelpCircle, Lock, Mic, Send, ShieldCheck, UserRound } from 'lucide-react-native';
 import { color, icon, radius, space, touch } from '../../theme/tokens';
-import { Panel, Press, T } from '../../components/ui';
+import { Button, Panel, Press, T } from '../../components/ui';
 import { Avatar, CurvedHeader, Screen } from '../../components/shell';
 import { useNav } from '../../nav';
 import { useApp } from '../../state/appState';
 import { languageCodes, languages, t } from '../../i18n';
 import { softwareOnly } from '../../adapters/crypto/deviceSigner';
-import { api } from '../../composition';
+import type { WakeCheck } from '../../adapters/speech/speech';
+import { api, speechIn, store } from '../../composition';
 import { profileStore } from '../../session/profileStore';
 import { withSession } from '../../session/guard';
 import { modelNote, useModelState } from './offlineAssistant';
+import { useHealth } from '../../state/health';
+
+import { CASH_OUT } from '../vault/topUp';
+import { WAKE_PACK_AT, useWakeWordSetting } from '../assistant/useWakeWord';
 
 /** ACT-16. Read from the phone; when online, the backend's copy wins and is saved here. */
 export function SettingsScreen() {
   const nav = useNav();
   const { name, profile, language, online, reload } = useApp();
   const model = useModelState();
+  const health = useHealth();
+  const service = !health ? t.serviceUnknown : health.database === 'down' ? t.serviceDbDown : health.paypal === 'down' ? t.servicePayPalDown : t.serviceOk(health.mode);
+  const serviceOk = !!health && health.status === 'ok';
+  // Whether money received offline goes on to PayPal by itself. The server holds the choice; the
+  // phone keeps the last answer so it can show it with no network.
+  const [cashOut, setCashOut] = useState<boolean | null>(null);
+  // "Hey T-Pay" needs a recogniser that runs on the phone; without one it can't be turned on.
+  const [wakeOn, setWakeOn] = useWakeWordSetting();
+  const [wake, setWake] = useState<'ready' | 'download' | 'unsupported' | 'downloading' | null>(null);
+  useEffect(() => {
+    const check = () => { void speechIn.wakeWordStatus().then(setWake); };
+    check();
+    return speechIn.onWakeWordStatus(check);
+  }, []);
+  const canWake = wake === null ? null : wake !== 'unsupported';
+  // What "Hey T-Pay" is doing right now, and the last words it heard: so anyone can see why it does
+  // or doesn't answer, on their own phone.
+  const [check, setCheck] = useState<WakeCheck | null>(null);
+  useEffect(() => speechIn.onWakeCheck(setCheck), []);
+  const getPack = async () => {
+    setWake('downloading');
+    const ok = await speechIn.downloadWakeWordPack();
+    if (ok) await store.setMeta(WAKE_PACK_AT, new Date().toISOString());
+    setWake(ok ? 'ready' : 'download');
+  };
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { void store.getMeta<boolean>(CASH_OUT).then(v => { if (v !== null) setCashOut(v); }); }, []);
+  const changeCashOut = async (on: boolean) => {
+    const before = cashOut;
+    setCashOut(on); setSaving(true);
+    try {
+      const saved = await withSession(() => api.updateProfile({ autoCashOut: on }));
+      setCashOut(saved.autoCashOut);
+      await store.setMeta(CASH_OUT, saved.autoCashOut);
+    } catch {
+      setCashOut(before);
+    } finally {
+      setSaving(false);
+    }
+  };
   useEffect(() => {
     if (!online || !profile) return;
     void withSession(() => api.getProfile()).then(async remote => {
+      setCashOut(remote.autoCashOut);
+      await store.setMeta(CASH_OUT, remote.autoCashOut);
       const next = { displayName: remote.displayName, language: profile.language, payoutEmail: remote.payoutEmail };
       if (next.displayName !== profile.displayName || next.payoutEmail !== profile.payoutEmail) {
         await profileStore.save(next);
@@ -53,20 +100,67 @@ export function SettingsScreen() {
         <Row label={t.yourDetails} note={profile?.payoutEmail} Icon={UserRound} onPress={() => nav.go({ name: 'details', edit: true })} />
         <Row label={t.changeLanguage} note={languages[languageCodes.indexOf(language)]} Icon={Globe} onPress={() => nav.go({ name: 'language', edit: true })} />
         <Row label={t.offlineAssistant} note={modelNote(model)} Icon={Cpu} onPress={() => nav.go({ name: 'offlineAi' })} />
+        <View style={a.setting}>
+          <View style={a.rowIcon}><Send size={icon.md} color={color.text} strokeWidth={1.7} /></View>
+          <View style={{ flex: 1, paddingVertical: space.sm }}>
+            <T v="label">{t.autoCashOut}</T>
+            <T v="small" c={color.muted}>{online ? t.autoCashOutNote : t.autoCashOutOffline}</T>
+          </View>
+          <Switch
+            accessibilityLabel={t.autoCashOut} accessibilityHint={t.autoCashOutNote}
+            value={cashOut ?? true} disabled={!online || saving} onValueChange={on => { void changeCashOut(on); }}
+            trackColor={{ false: color.panelHigh, true: color.green }} thumbColor={color.white}
+          />
+        </View>
+        <View style={a.setting}>
+          <View style={a.rowIcon}><Mic size={icon.md} color={color.text} strokeWidth={1.7} /></View>
+          <View style={{ flex: 1, paddingVertical: space.sm }}>
+            <T v="label">{t.wakeWord}</T>
+            <T v="small" c={color.muted}>{canWake === false ? t.wakeWordUnavailable : wake === 'download' || wake === 'downloading' ? t.wakeWordNeedsPack : speechIn.wakeWordOnDevice() ? t.wakeWordNote : t.wakeWordNoteOnline}</T>
+            {wakeOn && canWake !== false && check && (
+              <View style={{ gap: space.hair, marginTop: space.xs }} accessibilityLiveRegion="polite">
+                <T v="small" c={check.state === 'listening' ? color.green : check.state === 'no-permission' || check.state === 'no-recogniser' ? color.coral : color.muted}>
+                  {check.state === 'listening' ? t.wakeCheckListening(check.mode === 'phone')
+                    : check.state === 'restarting' ? t.wakeCheckRestarting
+                    : check.state === 'no-permission' ? t.wakeCheckNoPermission
+                    : check.state === 'no-recogniser' ? t.wakeCheckNoRecogniser
+                    : t.wakeCheckOff}
+                </T>
+                {check.heard && <T v="small" c={color.text}>{t.wakeCheckHeard(check.heard)}</T>}
+                {check.error && <T v="small" c={color.amber}>{t.wakeCheckError(check.error)}</T>}
+              </View>
+            )}
+            {(wake === 'download' || wake === 'downloading') && (
+              <Button kind="soft" label={wake === 'downloading' ? t.wakeWordDownloading : t.wakeWordDownload} loading={wake === 'downloading'} onPress={() => { void getPack(); }} />
+            )}
+          </View>
+          <Switch
+            accessibilityLabel={t.wakeWord} accessibilityHint={t.wakeWordNote}
+            value={wakeOn && canWake !== false} disabled={canWake === false} onValueChange={on => { void setWakeOn(on); }}
+            trackColor={{ false: color.panelHigh, true: color.green }} thumbColor={color.white}
+          />
+        </View>
       </View>
       <View style={a.group}>
         <T v="smallStrong" c={color.muted}>{t.security}</T>
         <Row label={t.lockApp} Icon={Lock} onPress={() => nav.reset({ name: 'lock' })} />
-        <View style={a.setting} accessible accessibilityLabel={`${t.phoneSecurity}, ${softwareOnly ? t.tierB : t.tierBHardware}`}>
+        <View style={a.setting} accessible accessibilityLabel={`${t.phoneSecurity}, ${softwareOnly ? t.keySoftware : t.keyHardware}`}>
           <View style={a.rowIcon}><ShieldCheck size={icon.md} color={color.green} strokeWidth={1.7} /></View>
           <View style={{ flex: 1 }}>
             <T v="label">{t.phoneSecurity}</T>
-            <T v="small" c={color.muted}>{softwareOnly ? t.tierB : t.tierBHardware}</T>
+            <T v="small" c={color.muted}>{softwareOnly ? t.keySoftware : t.keyHardware}</T>
           </View>
         </View>
       </View>
       <View style={a.group}>
         <T v="smallStrong" c={color.muted}>{t.support}</T>
+        <View style={a.setting} accessible accessibilityLabel={`${t.serviceTitle}, ${service}`}>
+          <View style={a.rowIcon}><Activity size={icon.md} color={serviceOk ? color.green : color.amber} strokeWidth={1.7} /></View>
+          <View style={{ flex: 1, paddingVertical: space.sm }}>
+            <T v="label">{t.serviceTitle}</T>
+            <T v="small" c={color.muted}>{service}</T>
+          </View>
+        </View>
         <Row label={t.help} Icon={HelpCircle} onPress={() => nav.go({ name: 'help' })} />
         <T v="small" c={color.muted} style={{ textAlign: 'center', paddingTop: space.sm }}>{t.buildNote}</T>
       </View>

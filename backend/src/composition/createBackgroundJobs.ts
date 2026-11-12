@@ -9,7 +9,7 @@ const JOB_INTERVAL_MS = 30_000;
 
 export function createBackgroundJobs(dependencies: AppDependencies) {
   const { renewVaultHold, settlement, vaultRelease, withdrawToPayPal } = createServices(dependencies);
-  const { clock, vaults } = dependencies;
+  const { clock, devices, vaults, wallet } = dependencies;
 
   const guarded = async (name: string, work: () => Promise<void>) => {
     try {
@@ -26,6 +26,13 @@ export function createBackgroundJobs(dependencies: AppDependencies) {
       await guarded(`release ${vault.id}`, () => vaultRelease.release(vault));
     }
     await guarded('withdrawals', () => withdrawToPayPal.processDue());
+    // Money received offline goes on to each person's PayPal: everything since the last run is one payout.
+    await guarded('cash out received money', async () => {
+      for (const deviceId of await wallet.listDevicesPaidOffline()) {
+        const device = await devices.findById(deviceId);
+        if (device) await guarded(`cash out ${deviceId}`, async () => { await withdrawToPayPal.cashOutReceived(device); });
+      }
+    });
   };
 
   return {

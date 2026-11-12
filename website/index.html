@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>T-Pay</title>
+<meta name="description" content="T-Pay: PayPal payments that keep working when the network doesn't. Lock money online, then pay or get paid phone to phone with no internet.">
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,380;0,9..144,480;0,9..144,560;1,9..144,380;1,9..144,480&family=Manrope:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>document.documentElement.classList.add('js');try{var t=localStorage.getItem('tpay-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<style>
+/* Layout: a two-column story. The left column scrolls (hero, the problem, seven moments); the right
+   column is a phone that stays put and plays each moment as it scrolls into view. Full-width
+   sections follow (the system, download), then a large closing line. Dark first, in the app's own
+   palette; a light theme uses the palette's soft white. */
+:root {
+  --bg: #160D0E;
+  --bg-deep: #000D20;
+  --surface: rgba(255,255,255,0.06);
+  --surface-high: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.14);
+  --border-soft: rgba(255,255,255,0.08);
+  --ink: #F3F5F9;
+  --ink-soft: #C9D0DD;
+  --ink-faint: #9DA8BA;
+  --accent: #7AA2FF;          /* the app's card icon blue */
+  --accent-text: #7AA2FF;
+  --green: #6FD98C;
+  --amber: #F0B64A;
+  --coral: #F58B7C;
+  --light: #F2EEEE;
+  --orb-a: rgba(0,15,37,0.95);
+  --orb-b: rgba(41,0,0,0.85);
+  --orb-c: rgba(242,238,238,0.10);
+  --device: #000D20;
+  --device-screen: #160D0E;
+  --display: "Fraunces", Georgia, serif;
+  --sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F2EEEE; --bg-deep: #E9E3E3; --surface: rgba(0,13,32,0.045); --surface-high: rgba(0,13,32,0.08);
+    --border: rgba(0,13,32,0.14); --border-soft: rgba(0,13,32,0.08);
+    --ink: #000D20; --ink-soft: rgba(0,13,32,0.74); --ink-faint: rgba(0,13,32,0.58);
+    --accent: #000F25; --accent-text: #000F25;
+    --orb-a: rgba(0,13,32,0.16); --orb-b: rgba(41,0,0,0.14); --orb-c: rgba(122,162,255,0.22);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #F2EEEE; --bg-deep: #E9E3E3; --surface: rgba(0,13,32,0.045); --surface-high: rgba(0,13,32,0.08);
+  --border: rgba(0,13,32,0.14); --border-soft: rgba(0,13,32,0.08);
+  --ink: #000D20; --ink-soft: rgba(0,13,32,0.74); --ink-faint: rgba(0,13,32,0.58);
+  --accent: #000F25; --accent-text: #000F25;
+  --orb-a: rgba(0,13,32,0.16); --orb-b: rgba(41,0,0,0.14); --orb-c: rgba(122,162,255,0.22);
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body { margin: 0; }
+body { font-family: var(--sans); font-weight: 500; font-size: 16px; line-height: 1.55; color: var(--ink); background: var(--bg);
+  -webkit-font-smoothing: antialiased; overflow-x: hidden; transition: background .4s, color .4s; }
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+p { margin: 0; }
+h1, h2, h3 { font-family: var(--display); font-weight: 380; letter-spacing: -0.02em; margin: 0; line-height: 1.05; text-wrap: balance; }
+em { font-style: italic; }
+.mono { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.skip { position: absolute; left: 16px; top: -60px; z-index: 50; padding: 10px 14px; background: var(--ink); color: var(--bg); border-radius: 999px; text-decoration: none; font-weight: 700; }
+.skip:focus { top: 16px; }
+svg.i { width: 1em; height: 1em; }
+
+/* ---- ambient field ---- */
+.ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.orb { position: absolute; border-radius: 50%; filter: blur(80px); will-change: transform; }
+.orb.a { width: 46vmax; height: 46vmax; background: var(--orb-a); left: 38%; top: -12vmax; animation: drift-a 28s ease-in-out infinite alternate; }
+.orb.b { width: 40vmax; height: 40vmax; background: var(--orb-b); right: -14vmax; top: 30vh; animation: drift-b 34s ease-in-out infinite alternate; }
+.orb.c { width: 30vmax; height: 30vmax; background: var(--orb-c); left: -10vmax; bottom: -12vmax; animation: drift-a 40s ease-in-out infinite alternate-reverse; }
+.grain { position: absolute; inset: 0; opacity: 0.22; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.4 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+@keyframes drift-a { from { transform: translate(0,0) } to { transform: translate(6vw, 4vh) } }
+@keyframes drift-b { from { transform: translate(0,0) } to { transform: translate(-7vw, -5vh) } }
+
+/* ---- top bar ---- */
+.bar { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px clamp(16px, 4vw, 48px); padding-left: max(clamp(16px, 4vw, 48px), env(safe-area-inset-left, 0px)); padding-right: max(clamp(16px, 4vw, 48px), env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid transparent; transition: background .3s, border-color .3s; }
+.bar.scrolled { background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2); border-bottom-color: var(--border-soft); }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; letter-spacing: -0.01em; font-size: 1.02rem; }
+.brand img { width: 30px; height: 30px; }
+.bar-nav { display: flex; gap: 22px; font-size: 0.86rem; font-weight: 600; color: var(--ink-soft); }
+.bar-nav a { text-decoration: none; transition: color .2s; }
+.bar-nav a:hover { color: var(--ink); }
+.bar-right { display: flex; align-items: center; gap: 10px; }
+.bar-link { font-size: 0.86rem; font-weight: 700; text-decoration: none; padding: 9px 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); transition: background .2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
+.bar-link:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.bar-link.solid { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.bar-link.solid:hover { background: color-mix(in srgb, var(--ink) 88%, var(--bg)); }
+.icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer; transition: background .2s; }
+.icon-btn:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.icon-btn svg { width: 17px; height: 17px; }
+.icon-btn .sun { display: none; }
+:root[data-theme="light"] .icon-btn .sun { display: block; } :root[data-theme="light"] .icon-btn .moon { display: none; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .icon-btn .sun { display: block; } :root:not([data-theme="dark"]) .icon-btn .moon { display: none; } }
+
+/* ---- layout ---- */
+.wrap { position: relative; z-index: 2; }
+.story { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, min(44vw, 600px)); max-width: 1440px; margin: 0 auto;
+  padding-left: max(clamp(16px, 4vw, 48px), env(safe-area-inset-left, 0px)); padding-right: max(clamp(16px, 4vw, 48px), env(safe-area-inset-right, 0px)); column-gap: clamp(24px, 4vw, 72px); }
+.col { min-width: 0; }
+
+/* ---- reveal on scroll ---- */
+.js .reveal { opacity: 0; transform: translateY(28px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); }
+.js .reveal.in { opacity: 1; transform: none; }
+.hero .reveal:nth-child(2) { transition-delay: .08s; } .hero .reveal:nth-child(3) { transition-delay: .16s; } .hero .reveal:nth-child(4) { transition-delay: .24s; } .hero .reveal:nth-child(5) { transition-delay: .32s; }
+
+/* ---- hero ---- */
+.hero { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; padding: 120px 0 80px; }
+.eyebrow { color: var(--accent-text); display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+.eyebrow::before { content: ""; width: 28px; height: 1px; background: currentColor; }
+.hero h1 { font-size: clamp(3.2rem, 7.4vw, 6.6rem); font-weight: 300; line-height: 0.95; letter-spacing: -0.035em; }
+.hero h1 em { font-weight: 380; color: var(--accent-text); }
+.hero .lede { font-size: clamp(1.1rem, 1.5vw, 1.32rem); color: var(--ink-soft); max-width: 36ch; margin-top: 34px; line-height: 1.55; }
+.hero .lede b { color: var(--ink); font-weight: 700; }
+.scroll-cue { margin-top: 30px; display: flex; align-items: center; gap: 10px; color: var(--ink-faint); font-size: 0.9rem; }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); animation: pulse 2s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent) } 100% { box-shadow: 0 0 0 14px transparent } }
+.hero-actions { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px; }
+.pill-btn { display: inline-flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 11px 18px 11px 12px; font-weight: 700; font-size: 0.92rem; cursor: pointer; text-decoration: none; transition: background .2s, transform .25s; }
+.pill-btn:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); transform: translateY(-1px); }
+.pill-btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pill-btn.primary:hover { background: color-mix(in srgb, var(--ink) 88%, var(--bg)); }
+.pill-btn .pi { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--bg-deep); }
+.pill-btn.primary .pi { background: var(--bg); color: var(--ink); }
+.pill-btn .pi svg { width: 13px; height: 13px; }
+
+/* ---- the problem ---- */
+.section-label { color: var(--ink-faint); display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.section-label i { font-style: normal; color: var(--accent-text); }
+.idea { padding: 12vh 0 6vh; }
+.idea h2 { font-size: clamp(2.2rem, 4.4vw, 3.8rem); max-width: 18ch; }
+.idea h2 em { color: var(--accent-text); }
+.idea .body { color: var(--ink-soft); margin-top: 22px; max-width: 52ch; font-size: 1.06rem; }
+.principles { display: grid; gap: 0; margin-top: 46px; }
+.principle { display: grid; grid-template-columns: 44px 1fr; gap: 18px; padding: 22px 0; border-top: 1px solid var(--border); }
+.principle:last-child { border-bottom: 1px solid var(--border); }
+.principle .n { font-family: var(--display); font-style: italic; font-size: 1.4rem; color: var(--accent-text); line-height: 1.2; }
+.principle h3 { font-size: 1.4rem; font-weight: 480; margin-bottom: 6px; line-height: 1.2; }
+.principle p { color: var(--ink-soft); }
+
+/* ---- chapters ---- */
+.chapters-intro { padding: 10vh 0 2vh; }
+.chapters-intro h2 { font-size: clamp(2.2rem, 4vw, 3.6rem); }
+.chapters-intro p { color: var(--ink-soft); margin-top: 18px; max-width: 46ch; }
+.chapter { min-height: 88vh; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 6vh 0; position: relative; }
+.chapter .num { font-family: var(--display); font-weight: 300; font-size: clamp(4.5rem, 8vw, 7.5rem); line-height: 0.9; color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--ink) 28%, transparent); transition: color .6s, -webkit-text-stroke-color .6s; }
+.chapter.active .num { color: var(--accent-text); -webkit-text-stroke-color: transparent; }
+.chapter h3 { font-size: clamp(1.9rem, 3.2vw, 2.8rem); margin-top: 18px; font-weight: 380; max-width: 16ch; }
+.chapter p { margin-top: 18px; color: var(--ink-soft); max-width: 44ch; font-size: 1.06rem; }
+.chapter p b { color: var(--ink); font-weight: 700; }
+.chapter .detail { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px; }
+.tag { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-soft); }
+.chapter .progress { position: absolute; left: -28px; top: 18%; bottom: 18%; width: 2px; border-radius: 2px; background: var(--border-soft); overflow: hidden; }
+.chapter .progress::after { content: ""; position: absolute; inset: 0; background: linear-gradient(var(--accent), var(--coral)); transform: scaleY(0); transform-origin: top; transition: transform 1.2s cubic-bezier(.2,.7,.2,1); }
+.chapter.active .progress::after { transform: scaleY(1); }
+.play { margin-top: 22px; display: inline-flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 8px 16px 8px 9px; font-weight: 700; font-size: 0.86rem; cursor: pointer; font-family: inherit; transition: background .2s; }
+.play:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.play .pi { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--bg-deep); }
+.play .pi svg { width: 11px; height: 11px; margin-left: 1px; }
+
+/* ---- the stage and the phone ---- */
+.stage { position: sticky; top: 0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 64px; }
+.device-fit { position: relative; width: 410px; height: 864px; transform-origin: center center; }
+.halo { position: absolute; inset: -12% -30%; border-radius: 50%; background: radial-gradient(closest-side, var(--orb-c), transparent); z-index: -1; pointer-events: none; }
+.device { position: absolute; inset: 0; border-radius: 60px; padding: 10px; background: linear-gradient(145deg, color-mix(in srgb, var(--device) 80%, #fff 20%), var(--device) 40%, var(--device) 70%, color-mix(in srgb, var(--device) 85%, #fff 15%));
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08) inset, 0 70px 120px -50px rgba(0,0,0,0.75), 0 30px 60px -30px rgba(0,0,0,0.5); }
+.btn-side { position: absolute; width: 3px; background: color-mix(in srgb, var(--device) 70%, #fff 30%); border-radius: 2px; }
+.btn-side.l1 { left: -3px; top: 160px; height: 46px; } .btn-side.l2 { left: -3px; top: 220px; height: 80px; } .btn-side.r1 { right: -3px; top: 200px; height: 110px; }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 50px; overflow: hidden; background: var(--device-screen); color: #F3F5F9; font-family: var(--sans); isolation: isolate; }
+.screen::before { content: ""; position: absolute; inset: 0; z-index: 0; background: radial-gradient(70% 40% at 50% -5%, rgba(242,238,238,0.18), transparent 70%), radial-gradient(60% 50% at 80% 90%, rgba(41,0,0,0.9), transparent 70%), linear-gradient(180deg, #000D20 0%, #160D0E 55%); opacity: .85; }
+.island { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: 110px; height: 32px; border-radius: 999px; background: #000; z-index: 3; }
+.view { position: absolute; inset: 0; z-index: 1; padding: 72px 22px 28px; display: flex; flex-direction: column; gap: 14px; opacity: 0; transform: translateY(12px) scale(0.985); transition: opacity .55s cubic-bezier(.2,.7,.2,1), transform .55s cubic-bezier(.2,.7,.2,1); pointer-events: none; }
+.view.on { opacity: 1; transform: none; pointer-events: auto; }
+.v-head { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #9DA8BA; font-weight: 600; }
+.v-head .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,0.11); color: #F3F5F9; font-weight: 800; font-size: 13px; }
+.v-head .who { color: #F3F5F9; }
+.v-title { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.v-label { font-size: 13px; color: #9DA8BA; font-weight: 600; }
+.v-money { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.v-card { border-radius: 18px; padding: 14px 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; flex-direction: column; gap: 8px; backdrop-filter: blur(10px); }
+.v-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #C9D0DD; font-weight: 600; }
+.v-row svg { width: 18px; height: 18px; color: #7AA2FF; flex: none; }
+.v-row.dim { color: #9DA8BA; }
+.v-tabs { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
+.v-tabs span { flex: 1; text-align: center; padding: 9px 0; border-radius: 999px; font-size: 13px; font-weight: 700; color: #9DA8BA; }
+.v-tabs span.on { background: rgba(255,255,255,0.12); color: #F3F5F9; }
+.v-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.v-actions div { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #C9D0DD; }
+.v-actions i { width: 48px; height: 48px; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: #F3F5F9; font-style: normal; }
+.v-actions svg { width: 20px; height: 20px; }
+.v-btn { margin-top: auto; height: 54px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: #F2EEEE; color: #160D0E; font-weight: 700; font-size: 15px; }
+.v-btn svg { width: 18px; height: 18px; }
+.v-btn.soft { background: rgba(255,255,255,0.11); color: #F3F5F9; border: 1px solid rgba(255,255,255,0.18); }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); font-size: 12px; font-weight: 700; color: #C9D0DD; width: max-content; }
+.chip svg { width: 14px; height: 14px; }
+.chip.ok { color: #6FD98C; border-color: rgba(111,217,140,0.4); } .chip.wait { color: #F0B64A; border-color: rgba(240,182,74,0.4); } .chip.off { color: #F58B7C; border-color: rgba(245,139,124,0.4); } .chip.blue { color: #7AA2FF; border-color: rgba(122,162,255,0.4); }
+.hours { display: flex; gap: 8px; }
+.hours span { flex: 1; text-align: center; padding: 12px 0; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid transparent; font-size: 14px; font-weight: 700; color: #9DA8BA; }
+.hours span.on { color: #F3F5F9; background: rgba(255,255,255,0.11); border-color: #7AA2FF; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: auto; }
+.keypad span { height: 52px; border-radius: 14px; background: rgba(255,255,255,0.06); display: grid; place-items: center; font-size: 20px; font-weight: 700; }
+.qr { width: 190px; aspect-ratio: 1; margin: 6px auto 0; border-radius: 14px; background: #F2EEEE; padding: 12px; display: grid; grid-template-columns: repeat(11, 1fr); gap: 2px; }
+.qr i { background: #160D0E; border-radius: 1px; display: block; } .qr i.o { background: transparent; }
+.mic { width: 120px; height: 120px; border-radius: 50%; margin: 10px auto 0; display: grid; place-items: center; background: #F2EEEE; color: #160D0E; position: relative; }
+.mic svg { width: 44px; height: 44px; }
+.mic::before, .mic::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 2px solid rgba(122,162,255,0.6); opacity: 0; }
+.view.on .mic.live::before { animation: ring 1.8s ease-out infinite; } .view.on .mic.live::after { animation: ring 1.8s ease-out .6s infinite; }
+@keyframes ring { 0% { transform: scale(0.85); opacity: .9 } 100% { transform: scale(1.5); opacity: 0 } }
+.said { font-size: 18px; font-weight: 600; color: #F3F5F9; text-align: center; min-height: 54px; }
+.said::before { content: "“"; color: #9DA8BA; } .said::after { content: "”"; color: #9DA8BA; }
+.scan { position: relative; height: 240px; border-radius: 20px; background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0.75)); border: 1px solid rgba(255,255,255,0.1); overflow: hidden; display: grid; place-items: center; }
+.scan .corner { position: absolute; width: 36px; height: 36px; border-color: #7AA2FF; border-style: solid; border-width: 0; }
+.scan .tl { top: 22px; left: 22px; border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 10px; }
+.scan .tr { top: 22px; right: 22px; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 10px; }
+.scan .bl { bottom: 22px; left: 22px; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 10px; }
+.scan .br { bottom: 22px; right: 22px; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 10px; }
+.scan .beam { position: absolute; left: 30px; right: 30px; height: 2px; background: #7AA2FF; box-shadow: 0 0 18px #7AA2FF; top: 30px; }
+.view.on .scan .beam { animation: beam 2.2s ease-in-out infinite alternate; }
+@keyframes beam { from { top: 30px } to { top: 206px } }
+.scan .qr { width: 130px; padding: 8px; margin: 0; opacity: .9; }
+.fp { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); color: #7AA2FF; margin: 4px auto 0; }
+.fp svg { width: 30px; height: 30px; }
+.fp.go { animation: fpglow 1.4s ease-in-out infinite alternate; }
+@keyframes fpglow { from { box-shadow: 0 0 0 0 rgba(122,162,255,0.4) } to { box-shadow: 0 0 0 12px rgba(122,162,255,0) } }
+.bubble { max-width: 86%; padding: 12px 14px; border-radius: 18px; font-size: 14px; font-weight: 600; line-height: 1.4; }
+.bubble.you { align-self: flex-end; background: #F2EEEE; color: #160D0E; border-bottom-right-radius: 6px; }
+.bubble.ai { align-self: flex-start; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #F3F5F9; border-bottom-left-radius: 6px; }
+.blaze { position: relative; }
+@property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes spin { to { --a: 360deg } }
+.step { display: none; } .step.show { display: flex; } .step.show.col { flex-direction: column; }
+.check-big { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: rgba(111,217,140,0.14); border: 1px solid rgba(111,217,140,0.45); color: #6FD98C; margin: 6px auto; }
+.check-big svg { width: 34px; height: 34px; }
+.pop { animation: pop .6s cubic-bezier(.2,.9,.2,1.2) both; }
+@keyframes pop { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
+.now-playing { margin-top: 18px; display: flex; align-items: center; gap: 10px; font-size: 0.86rem; color: var(--ink-soft); }
+.now-playing .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.now-playing b { color: var(--ink); }
+.replay { border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
+.replay:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.sim-note { margin-top: 10px; font-size: 0.78rem; color: var(--ink-faint); max-width: 36ch; text-align: center; }
+
+/* ---- full-width sections ---- */
+.full { position: relative; z-index: 2; max-width: 1440px; margin: 0 auto; padding: 16vh clamp(16px, 4vw, 48px) 8vh;
+  padding-left: max(clamp(16px, 4vw, 48px), env(safe-area-inset-left, 0px)); padding-right: max(clamp(16px, 4vw, 48px), env(safe-area-inset-right, 0px)); }
+.full > h2 { font-size: clamp(2.4rem, 5vw, 4.6rem); max-width: 18ch; }
+.full > h2 em { color: var(--accent-text); }
+.full > .intro { margin-top: 20px; color: var(--ink-soft); max-width: 58ch; font-size: 1.08rem; }
+.swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-top: 56px; }
+.sw { border-radius: 22px; overflow: hidden; border: 1px solid var(--border-soft); background: var(--surface); }
+.sw .chip-sw { height: 150px; position: relative; }
+.sw .chip-sw span { position: absolute; left: 14px; bottom: 12px; font-family: var(--mono); font-size: 0.72rem; }
+.sw .info { padding: 14px 16px 18px; }
+.sw .info b { display: block; font-size: 1rem; }
+.sw .info small { color: var(--ink-soft); font-size: 0.84rem; line-height: 1.45; display: block; margin-top: 4px; }
+.subhead { margin-top: 72px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 14px; }
+.subhead h3 { font-size: 1.7rem; font-weight: 400; }
+.subhead .mono { color: var(--ink-faint); }
+.spec-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 14px; margin-top: 18px; }
+.spec { border-radius: 22px; border: 1px solid var(--border-soft); background: var(--surface); padding: 24px; display: flex; flex-direction: column; justify-content: space-between; min-height: 230px; }
+.spec .glyph { font-size: 4.2rem; line-height: 1; font-family: var(--display); font-weight: 300; }
+.spec .glyph svg { width: 44px; height: 44px; color: var(--accent); }
+.spec .role { color: var(--ink-faint); }
+.spec b { display: block; font-size: 1.02rem; margin-top: 12px; }
+.spec small { color: var(--ink-soft); font-size: 0.86rem; line-height: 1.45; }
+.motion-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px; }
+.mcard { border-radius: 22px; border: 1px solid var(--border-soft); background: var(--surface); padding: 26px; }
+.mcard .demo { height: 120px; display: grid; place-items: center; margin-bottom: 18px; border-radius: 14px; background: color-mix(in srgb, var(--bg) 60%, transparent); }
+.mcard h3 { font-size: 1.35rem; font-weight: 480; line-height: 1.2; }
+.mcard p { color: var(--ink-soft); margin-top: 8px; font-size: 0.95rem; }
+.state-pill { display: inline-flex; align-items: center; gap: 9px; padding: 12px 18px; border-radius: 14px; background: var(--surface-high); font-weight: 700; font-size: 0.95rem; }
+.state-pill svg { width: 18px; height: 18px; }
+.state-pill.q { color: var(--amber); } .state-pill.p { color: var(--green); } .state-pill.r { color: var(--coral); }
+.a11y { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px; }
+.a11y .item { border-radius: 22px; border: 1px solid var(--border-soft); background: var(--surface); padding: 24px; }
+.a11y .big { font-family: var(--display); font-size: 2.6rem; font-weight: 380; line-height: 1; }
+.a11y .big small { font-size: 1rem; color: var(--ink-soft); font-family: var(--sans); }
+.a11y p { color: var(--ink-soft); margin-top: 10px; font-size: 0.95rem; }
+.ratio-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border-soft); font-size: 0.9rem; color: var(--ink-soft); }
+.ratio-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---- videos ---- */
+.videos { padding-top: 10vh; }
+.vid-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; margin-top: 40px; align-items: start; }
+.vid { border-radius: 22px; border: 1px solid var(--border-soft); background: var(--surface); padding: 12px; display: flex; flex-direction: column; gap: 14px; }
+.vid-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #000D20; }
+.vid-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.vid-poster { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; padding: 0; cursor: pointer; display: grid; place-items: center; color: #F3F5F9; font: inherit;
+  background: radial-gradient(70% 60% at 30% 20%, rgba(242,238,238,0.16), transparent 70%), radial-gradient(60% 70% at 80% 90%, rgba(90,12,12,0.9), transparent 70%), linear-gradient(160deg, #000D20, #160D0E); }
+.vid-poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .85; transition: opacity .3s, transform .6s cubic-bezier(.2,.7,.2,1); }
+.vid-poster:hover img { opacity: 1; transform: scale(1.03); }
+.vid-play { position: relative; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: rgba(242,238,238,0.92); color: #160D0E; box-shadow: 0 18px 40px -16px rgba(0,0,0,.7); transition: transform .3s cubic-bezier(.2,.9,.2,1.2); }
+.vid-poster:hover .vid-play { transform: scale(1.08); }
+.vid-play svg { width: 26px; height: 26px; margin-left: 3px; }
+.vid-soon { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 16px; }
+.vid-soon small { color: #C9D0DD; font-size: 0.85rem; }
+.vid-body { padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+.vid-body h3 { font-size: 1.45rem; font-weight: 400; }
+.vid-body p { color: var(--ink-soft); font-size: 0.95rem; }
+.vid-body .mono { color: var(--ink-faint); }
+.channel { margin-top: 14px; }
+
+/* ---- download ---- */
+.download { padding-top: 10vh; }
+.dl-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; margin-top: 40px; align-items: stretch; }
+.dl-card { border-radius: 22px; border: 1px solid var(--border-soft); background: var(--surface); padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+.dl-card h3 { font-size: 1.6rem; font-weight: 400; }
+.dl-card p { color: var(--ink-soft); }
+.dl-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.dl-card li { display: flex; align-items: center; gap: 10px; color: var(--ink-soft); font-size: 0.95rem; }
+.dl-card li svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+.dl-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; }
+
+/* ---- credits ---- */
+.credits { position: relative; z-index: 2; max-width: 1440px; margin: 0 auto; padding: 14vh clamp(16px, 4vw, 48px) 60px;
+  padding-left: max(clamp(16px, 4vw, 48px), env(safe-area-inset-left, 0px)); padding-right: max(clamp(16px, 4vw, 48px), env(safe-area-inset-right, 0px)); }
+.credits .big { font-family: var(--display); font-weight: 300; font-size: clamp(2.6rem, 6.4vw, 6rem); line-height: 1; letter-spacing: -0.03em; max-width: 14ch; }
+.credits .big em { color: var(--accent-text); }
+.credit-line { margin-top: 26px; color: var(--ink-soft); max-width: 50ch; }
+.credit-line b { color: var(--ink); }
+.fine { margin-top: 56px; color: var(--ink-faint); font-size: 0.85rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; }
+.fine a { text-decoration: none; } .fine a:hover { color: var(--ink); }
+.fine .links { display: flex; gap: 18px; flex-wrap: wrap; }
+
+/* ---- liquid glass ----
+   Three layers on every glass surface: the pane itself (blur, saturation and, where the browser can,
+   a slow refraction through an SVG displacement map), a specular highlight that follows the pointer,
+   and a rim light that travels round the edge. Under the phone's screen a fluid colour field moves,
+   so the glass has something to bend. Colours stay the app's: navy, maroon glows, soft white. */
+:root { --g-fill-a: rgba(255,255,255,0.11); --g-fill-b: rgba(255,255,255,0.035); --g-line: rgba(255,255,255,0.24); --g-spec: rgba(255,255,255,0.26); --g-rim: rgba(255,255,255,0.6); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --g-fill-a: rgba(255,255,255,0.62); --g-fill-b: rgba(255,255,255,0.28); --g-line: rgba(0,13,32,0.16); --g-spec: rgba(255,255,255,0.8); --g-rim: rgba(255,255,255,0.95); } }
+:root[data-theme="light"] { --g-fill-a: rgba(255,255,255,0.62); --g-fill-b: rgba(255,255,255,0.28); --g-line: rgba(0,13,32,0.16); --g-spec: rgba(255,255,255,0.8); --g-rim: rgba(255,255,255,0.95); }
+.glass.glass { position: relative; isolation: isolate; background: linear-gradient(135deg, var(--g-fill-a), var(--g-fill-b)); border: 1px solid var(--g-line);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.38), inset 0 -1px 0 rgba(255,255,255,0.06), inset 1px 0 0 rgba(255,255,255,0.12), inset -1px 0 0 rgba(255,255,255,0.05), 0 24px 60px -34px rgba(0,0,0,0.65);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6);
+  transition: transform .5s cubic-bezier(.2,.9,.2,1.1), box-shadow .4s; }
+.refract .glass.glass { -webkit-backdrop-filter: url(#liquid) blur(14px) saturate(1.6); backdrop-filter: url(#liquid) blur(14px) saturate(1.6); }
+.glass.glass::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  background: radial-gradient(280px 200px at var(--mx, 28%) var(--my, 18%), var(--g-spec), transparent 62%), linear-gradient(180deg, rgba(255,255,255,0.08), transparent 40%);
+  mix-blend-mode: screen; opacity: .85; transition: opacity .4s; }
+.glass.glass::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; z-index: 0; padding: 1px;
+  background: conic-gradient(from var(--rim, 0deg), transparent 0deg, var(--g-rim) 40deg, transparent 100deg, rgba(122,162,255,0.45) 200deg, transparent 260deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: rim 11s linear infinite; opacity: .75; }
+.glass.glass > * { position: relative; z-index: 1; }
+.glass.glass:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(255,255,255,0.08), inset 1px 0 0 rgba(255,255,255,0.16), inset -1px 0 0 rgba(255,255,255,0.06), 0 30px 70px -34px rgba(0,0,0,0.7); }
+.glass.glass:hover::before { opacity: 1; }
+a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scale(1.012); }
+@property --rim { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes rim { to { --rim: 360deg } }
+/* status colours stay on top of the glass line */
+.chip.glass.ok { border-color: rgba(111,217,140,0.45); } .chip.glass.wait { border-color: rgba(240,182,74,0.45); } .chip.glass.off { border-color: rgba(245,139,124,0.45); } .chip.glass.blue { border-color: rgba(122,162,255,0.45); }
+.pill-btn.primary.glass, .bar-link.solid.glass { background: var(--ink); }
+/* the circling light on queued money, as its own layer so it never fights the glass */
+.blaze .ring { position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 2;
+  background: conic-gradient(from var(--a, 0deg), transparent 0deg, #F0B64A 30deg, transparent 70deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: spin 3.2s linear infinite; }
+/* the fluid field under the phone's screen */
+.liquid { position: absolute; inset: 0; z-index: 0; overflow: hidden; filter: blur(30px) saturate(1.3); pointer-events: none; }
+.liquid i { position: absolute; border-radius: 50%; display: block; mix-blend-mode: screen; will-change: transform; }
+.liquid .l1 { width: 75%; aspect-ratio: 1; left: -18%; top: -8%; background: #001A3D; animation: lq1 16s ease-in-out infinite alternate; }
+.liquid .l2 { width: 85%; aspect-ratio: 1; left: 38%; top: 42%; background: #5A0C0C; animation: lq2 19s ease-in-out infinite alternate; }
+.liquid .l3 { width: 60%; aspect-ratio: 1; left: 10%; top: 66%; background: #420404; animation: lq3 14s ease-in-out infinite alternate; }
+.liquid .l4 { width: 42%; aspect-ratio: 1; left: 52%; top: -6%; background: rgba(242,238,238,0.32); animation: lq1 23s ease-in-out infinite alternate-reverse; }
+.liquid .l5 { width: 36%; aspect-ratio: 1; left: 5%; top: 30%; background: rgba(122,162,255,0.28); animation: lq2 21s ease-in-out infinite alternate-reverse; }
+@keyframes lq1 { from { transform: translate(0,0) scale(1) } 50% { transform: translate(14%, 18%) scale(1.15) } to { transform: translate(-6%, 30%) scale(0.95) } }
+@keyframes lq2 { from { transform: translate(0,0) scale(1) } 50% { transform: translate(-18%, -14%) scale(1.2) } to { transform: translate(8%, -28%) scale(1.05) } }
+@keyframes lq3 { from { transform: translate(0,0) } 50% { transform: translate(22%, -12%) scale(1.1) } to { transform: translate(30%, 6%) } }
+.device { box-shadow: 0 0 0 1px rgba(255,255,255,0.08) inset, 0 1px 0 rgba(255,255,255,0.25) inset, 0 70px 120px -50px rgba(0,0,0,0.75), 0 30px 60px -30px rgba(0,0,0,0.5); }
+.bar.scrolled { -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1); }
+.refract .bar.scrolled { -webkit-backdrop-filter: url(#liquid) blur(18px) saturate(1.6); backdrop-filter: url(#liquid) blur(18px) saturate(1.6); }
+
+/* ---- responsive ---- */
+@media (max-width: 1100px) { .swatches { grid-template-columns: repeat(3, 1fr); } .spec-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 900px) {
+  .vid-grid { grid-template-columns: 1fr; }
+  .bar-nav { display: none; }
+  .story { grid-template-columns: 1fr; }
+  .col.after { order: -1; position: sticky; top: 0; z-index: 5; }
+  .stage { height: auto; min-height: 0; padding: 72px 0 0; align-items: center; pointer-events: none; }
+  .stage .device-fit, .stage .now-playing { pointer-events: auto; }
+  .stage::after { content: ""; position: absolute; inset: 0 0 -1px; z-index: -1; background: linear-gradient(180deg, var(--bg) 70%, transparent); }
+  .stage .now-playing, .stage .sim-note { display: none; }
+  .hero { min-height: auto; padding-top: 24px; padding-bottom: 40px; }
+  .chapter { min-height: 70vh; }
+  .chapter .progress { display: none; }
+  .motion-grid, .a11y, .dl-grid { grid-template-columns: 1fr; }
+  .swatches { grid-template-columns: repeat(2, 1fr); }
+  .spec-grid { grid-template-columns: 1fr; }
+  .bar { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .orb, .pulse, .view.on .mic.live::before, .view.on .mic.live::after, .view.on .scan .beam, .fp.go, .blaze .ring, .pop, .glass.glass::after, .liquid i { animation: none; }
+  .js .reveal { opacity: 1; transform: none; transition: none; }
+  .view, .chapter .num, .chapter .progress::after, .pill-btn, .play { transition: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#idea">Skip to the story</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="liquid" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+    <feTurbulence id="liqTurb" type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="2" seed="3" result="n"/>
+    <feGaussianBlur in="n" stdDeviation="2.5" result="nb"/>
+    <feDisplacementMap in="SourceGraphic" in2="nb" scale="12" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<div class="ambient" aria-hidden="true">
+  <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+  <div class="grain"></div>
+</div>
+
+<header class="bar" id="bar">
+  <a class="brand" href="#top" aria-label="T-Pay home"><img src="assets/emblem.png" alt="">T-Pay</a>
+  <nav class="bar-nav" aria-label="Sections">
+    <a href="#idea">The problem</a>
+    <a href="#moments">Moments</a>
+    <a href="#system">System</a>
+    <a href="#watch">Watch</a>
+    <a href="#download">Download</a>
+  </nav>
+  <div class="bar-right">
+    <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch theme">
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    </button>
+    <a class="bar-link solid" href="https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5" target="_blank" rel="noopener">Get the app <span aria-hidden="true">↗</span></a>
+  </div>
+</header>
+
+<div class="wrap" id="top">
+  <div class="story">
+    <div class="col">
+
+      <section class="hero" aria-labelledby="heroTitle">
+        <p class="eyebrow mono reveal">Offline payments · PayPal AI Hackathon 2026</p>
+        <h1 id="heroTitle" class="reveal">The signal drops.<br>The sale <em>doesn't.</em></h1>
+        <p class="lede reveal">T-Pay locks money from PayPal while you're online, then lets you <b>pay or get paid phone to phone with no internet at all.</b> Signed on your phone. Settled the moment either side reconnects.</p>
+        <p class="scroll-cue reveal"><span class="pulse" aria-hidden="true"></span>The phone on the right plays along as you scroll</p>
+        <div class="hero-actions reveal">
+          <a class="pill-btn primary" href="https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5" target="_blank" rel="noopener"><span class="pi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg></span>Download for Android</a>
+          <a class="pill-btn" href="#moments"><span class="pi" aria-hidden="true"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>See the seven moments</a>
+        </div>
+      </section>
+
+      <section class="idea" id="idea" aria-labelledby="ideaTitle">
+        <p class="section-label mono reveal"><i>01</i> The problem</p>
+        <h2 id="ideaTitle" class="reveal">A dropped signal shouldn't be <em>a lost sale.</em></h2>
+        <p class="body reveal">In a busy market the network comes and goes all day. When it goes, the card machine stops, the transfer app spins, and the customer walks. T-Pay moves the one step that needs the internet, locking the money, to a moment when you have it, and keeps the payment itself between the two phones.</p>
+        <div class="principles">
+          <div class="principle reveal"><span class="n">i.</span><div><h3>Lock it while you can.</h3><p>Put money in the Offline vault from PayPal or your Wallet whenever you have signal. It waits there, ready to spend, for up to 24 hours at a time.</p></div></div>
+          <div class="principle reveal"><span class="n">ii.</span><div><h3>Nothing moves without your fingerprint.</h3><p>Every payment is signed by a key that never leaves your phone, and only after your fingerprint or PIN. The assistant can propose. It can't pay.</p></div></div>
+          <div class="principle reveal"><span class="n">iii.</span><div><h3>Signed on the phone. Settled by PayPal.</h3><p>The seller's phone checks the payment on the spot. When either phone comes back online, T-Pay captures it from the PayPal hold and the money lands.</p></div></div>
+        </div>
+      </section>
+
+      <section id="moments" aria-labelledby="momentsTitle">
+        <div class="chapters-intro">
+          <p class="section-label mono reveal"><i>02</i> Seven moments</p>
+          <h2 id="momentsTitle" class="reveal">Scroll, and the phone plays along.</h2>
+          <p class="reveal">Each moment drives the phone on the right. Ada is buying; Bola is selling. Play any of them again whenever you like.</p>
+        </div>
+
+        <article class="chapter" data-view="lock" data-title="Lock money">
+          <span class="progress" aria-hidden="true"></span>
+          <span class="num" aria-hidden="true">01</span>
+          <h3>Lock money while you're online.</h3>
+          <p>Ada chooses ₦10,000 and 24 hours. PayPal places a hold for it; nothing is taken until she pays someone. From the Wallet, it's one fingerprint and done.</p>
+          <div class="detail"><span class="tag">PayPal hold</span><span class="tag">Or from the Wallet</span><span class="tag">6 · 12 · 24 h</span></div>
+          <button class="play" type="button"><span class="pi"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>Play on the phone</button>
+        </article>
+
+        <article class="chapter" data-view="offline" data-title="Go offline">
+          <span class="progress" aria-hidden="true"></span>
+          <span class="num" aria-hidden="true">02</span>
+          <h3>The network goes. The vault stays.</h3>
+          <p>Airplane mode on both phones, Bluetooth on. Nothing on the next three screens touches the internet.</p>
+          <div class="detail"><span class="tag">No signal</span><span class="tag">Bluetooth</span><span class="tag">Works in airplane mode</span></div>
+          <button class="play" type="button"><span class="pi"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>Play on the phone</button>
+        </article>
+
+        <article class="chapter" data-view="voice" data-title="Say it out loud">
+          <span class="progress" aria-hidden="true"></span>
+          <span class="num" aria-hidden="true">03</span>
+          <h3>"Abeg collect one thousand."</h3>
+          <p>Bola doesn't type. She says it, in Pidgin, and her phone shows the payment code at once. English, Yoruba, Igbo and Hausa work too.</p>
+          <div class="detail"><span class="tag">Voice-first</span><span class="tag">Five languages</span><span class="tag">Answered on the phone</span></div>
+          <button class="play" type="button"><span class="pi"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>Play on the phone</button>
+        </article>
+
+        <article class="chapter" data-view="pay" data-title="Scan and confirm">
+          <span class="progress" aria-hidden="true"></span>
+          <span class="num" aria-hidden="true">04</span>
+          <h3>Scan. Check. Confirm with a fingerprint.</h3>
+          <p>Ada scans Bola's code. Her phone checks Bola's certificate against T-Pay's root key, shows the amount, and signs the payment only after her fingerprint.</p>
+          <div class="detail"><span class="tag">Verified offline</span><span class="tag">Fingerprint or PIN</span><span class="tag">Signed voucher</span></div>
+          <button class="play" type="button"><span class="pi"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>Play on the phone</button>
+        </article>
+
+        <article class="chapter" data-view="arrive" data-title="It arrives">
+          <span class="progress" aria-hidden="true"></span>
+          <span class="num" aria-hidden="true">05</span>
+          <h3>It crosses by Bluetooth, and Bola's phone says so.</h3>
+          <p>The signed payment reaches Bola's phone, which checks it and reads the amount out loud. <b>Queued</b> means received and waiting for a network. It can't be copied or spent again.</p>
+          <div class="detail"><span class="tag">Bluetooth</span><span class="tag">Or a second QR</span><span class="tag">No double spend</span></div>
+          <button class="play" type="button"><span class="pi"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>Play on the phone</button>
+        </article>
+
+        <article class="chapter" data-view="settle" data-title="Back online">
+          <span class="progress" aria-hidden="true"></span>
+          <span class="num" aria-hidden="true">06</span>
+          <h3>One phone reconnects. The money lands.</h3>
+          <p>Either phone can submit the payment. T-Pay checks the signature and the running total, captures ₦1,000 from the hold, and credits Bola's Wallet. With cash-out on, it goes on to her PayPal by itself.</p>
+          <div class="detail"><span class="tag">Settled by PayPal</span><span class="tag">Either phone</span><span class="tag">Auto cash-out</span></div>
+          <button class="play" type="button"><span class="pi"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>Play on the phone</button>
+        </article>
+
+        <article class="chapter" data-view="assist" data-title="Hey T-Pay">
+          <span class="progress" aria-hidden="true"></span>
+          <span class="num" aria-hidden="true">07</span>
+          <h3>"Hey T-Pay." Hands free, all day.</h3>
+          <p>Withdraw, add money, lock, unlock, check stock, set a budget, open any screen. The assistant does it and listens for the next request. The only time it needs your hands is your fingerprint.</p>
+          <div class="detail"><span class="tag">Wake word</span><span class="tag">Natural voice</span><span class="tag">Never enters a PIN</span></div>
+          <button class="play" type="button"><span class="pi"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>Play on the phone</button>
+        </article>
+      </section>
+    </div>
+
+    <div class="col after">
+      <aside class="stage" aria-label="T-Pay on a phone">
+        <div class="device-fit" id="deviceFit">
+          <div class="halo" aria-hidden="true"></div>
+          <div class="device">
+            <span class="btn-side l1" aria-hidden="true"></span><span class="btn-side l2" aria-hidden="true"></span><span class="btn-side r1" aria-hidden="true"></span>
+            <div class="screen" id="screen">
+              <div class="liquid" aria-hidden="true"><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i><i class="l5"></i></div>
+              <div class="island" aria-hidden="true"></div>
+
+              <!-- home -->
+              <div class="view on" data-view="home">
+                <div class="v-head"><span class="av">A</span><span class="who">Good morning, Ada</span></div>
+                <div class="v-tabs"><span class="on">Offline vault</span><span>Wallet</span></div>
+                <div><div class="v-label">Available balance</div><div class="v-money">₦0.00</div></div>
+                <div class="v-actions">
+                  <div><i><svg class="ic" data-i="pay"></svg></i>Pay</div><div><i><svg class="ic" data-i="lock"></svg></i>Lock</div><div><i><svg class="ic" data-i="receive"></svg></i>Receive</div><div><i><svg class="ic" data-i="activity"></svg></i>Activity</div>
+                </div>
+                <div class="v-card"><div class="v-row"><svg class="ic" data-i="lock"></svg>Lock money to pay offline</div><div class="v-row dim"><svg class="ic" data-i="mic"></svg>Or say "Hey T-Pay, lock ten thousand"</div></div>
+              </div>
+
+              <!-- 01 lock -->
+              <div class="view" data-view="lock">
+                <div class="v-head"><span class="av">A</span><span class="who">Ada</span> · Lock money</div>
+                <div class="step show col" data-step="a">
+                  <div class="v-title">How much do you want to lock?</div>
+                  <div class="v-money" id="lockAmt">₦0</div>
+                  <div class="v-label">Spend within</div>
+                  <div class="hours"><span>6 h</span><span>12 h</span><span class="on">24 h</span></div>
+                  <div class="keypad"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span></span><span>0</span><span>⌫</span></div>
+                  <div class="v-btn"><svg class="ic" data-i="paypal"></svg>Lock with PayPal</div>
+                </div>
+                <div class="step col" data-step="b">
+                  <div class="check-big pop"><svg class="ic" data-i="check"></svg></div>
+                  <div class="v-title" style="text-align:center">₦10,000 locked</div>
+                  <div class="v-card"><div class="v-row"><svg class="ic" data-i="lock"></svg>Spend by tomorrow, 9:41</div><div class="v-row"><svg class="ic" data-i="shield"></svg>Held by PayPal until you pay</div><div class="v-row"><svg class="ic" data-i="undo"></svg>Unspent money comes back</div></div>
+                  <div class="v-btn soft">Done</div>
+                </div>
+              </div>
+
+              <!-- 02 offline -->
+              <div class="view" data-view="offline">
+                <div class="v-head"><span class="av">A</span><span class="who">Ada</span> · Offline vault</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip off"><svg class="ic" data-i="plane"></svg>Airplane mode</span><span class="chip blue"><svg class="ic" data-i="bt"></svg>Bluetooth on</span></div>
+                <div><div class="v-label">Available to spend</div><div class="v-money">₦10,000.00</div></div>
+                <div class="v-card"><div class="v-row"><svg class="ic" data-i="wifioff"></svg>No signal. This still works.</div><div class="v-row dim"><svg class="ic" data-i="clock"></svg>23 h 40 min left to spend</div></div>
+                <div class="v-actions">
+                  <div><i><svg class="ic" data-i="pay"></svg></i>Pay</div><div><i><svg class="ic" data-i="receive"></svg></i>Receive</div><div><i><svg class="ic" data-i="vault"></svg></i>Vault</div><div><i><svg class="ic" data-i="activity"></svg></i>Activity</div>
+                </div>
+                <div class="v-btn">Pay</div>
+              </div>
+
+              <!-- 03 voice -->
+              <div class="view" data-view="voice">
+                <div class="v-head"><span class="av">B</span><span class="who">Bola</span> · Speak</div>
+                <div class="step show col" data-step="a" style="gap:18px;flex:1">
+                  <div class="v-title" style="text-align:center;margin-top:30px">Listening</div>
+                  <div class="mic live"><svg class="ic" data-i="mic"></svg></div>
+                  <div class="said" id="saidText"></div>
+                  <div class="v-label" style="text-align:center;margin-top:auto">Say what you want to do</div>
+                </div>
+                <div class="step col" data-step="b" style="gap:12px">
+                  <div class="v-title">Show this to the customer</div>
+                  <div class="qr" data-qr aria-hidden="true"></div>
+                  <div class="v-money" style="text-align:center">₦1,000.00</div>
+                  <span class="chip wait" style="align-self:center"><svg class="ic" data-i="loader"></svg>Waiting for the payment</span>
+                  <div class="v-row dim" style="justify-content:center"><svg class="ic" data-i="volume"></svg>"Collect one thousand naira. Show the customer."</div>
+                </div>
+              </div>
+
+              <!-- 04 pay -->
+              <div class="view" data-view="pay">
+                <div class="v-head"><span class="av">A</span><span class="who">Ada</span> · Pay</div>
+                <div class="step show col" data-step="a" style="gap:14px">
+                  <div class="v-title">Scan the seller's code</div>
+                  <div class="scan"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span><span class="beam"></span><div class="qr" data-qr aria-hidden="true"></div></div>
+                  <div class="v-row dim"><svg class="ic" data-i="wifioff"></svg>No network needed</div>
+                </div>
+                <div class="step col" data-step="b" style="gap:12px">
+                  <div class="v-label">You pay</div>
+                  <div class="v-money">₦1,000.00</div>
+                  <div class="v-card"><div class="v-row"><svg class="ic" data-i="badge"></svg>Bola · Verified seller</div><div class="v-row dim"><svg class="ic" data-i="wallet"></svg>From your Offline vault</div><div class="v-row dim"><svg class="ic" data-i="coins"></svg>₦9,000.00 left after this</div></div>
+                  <div class="fp go"><svg class="ic" data-i="fingerprint"></svg></div>
+                  <div class="v-label" style="text-align:center">Confirm with your fingerprint or PIN</div>
+                  <div class="v-btn" style="margin-top:auto"><svg class="ic" data-i="fingerprint"></svg>Pay ₦1,000</div>
+                </div>
+                <div class="step col" data-step="c" style="gap:12px">
+                  <div class="check-big pop"><svg class="ic" data-i="check"></svg></div>
+                  <div class="v-title" style="text-align:center">Payment sent</div>
+                  <div class="v-money" style="text-align:center">₦1,000.00</div>
+                  <div class="v-card"><div class="v-row"><svg class="ic" data-i="bt"></svg>Sent to Bola over Bluetooth</div><div class="v-row dim"><svg class="ic" data-i="clock"></svg>Settles when a phone has network</div></div>
+                  <div class="v-btn soft" style="margin-top:auto">Done</div>
+                </div>
+              </div>
+
+              <!-- 05 arrive -->
+              <div class="view" data-view="arrive">
+                <div class="v-head"><span class="av">B</span><span class="who">Bola</span> · Got money</div>
+                <div class="check-big pop"><svg class="ic" data-i="check"></svg></div>
+                <div class="v-title" style="text-align:center">Got money</div>
+                <div class="v-money" style="text-align:center">₦1,000.00</div>
+                <div class="v-card blaze"><div class="v-row"><svg class="ic" data-i="user"></svg>From Ada</div><span class="chip wait"><svg class="ic" data-i="clock"></svg>Queued · settles when online</span><div class="v-row dim"><svg class="ic" data-i="shield"></svg>Checked on this phone. Can't be spent twice.</div></div>
+                <div class="v-row dim" style="justify-content:center"><svg class="ic" data-i="volume"></svg>"Got money. One thousand naira."</div>
+                <div class="v-btn soft" style="margin-top:auto">Done</div>
+              </div>
+
+              <!-- 06 settle -->
+              <div class="view" data-view="settle">
+                <div class="v-head"><span class="av">B</span><span class="who">Bola</span> · Wallet</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip ok"><svg class="ic" data-i="wifi"></svg>Back online</span></div>
+                <div><div class="v-label">Wallet balance</div><div class="v-money" id="walletAmt">₦0.00</div></div>
+                <div class="v-card">
+                  <div class="v-row"><svg class="ic" data-i="user"></svg>From Ada · ₦1,000.00</div>
+                  <span class="chip wait" id="settleChip"><svg class="ic" data-i="clock"></svg>Queued</span>
+                </div>
+                <div class="v-card step col" data-step="payout" style="gap:8px">
+                  <div class="v-row"><svg class="ic" data-i="paypal"></svg>On its way to your PayPal</div>
+                  <div class="v-row dim"><svg class="ic" data-i="repeat"></svg>Automatic cash-out is on</div>
+                </div>
+                <div class="v-row dim" style="justify-content:center;margin-top:auto"><svg class="ic" data-i="volume"></svg>"One thousand naira from Ada is now paid."</div>
+              </div>
+
+              <!-- 07 assist -->
+              <div class="view" data-view="assist">
+                <div class="v-head"><span class="av">B</span><span class="who">Bola</span> · Hey T-Pay</div>
+                <span class="chip blue"><svg class="ic" data-i="mic"></svg>Listening</span>
+                <div class="step show col" data-step="a" style="gap:10px"></div>
+                <div class="bubble you" data-say="1">Hey T-Pay, withdraw two thousand.</div>
+                <div class="bubble ai" data-say="2">Send ₦2,000 from your Wallet to your PayPal?</div>
+                <div class="bubble you" data-say="3">Yes.</div>
+                <div class="bubble ai" data-say="4">Confirm with your fingerprint or PIN to send it.</div>
+                <div class="fp go" data-say="5" style="margin-top:auto"><svg class="ic" data-i="fingerprint"></svg></div>
+                <div class="v-label" data-say="5" style="text-align:center">Only your fingerprint moves money</div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        <div class="now-playing" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="nowText">Home · <b>scroll to begin</b></span>
+          <button class="replay" id="resetBtn" type="button">Reset</button>
+        </div>
+        <p class="sim-note">A walkthrough, not the live app. The real one runs on Android.</p>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<section id="system" class="full" aria-labelledby="systemTitle">
+  <p class="section-label mono reveal"><i>03</i> The system</p>
+  <h2 id="systemTitle" class="reveal">Two wallets, one palette, and <em>one rule about money.</em></h2>
+  <p class="intro reveal">The Offline vault spends with no network. The Wallet holds what you receive and add, and talks to PayPal. The rule: software can suggest, read out and prepare, but money moves only after a person's fingerprint, PIN or PayPal sign-in.</p>
+
+  <div class="swatches">
+    <div class="sw reveal"><div class="chip-sw" style="background:#000D20"><span style="color:#F3F5F9">#000D20</span></div><div class="info"><b>Night</b><small>The navy the app opens on. The top of every screen.</small></div></div>
+    <div class="sw reveal"><div class="chip-sw" style="background:#160D0E"><span style="color:#F3F5F9">#160D0E</span></div><div class="info"><b>Page</b><small>Dark brown underneath everything. Glass cards sit on it.</small></div></div>
+    <div class="sw reveal"><div class="chip-sw" style="background:#290000"><span style="color:#F3F5F9">#290000</span></div><div class="info"><b>Maroon</b><small>The glow lower down the screen. Never a status.</small></div></div>
+    <div class="sw reveal"><div class="chip-sw" style="background:#7AA2FF"><span style="color:#000D20">#7AA2FF</span></div><div class="info"><b>Icon blue</b><small>Icons inside cards, and the Bluetooth link.</small></div></div>
+    <div class="sw reveal"><div class="chip-sw" style="background:#6FD98C"><span style="color:#000D20">#6FD98C</span></div><div class="info"><b>Paid green</b><small>Money that has settled. Always with the word Paid.</small></div></div>
+    <div class="sw reveal"><div class="chip-sw" style="background:#F0B64A"><span style="color:#000D20">#F0B64A</span></div><div class="info"><b>Queued amber</b><small>Received, waiting for a network. Always with a clock.</small></div></div>
+  </div>
+
+  <div class="subhead reveal"><h3>What keeps a payment honest</h3><span class="mono">Checked on the phone, then again on the server</span></div>
+  <div class="spec-grid">
+    <div class="spec reveal"><div class="glyph"><svg class="ic" data-i="key"></svg></div><div><span class="role mono">Device key</span><b>A key that never leaves the phone</b><small>Each phone makes its own P-256 key in secure storage and registers it once. Every payment is signed with it.</small></div></div>
+    <div class="spec reveal"><div class="glyph"><svg class="ic" data-i="award"></svg></div><div><span class="role mono">Certificates</span><b>Trust with no network</b><small>Devices and vaults carry certificates signed by T-Pay's root key. The app ships with the public half, so it can check them offline.</small></div></div>
+    <div class="spec reveal"><div class="glyph"><svg class="ic" data-i="hash"></svg></div><div><span class="role mono">Sequence</span><b>Counted the moment it's signed</b><small>Each payment takes the next number under a vault that states its total. A reused number, or a total over the lock, is refused.</small></div></div>
+    <div class="spec reveal"><div class="glyph"><svg class="ic" data-i="fingerprint"></svg></div><div><span class="role mono">Confirmation</span><b>Fingerprint or PIN, every time</b><small>Paying, withdrawing by voice and closing a vault all stop for the person. The assistant never enters a PIN.</small></div></div>
+  </div>
+
+  <div class="subhead reveal"><h3>Status, in words and colour</h3><span class="mono">Never colour alone</span></div>
+  <div class="motion-grid">
+    <div class="mcard reveal"><div class="demo"><span class="state-pill q blaze" style="border-radius:14px"><svg class="ic" data-i="clock"></svg>Queued</span></div><h3>Moving: waiting for a network</h3><p>Received and checked on the phone. A light circles it until a phone reconnects and T-Pay settles it.</p></div>
+    <div class="mcard reveal"><div class="demo"><span class="state-pill p"><svg class="ic" data-i="check"></svg>Paid</span></div><h3>Still: it's done</h3><p>Captured from the PayPal hold and in the Wallet. Nothing more to wait for, so nothing moves.</p></div>
+    <div class="mcard reveal"><div class="demo"><span class="state-pill r"><svg class="ic" data-i="x"></svg>Refused</span></div><h3>Stopped: and it says why</h3><p>Over the vault's limit, already received, or changed after signing. The screen names the reason in plain words.</p></div>
+  </div>
+
+  <div class="subhead reveal"><h3>For everyone in the market</h3><span class="mono">Low literacy, loud rooms, old phones</span></div>
+  <div class="a11y">
+    <div class="item reveal"><div class="big">17.5<small>:1</small></div><p>Contrast of body text on the app's page colour. Every line on this page clears WCAG AAA.</p>
+      <div class="ratio-row" style="margin-top:14px"><span>Muted text</span><b>8.0:1</b></div><div class="ratio-row"><span>Icon blue</span><b>7.7:1</b></div><div class="ratio-row"><span>Queued amber</span><b>10.5:1</b></div></div>
+    <div class="item reveal"><div class="big">5<small> languages</small></div><p>English, Nigerian Pidgin, Yoruba, Igbo and Hausa, spoken and written. Amounts in Yoruba, Igbo and Hausa number words are understood too.</p></div>
+    <div class="item reveal"><div class="big">0<small> typing required</small></div><p>Every action can be done by voice, with the phone reading results back. Reduced-motion settings stop every animation, on the app and on this page.</p></div>
+  </div>
+</section>
+
+<!-- Videos. Put each YouTube link in data-video, and the channel link in data-channel.
+     A video with no link shows a "Watch on YouTube" card instead. -->
+<section id="watch" class="full videos" aria-labelledby="watchTitle" data-channel="https://www.youtube.com/@ATA_AfricanTech">
+  <p class="section-label mono reveal"><i>04</i> Watch</p>
+  <h2 id="watchTitle" class="reveal">See it work, <em>with no signal.</em></h2>
+  <p class="intro reveal">A short explainer on why T-Pay exists, and a full demo on two phones: locking money, paying in airplane mode, and the money landing when one phone reconnects.</p>
+  <div class="vid-grid">
+    <article class="vid reveal" data-video="https://www.youtube.com/watch?v=xpTYEPPETxM" data-title="T-Pay explainer">
+      <div class="vid-frame"></div>
+      <div class="vid-body"><span class="mono">Explainer</span><h3>Why T-Pay, in a few minutes</h3><p>The problem in Nigerian markets, and how locking money ahead of time solves it.</p></div>
+    </article>
+    <article class="vid reveal" data-video="" data-title="T-Pay demo">
+      <div class="vid-frame"></div>
+      <div class="vid-body"><span class="mono">Demo · two phones</span><h3>The whole payment, start to finish</h3><p>Lock, go offline, pay with a fingerprint, receive over Bluetooth, settle with PayPal.</p></div>
+    </article>
+  </div>
+  <a class="pill-btn channel reveal" id="channelLink" href="#watch" target="_blank" rel="noopener" hidden><span class="pi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg></span>More on our YouTube channel</a>
+</section>
+
+<section id="download" class="full download" aria-labelledby="dlTitle">
+  <p class="section-label mono reveal"><i>05</i> Try it</p>
+  <h2 id="dlTitle" class="reveal">Put it on <em>two phones.</em></h2>
+  <p class="intro reveal">One to pay, one to get paid. It runs on the PayPal sandbox during the pilot, so no real money moves and you can try every refusal without worry.</p>
+  <div class="dl-grid">
+    <div class="dl-card reveal">
+      <h3>Download for Android</h3>
+      <p>An installable build from Expo. Android 8 or later, with Bluetooth and a camera.</p>
+      <ul>
+        <li><svg class="ic" data-i="check"></svg>Lock, pay and get paid with no network</li>
+        <li><svg class="ic" data-i="check"></svg>"Hey T-Pay" voice assistant in five languages</li>
+        <li><svg class="ic" data-i="check"></svg>Wallet, withdrawals and pay links through PayPal</li>
+      </ul>
+      <div class="dl-actions">
+        <a class="pill-btn primary" href="https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5" target="_blank" rel="noopener" id="dlLink"><span class="pi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg></span>Download the APK</a>
+        <a class="pill-btn" href="https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public/blob/main-copy/docs/T-Pay-User-Guide.md"><span class="pi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15Z"/></svg></span>Read the user guide</a>
+      </div>
+    </div>
+    <div class="dl-card reveal">
+      <h3>For judges and engineers</h3>
+      <p>A ten-minute test script, the API contract, and the code.</p>
+      <ul>
+        <li><svg class="ic" data-i="check"></svg>908 backend tests and 167 app tests on every push</li>
+        <li><svg class="ic" data-i="check"></svg>Payment rules shared between phone and server</li>
+        <li><svg class="ic" data-i="check"></svg>MIT licensed</li>
+      </ul>
+      <div class="dl-actions">
+        <a class="pill-btn" href="https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public"><span class="pi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg></span>Source on GitHub</a>
+        <a class="pill-btn" href="https://t-pay-public.onrender.com/api/health"><span class="pi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>Live API status</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="credits" aria-labelledby="creditsTitle">
+  <p id="creditsTitle" class="big reveal">Smart payments. <em>Online or off.</em></p>
+  <p class="credit-line reveal">Built by the <b>T-Pay team</b> for the PayPal AI Hackathon, November 2026. Payments on the PayPal sandbox; no real money moves.</p>
+  <div class="fine">
+    <span>T-Pay · 2026 · African Technology Accelerator</span>
+    <span class="links"><a href="https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public/blob/main-copy/SECURITY.md">Security</a><a href="https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public/blob/main-copy/docs/T-Pay-API-Contract.md">API contract</a><a href="#top">Back to top ↑</a></span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // ---- icons: a small inline set (Lucide outlines), so nothing loads from elsewhere ----
+  var ICONS = {
+    pay: '<path d="M7 17 17 7M7 7h10v10"/>',
+    receive: '<path d="M17 7 7 17M17 17H7V7"/>',
+    lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>',
+    plane: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+    bt: '<path d="m7 7 10 10-5 5V2l5 5L7 17"/>',
+    wifioff: '<path d="M12 20h.01M8.5 16.4a5 5 0 0 1 7 0M2 8.8a15 15 0 0 1 4.2-2.6M5 12.9a10 10 0 0 1 5.2-2.7M10.7 5.1a15 15 0 0 1 11.3 3.7M16.8 11.6a10 10 0 0 1 2.2 1.3M2 2l20 20"/>',
+    wifi: '<path d="M12 20h.01M2 8.8a15 15 0 0 1 20 0M5 12.9a10 10 0 0 1 14 0M8.5 16.4a5 5 0 0 1 7 0"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    vault: '<path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>',
+    paypal: '<path d="M6 21 8 4h7a4 4 0 0 1 4 4.5c-.5 3.5-3 5.5-6.5 5.5H10l-1 7Z"/><path d="M9 14h2.5c3.5 0 6-2 6.5-5.5"/>',
+    loader: '<path d="M21 12a9 9 0 1 1-6.2-8.6"/>',
+    volume: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>',
+    badge: '<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/>',
+    wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+    coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4M16.71 13.88l.7.71-2.82 2.82"/>',
+    fingerprint: '<path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4M14 13.12c0 2.38 0 6.38-1 8.88M17.29 21.02c.12-.6.43-2.3.5-3.02M2 12a10 10 0 0 1 18-6M2 16h.01M21.8 16c.2-2 .131-5.354 0-6M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2M8.65 22c.21-.66.45-1.32.57-2M9 6.8a6 6 0 0 1 9 5.2v2"/>',
+    user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+    repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+    key: '<path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/>',
+    award: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>',
+    hash: '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>'
+  };
+  document.querySelectorAll('svg.ic').forEach(function (el) {
+    var d = ICONS[el.getAttribute('data-i')]; if (!d) return;
+    el.setAttribute('viewBox', '0 0 24 24'); el.setAttribute('fill', 'none'); el.setAttribute('stroke', 'currentColor');
+    el.setAttribute('stroke-width', '2'); el.setAttribute('stroke-linecap', 'round'); el.setAttribute('stroke-linejoin', 'round'); el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = d;
+  });
+
+  // ---- a fixed pattern that looks like a QR code; never a real one ----
+  document.querySelectorAll('[data-qr]').forEach(function (qr) {
+    var seed = 11, cells = [], n = 11;
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
+      var inF = function (r0, c0) { return r >= r0 && r < r0 + 3 && c >= c0 && c < c0 + 3; };
+      var finder = inF(0, 0) || inF(0, 8) || inF(8, 0);
+      var on;
+      if (finder) { var rr = r % 8 === 0 || r % 8 === 2, cc = c % 8 === 0 || c % 8 === 2; on = rr || cc || (r % 8 === 1 && c % 8 === 1); }
+      else { seed = (seed * 9301 + 49297) % 233280; on = seed / 233280 > 0.52; }
+      cells.push('<i class="' + (on ? '' : 'o') + '"></i>');
+    }
+    qr.innerHTML = cells.join('');
+  });
+
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- liquid glass ----
+  var GLASS = '.v-card, .v-tabs, .v-btn.soft, .bubble.ai, .scan, .chip, .fp, .check-big, .sw, .spec, .mcard, .a11y .item, .dl-card, .pill-btn, .play, .bar-link, .icon-btn, .replay, .state-pill, .hours span';
+  document.querySelectorAll(GLASS).forEach(function (el) { el.classList.add('glass'); });
+  document.querySelectorAll('.blaze').forEach(function (el) { var r = document.createElement('span'); r.className = 'ring'; r.setAttribute('aria-hidden', 'true'); el.appendChild(r); });
+  try {
+    if (CSS.supports('backdrop-filter', 'url(#liquid)') || CSS.supports('-webkit-backdrop-filter', 'url(#liquid)')) document.documentElement.classList.add('refract');
+  } catch (e) {}
+  // the specular highlight follows the pointer across whichever pane it is over
+  document.addEventListener('pointermove', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('.glass') : null;
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    el.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+    el.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+  }, { passive: true });
+  // the refraction drifts, slowly, like light through moving water
+  var turb = document.getElementById('liqTurb');
+  if (turb && !reduce) {
+    var t = 0;
+    (function drift() {
+      if (!document.hidden) { t += 0.012; turb.setAttribute('baseFrequency', (0.011 + 0.003 * Math.sin(t)).toFixed(4) + ' ' + (0.017 + 0.003 * Math.cos(t * 0.7)).toFixed(4)); }
+      setTimeout(function () { requestAnimationFrame(drift); }, 90);
+    })();
+  }
+
+  // ---- videos: a still with a play button; the YouTube player loads only when pressed ----
+  function videoId(url) {
+    var m = (url || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+  var watch = document.getElementById('watch'), channel = watch.getAttribute('data-channel');
+  var channelLink = document.getElementById('channelLink');
+  if (channel) { channelLink.href = channel; channelLink.hidden = false; }
+  watch.querySelectorAll('.vid').forEach(function (card) {
+    var frame = card.querySelector('.vid-frame'), title = card.getAttribute('data-title'), id = videoId(card.getAttribute('data-video'));
+    var playIcon = '<span class="vid-play" aria-hidden="true"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>';
+    if (!id) {
+      var soon = channel
+        ? '<a class="vid-poster" href="' + channel + '" target="_blank" rel="noopener" aria-label="' + title + ' on YouTube"><span class="vid-soon">' + playIcon + '<small>Watch on our YouTube channel</small></span></a>'
+        : '<div class="vid-poster" style="cursor:default"><span class="vid-soon">' + playIcon + '<small>Video coming soon</small></span></div>';
+      frame.innerHTML = soon;
+      return;
+    }
+    var btn = document.createElement('button');
+    btn.className = 'vid-poster'; btn.type = 'button'; btn.setAttribute('aria-label', 'Play: ' + title);
+    btn.innerHTML = '<img alt="" loading="lazy" src="https://i.ytimg.com/vi/' + id + '/hqdefault.jpg">' + playIcon;
+    btn.addEventListener('click', function () {
+      frame.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&modestbranding=1" title="' + title + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    });
+    frame.appendChild(btn);
+  });
+
+  // ---- theme ----
+  var root = document.documentElement, themeBtn = document.getElementById('themeBtn');
+  function current() { var t = root.getAttribute('data-theme'); if (t) return t; return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+  themeBtn.addEventListener('click', function () {
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('tpay-theme', next); } catch (e) {}
+  });
+
+  // ---- top bar ----
+  var bar = document.getElementById('bar');
+  function onScroll() { bar.classList.toggle('scrolled', window.scrollY > 24); }
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+  // ---- reveal ----
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+
+  // ---- phone: fit to the stage ----
+  var fit = document.getElementById('deviceFit'), stage = fit.parentElement;
+  function fitDevice() {
+    var narrow = window.innerWidth <= 900;
+    var availW = stage.clientWidth - 24, availH = narrow ? Math.min(window.innerHeight * 0.46, 420) : window.innerHeight - 190;
+    var s = Math.min(availW / 410, availH / 864, 1);
+    fit.style.transform = 'scale(' + s + ')';
+    fit.style.marginTop = (-(864 - 864 * s) / 2) + 'px';
+    fit.style.marginBottom = (-(864 - 864 * s) / 2) + 'px';
+  }
+  window.addEventListener('resize', fitDevice); fitDevice();
+
+  // ---- phone: views and their small sequences ----
+  var views = document.querySelectorAll('.view'), nowText = document.getElementById('nowText');
+  var timers = [], token = 0;
+  function later(fn, ms) { var t = setTimeout(fn, reduce ? 0 : ms); timers.push(t); }
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+  function steps(view, name) { view.querySelectorAll('[data-step]').forEach(function (s) { s.classList.toggle('show', s.getAttribute('data-step') === name); }); }
+  function restartPop(view) { view.querySelectorAll('.pop').forEach(function (p) { p.style.animation = 'none'; void p.offsetWidth; p.style.animation = ''; }); }
+
+  var seq = {
+    home: function () {},
+    lock: function (v) {
+      steps(v, 'a');
+      var amt = document.getElementById('lockAmt'), digits = ['₦1', '₦10', '₦100', '₦1,000', '₦10,000'];
+      amt.textContent = '₦0';
+      digits.forEach(function (d, i) { later(function () { amt.textContent = d; }, 400 + i * 260); });
+      later(function () { steps(v, 'b'); restartPop(v); }, 2600);
+    },
+    offline: function () {},
+    voice: function (v) {
+      steps(v, 'a');
+      var said = document.getElementById('saidText'), words = 'Abeg collect one thousand'.split(' ');
+      said.textContent = '';
+      words.forEach(function (w, i) { later(function () { said.textContent += (i ? ' ' : '') + w; }, 700 + i * 330); });
+      later(function () { steps(v, 'b'); }, 2700);
+    },
+    pay: function (v) {
+      steps(v, 'a');
+      later(function () { steps(v, 'b'); }, 2300);
+      later(function () { steps(v, 'c'); restartPop(v); }, 5200);
+    },
+    arrive: function (v) { restartPop(v); },
+    settle: function (v) {
+      var chip = document.getElementById('settleChip'), wallet = document.getElementById('walletAmt'), payout = v.querySelector('[data-step="payout"]');
+      chip.className = 'chip wait'; chip.innerHTML = '<svg class="ic" data-i="clock"></svg>Queued'; wallet.textContent = '₦0.00'; payout.classList.remove('show');
+      icon(chip.querySelector('svg'));
+      later(function () { chip.className = 'chip ok pop'; chip.innerHTML = '<svg class="ic" data-i="check"></svg>Paid'; icon(chip.querySelector('svg')); wallet.textContent = '₦1,000.00'; }, 1600);
+      later(function () { payout.classList.add('show'); }, 2600);
+    },
+    assist: function (v) {
+      var items = v.querySelectorAll('[data-say]');
+      items.forEach(function (el) { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; el.style.transition = 'opacity .4s, transform .4s'; });
+      items.forEach(function (el) { var n = Number(el.getAttribute('data-say')); later(function () { el.style.opacity = '1'; el.style.transform = 'none'; }, 500 + n * 900); });
+    }
+  };
+  function icon(el) { if (!el) return; var d = ICONS[el.getAttribute('data-i')]; el.setAttribute('viewBox', '0 0 24 24'); el.setAttribute('fill', 'none'); el.setAttribute('stroke', 'currentColor'); el.setAttribute('stroke-width', '2'); el.setAttribute('stroke-linecap', 'round'); el.setAttribute('stroke-linejoin', 'round'); el.innerHTML = d; }
+
+  var currentView = 'home';
+  function play(name, title) {
+    clearTimers(); token++;
+    currentView = name;
+    views.forEach(function (v) { v.classList.toggle('on', v.getAttribute('data-view') === name); });
+    var v = document.querySelector('.view[data-view="' + name + '"]');
+    if (seq[name]) seq[name](v);
+    nowText.innerHTML = title ? 'Moment · <b>' + title + '</b>' : 'Home · <b>scroll to begin</b>';
+  }
+
+  // ---- chapters drive the phone ----
+  var chapters = document.querySelectorAll('.chapter');
+  var cio = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        chapters.forEach(function (c) { c.classList.remove('active'); });
+        e.target.classList.add('active');
+        var name = e.target.getAttribute('data-view');
+        if (name !== currentView) play(name, e.target.getAttribute('data-title'));
+      }
+    });
+  }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+  chapters.forEach(function (c) { cio.observe(c); });
+  var hero = document.querySelector('.hero');
+  new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting && currentView !== 'home') { chapters.forEach(function (c) { c.classList.remove('active'); }); play('home'); } });
+  }, { rootMargin: '-40% 0px -40% 0px' }).observe(hero);
+
+  document.querySelectorAll('.play').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var ch = b.closest('.chapter');
+      chapters.forEach(function (c) { c.classList.remove('active'); }); ch.classList.add('active');
+      currentView = null; play(ch.getAttribute('data-view'), ch.getAttribute('data-title'));
+      if (window.innerWidth <= 900) window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+  document.getElementById('resetBtn').addEventListener('click', function () { var n = currentView; currentView = null; var ch = document.querySelector('.chapter[data-view="' + n + '"]'); play(n || 'home', ch ? ch.getAttribute('data-title') : ''); });
+})();
+</script>
+</body>
+</html>

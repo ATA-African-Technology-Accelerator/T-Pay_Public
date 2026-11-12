@@ -76,6 +76,11 @@ export class InMemoryVoucherRepository implements IVoucherRepository {
   }
 
 
+  public devicesWithLedgerType(type: LedgerRecord['type']): string[] {
+    return [...new Set(this.ledger.filter((entry) => entry.type === type).map((entry) => entry.deviceId))];
+  }
+
+
   public ledgerFor(deviceId: string): LedgerRecord[] {
     return this.ledger.filter((entry) => entry.deviceId === deviceId);
   }
@@ -89,7 +94,7 @@ export class InMemoryVoucherRepository implements IVoucherRepository {
         || (depositId !== null && depositId === entry.depositId)
         || (vaultId != null && vaultId === entry.vaultId)));
     if (!exists) {
-      this.ledger.push({ ...entry, vaultId: entry.vaultId ?? null });
+      this.ledger.push({ ...entry, vaultId: entry.vaultId ?? null, autoCashOut: entry.autoCashOut === true });
     }
   }
 

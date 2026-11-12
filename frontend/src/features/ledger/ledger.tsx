@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { AlertCircle, Check, Copy, Link2, Share2 } from 'lucide-react-native';
@@ -8,7 +8,7 @@ import { convertNgnToUsd, convertUsdToNgn } from '@tpay/shared/domain/convertNgn
 import { Money } from '@tpay/shared/shared/domain/Money';
 import { Keypad } from '../../components/keypad';
 import { ConfirmPin } from '../onboarding/lock';
-import { Button, HearIt, OfflineTag, Panel, Rise, T, money, sayNaira, usd, when } from '../../components/ui';
+import { Button, HearIt, OfflineTag, Panel, Rise, T, money, sayNaira, speakNaturally, usd, when } from '../../components/ui';
 import { CurvedHeader, Screen, Section } from '../../components/shell';
 import { Line } from '../../components/rows';
 import { StatusMark } from '../../components/money';
@@ -21,7 +21,7 @@ import { api } from '../../composition';
 import { withSession } from '../../session/guard';
 import { withdraw } from './walletActivities';
 
-const word = (e: LedgerEntry) => ({ CREDIT: t.ledgerCredit, PAYMENT_LINK: t.ledgerPaymentLink, DEPOSIT: t.ledgerDeposit, WITHDRAWAL: t.ledgerWithdrawal, REVERSAL: t.ledgerReversal, WITHDRAWAL_RETURNED: t.ledgerReturned, VAULT_LOCK: t.ledgerVaultLock, VAULT_RETURN: t.ledgerVaultReturn })[e.type];
+const word = (e: LedgerEntry) => e.type === 'WITHDRAWAL' && e.autoCashOut ? t.ledgerAutoCashOut : ({ CREDIT: t.ledgerCredit, PAYMENT_LINK: t.ledgerPaymentLink, DEPOSIT: t.ledgerDeposit, WITHDRAWAL: t.ledgerWithdrawal, REVERSAL: t.ledgerReversal, WITHDRAWAL_RETURNED: t.ledgerReturned, VAULT_LOCK: t.ledgerVaultLock, VAULT_RETURN: t.ledgerVaultReturn })[e.type];
 const out = (e: LedgerEntry) => e.type === 'WITHDRAWAL' || e.type === 'REVERSAL' || e.type === 'VAULT_LOCK';
 
 /** Anyone with the link can pay this account by PayPal. The link is the same every time. */
@@ -66,7 +66,7 @@ export function Ledger() {
   const { active, online } = useApp();
   useEffect(() => { if (online) void refreshWallet().catch(() => undefined); }, []);
   return (
-    <Screen head={<CurvedHeader back bell={false} title={t.walletActive} />} footer={<View style={{ gap: space.sm }}><Button label={t.depositTitle} onPress={() => nav.go({ name: 'addMoney' })} /><Button kind="soft" label={t.sendOrWithdraw} disabled={!active.known || active.balanceUsd <= 0} onPress={() => nav.go({ name: 'withdraw' })} /></View>}>
+    <Screen refreshable head={<CurvedHeader back bell={false} title={t.walletActive} />} footer={<View style={{ gap: space.sm }}><Button label={t.depositTitle} onPress={() => nav.go({ name: 'addMoney' })} /><Button kind="soft" label={t.sendOrWithdraw} disabled={!active.known || active.balanceUsd <= 0} onPress={() => nav.go({ name: 'withdraw' })} /></View>}>
       <Panel style={s.big}>
         <T v="body" c={color.muted}>{t.moneyIn}</T>
         <T v="moneyL" numberOfLines={1} adjustsFontSizeToFit>{money(active.balanceNgn)}</T>
@@ -103,15 +103,15 @@ export function Ledger() {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /**
- * ACT-14. Money leaves the Online wallet for a PayPal email: the account's own, or anyone's.
+ * ACT-14. Money leaves the Wallet for a PayPal email: the account's own, or anyone's.
  * The person types an amount in naira; the exchange rate comes with the wallet.
  */
-export function Withdraw() {
+export function Withdraw({ prefill, handsFree = false }: { prefill?: number; handsFree?: boolean }) {
   const nav = useNav();
   const { active, withdrawalOpen, withdrawal, online } = useApp();
   const [other, setOther] = useState(false);
   const [email, setEmail] = useState('');
-  const [naira, setNaira] = useState(0);
+  const [naira, setNaira] = useState(prefill ? Math.floor(prefill / 100) : 0);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [sent, setSent] = useState<{ amountNgn: number; to: string } | null>(null);
@@ -145,14 +145,25 @@ export function Withdraw() {
     }
   };
 
+  // Asked by voice, even sending to your own PayPal needs the fingerprint or PIN: a voice nearby
+  // must never be able to move money. The assistant opens it; the person gives it.
+  const spoke = useRef(false);
+  useEffect(() => {
+    if (!handsFree || spoke.current || !ready) return;
+    spoke.current = true;
+    void speakNaturally(t.confirmToWithdraw).then(() => setAsking(true));
+  }, [ready]);
+
   // Sending to someone else asks for the PIN first. Sending to your own PayPal doesn't: the money stays yours.
   if (asking) {
-    return <ConfirmPin heading={t.sendAmountTo(money(worthKobo), target)} onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void go(); }} />;
+    return <ConfirmPin heading={other ? t.sendAmountTo(money(worthKobo), target) : t.withdrawAmount(money(worthKobo))} offerFingerprint={handsFree} onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void go(); }} />;
   }
 
-  if (sent || withdrawalOpen) {
-    const amount = sent?.amountNgn ?? withdrawal?.amountNgnMinor ?? 0;
-    const where = sent?.to ?? withdrawal?.recipientEmail ?? active.payoutEmail;
+  // Only the send just made shows this result. An older one still on its way never blocks a new send:
+  // it shows as a note on the form instead.
+  if (sent) {
+    const amount = sent.amountNgn;
+    const where = sent.to;
     return (
       <Screen head={<CurvedHeader back bell={false} title={t.sendTitle} />} footer={<Button label={t.done} onPress={() => nav.reset({ name: 'home' })} />}>
         <Rise>
@@ -164,7 +175,7 @@ export function Withdraw() {
           </Panel>
         </Rise>
         <T v="body" c={color.muted} style={s.center}>{t.withdrawPendingNote}</T>
-        <HearIt say={`${t.withdrawPending}. ${sayNaira(amount)}`} />
+        <HearIt auto say={`${t.withdrawPending}. ${sayNaira(amount)}`} />
       </Screen>
     );
   }
@@ -200,6 +211,9 @@ export function Withdraw() {
         {!empty && <Button kind="quiet" label={t.sendAll} onPress={() => setNaira(Math.floor(active.balanceNgn / 100))} />}
       </Panel>
       {other && <T v="small" c={color.amber}>{t.recipientCheck}</T>}
+      {withdrawalOpen && withdrawal && (
+        <T v="small" c={color.muted} style={s.center}>{t.earlierSendOnWay(money(withdrawal.amountNgnMinor), withdrawal.recipientEmail ?? active.payoutEmail)}</T>
+      )}
       {!online && <Problem text={t.needsInternet} />}
       {problem && <Problem text={problem} />}
       <Keypad onKey={press} />

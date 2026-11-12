@@ -22,7 +22,7 @@ export function Budget() {
   const over = limit !== null && spent > limit;
 
   return (
-    <Screen tabsFor="budget" head={<CurvedHeader home title={t.budget} />}>
+    <Screen tabsFor="budget" head={<CurvedHeader home title={t.personalBudget} />}>
       {limit !== null && (
         <Panel>
           <T v="label" c={color.muted}>{t.spentThisMonth}</T>

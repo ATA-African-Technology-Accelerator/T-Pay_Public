@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { Fingerprint } from 'lucide-react-native';
 import { color, glass, icon, radius, space, touch } from '../../theme/tokens';
 import { Button, Press, T } from '../../components/ui';
@@ -14,6 +14,8 @@ import { t } from '../../i18n';
 
 const LENGTH = 4;
 const SECOND = 1000;
+// How long the lock screen settles before the fingerprint prompt is shown.
+const FINGERPRINT_SETTLE_MS = 600;
 
 /** Set up during onboarding: pick a PIN, then type it again to confirm. */
 export function CreatePin() {
@@ -58,18 +60,34 @@ function usePinCheck(onPassed: () => void, offerFingerprint = true) {
   const [now, setNow] = useState(Date.now());
   const asked = useRef(false);
 
-  const tryFingerprint = async () => {
+  // `quiet` is the automatic offer when the screen opens. If Android turns that one down, the
+  // person did nothing wrong, so no error shows: the fingerprint button is right there.
+  const tryFingerprint = async (quiet = false) => {
     const result = await appLock.unlockWithBiometrics();
     if (result.status === 'UNLOCKED') onPassed();
     else if (result.status === 'NO_PIN') nav.reset({ name: 'createPin' });
-    else setNote(t.fingerprintFailed);
+    else if (!quiet) setNote(t.fingerprintFailed);
   };
 
   useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Android cancels a fingerprint prompt asked for while the screen is still changing (from the
+    // loading screen, or coming back from the background). Offer it once the lock screen has
+    // settled and the app is in front.
+    const offer = () => {
+      if (cancelled || asked.current || AppState.currentState !== 'active') return;
+      asked.current = true;
+      void tryFingerprint(true);
+    };
     biometrics.isAvailable().then(ok => {
+      if (cancelled) return;
       setFingerprint(ok);
-      if (ok && offerFingerprint && !asked.current) { asked.current = true; void tryFingerprint(); }
+      if (!ok || !offerFingerprint) return;
+      requestAnimationFrame(() => { timer = setTimeout(offer, FINGERPRINT_SETTLE_MS); });
     });
+    const sub = AppState.addEventListener('change', state => { if (state === 'active') timer = setTimeout(offer, FINGERPRINT_SETTLE_MS); });
+    return () => { cancelled = true; if (timer) clearTimeout(timer); sub.remove(); };
   }, []);
 
   // Count down a lockout so people can see when to try again.
@@ -123,7 +141,7 @@ export function Lock() {
       note={check.note}
       disabled={check.locked}
       onComplete={check.complete}
-      footer={check.fingerprint ? <FingerprintButton disabled={check.locked} onPress={check.tryFingerprint} /> : null}
+      footer={check.fingerprint ? <FingerprintButton disabled={check.locked} onPress={() => { void check.tryFingerprint(); }} /> : null}
     />
   );
 }
@@ -132,8 +150,12 @@ export function Lock() {
  * Asks for the PIN (or fingerprint) again before something that moves money, so a phone left
  * unlocked in someone else's hands can't send the balance away. It shows what is about to happen.
  */
-export function ConfirmPin({ heading, onConfirmed, onCancel }: { heading: string; onConfirmed(): void; onCancel(): void }) {
-  const check = usePinCheck(onConfirmed, false);
+export function ConfirmPin({ heading, onConfirmed, onCancel, offerFingerprint = false }: {
+  heading: string; onConfirmed(): void; onCancel(): void;
+  /** Open the fingerprint prompt by itself, for a payment started by voice. */
+  offerFingerprint?: boolean;
+}) {
+  const check = usePinCheck(onConfirmed, offerFingerprint);
   return (
     <PinPad
       eyebrow={t.confirmWithPin}
@@ -144,7 +166,7 @@ export function ConfirmPin({ heading, onConfirmed, onCancel }: { heading: string
       onComplete={check.complete}
       footer={(
         <View style={{ gap: space.sm }}>
-          {check.fingerprint ? <FingerprintButton disabled={check.locked} onPress={check.tryFingerprint} /> : null}
+          {check.fingerprint ? <FingerprintButton disabled={check.locked} onPress={() => { void check.tryFingerprint(); }} /> : null}
           <Button kind="quiet" label={t.cancel} onPress={onCancel} />
         </View>
       )}

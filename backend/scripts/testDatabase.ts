@@ -11,9 +11,13 @@ const DEFAULT_URL = 'postgres://tpay:tpay@localhost:5433/tpay';
 const vitest = fileURLToPath(new URL('../node_modules/vitest/vitest.mjs', import.meta.url));
 const databaseUrl = process.env.TEST_DATABASE_URL ?? DEFAULT_URL;
 
+// Every test file shares one database. Two at a time keeps a small machine (a laptop running
+// an emulator, or a CI runner) from timing out while it waits for connections.
+const WORKERS = '--maxWorkers=2';
+
 const runs: Array<{ label: string; args: string[]; env: Record<string, string> }> = [
-  { label: 'all tests with Postgres repositories', args: ['run'], env: {} },
-  { label: 'API tests on Postgres storage', args: ['run', 'tests/http'], env: { API_STORAGE: 'postgres' } },
+  { label: 'all tests with Postgres repositories', args: ['run', WORKERS], env: {} },
+  { label: 'API tests on Postgres storage', args: ['run', 'tests/http', WORKERS], env: { API_STORAGE: 'postgres' } },
 ];
 
 for (const { args, env, label } of runs) {

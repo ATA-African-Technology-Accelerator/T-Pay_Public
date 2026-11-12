@@ -56,6 +56,7 @@ interface WithdrawalRow {
   next_attempt_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  auto_cash_out?: boolean;
 }
 
 
@@ -80,6 +81,7 @@ const toWithdrawal = (row: WithdrawalRow): Withdrawal => ({
   nextAttemptAt: row.next_attempt_at,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  autoCashOut: row.auto_cash_out === true,
 });
 
 
@@ -100,6 +102,12 @@ export class PostgresWalletRepository implements IWalletRepository {
     } finally {
       client.release();
     }
+  }
+
+
+  public async listDevicesPaidOffline(): Promise<string[]> {
+    const { rows } = await this.pool.query<{ device_id: string }>("SELECT DISTINCT device_id FROM ledger_entries WHERE type = 'CREDIT'");
+    return rows.map(({ device_id }) => device_id);
   }
 
 
@@ -178,12 +186,12 @@ export class PostgresWalletRepository implements IWalletRepository {
         await client.query(
           `INSERT INTO withdrawals
              (id, device_id, receiver_email, amount_usd_minor, amount_ngn_minor, status, paypal_batch_id,
-              attempts, next_attempt_at, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+              attempts, next_attempt_at, created_at, updated_at, auto_cash_out)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
           [
             withdrawal.id, withdrawal.deviceId, withdrawal.receiverEmail, withdrawal.amountUsdMinor,
             withdrawal.amountNgnMinor, withdrawal.status, withdrawal.paypalBatchId, withdrawal.attempts,
-            withdrawal.nextAttemptAt, withdrawal.createdAt, withdrawal.updatedAt,
+            withdrawal.nextAttemptAt, withdrawal.createdAt, withdrawal.updatedAt, withdrawal.autoCashOut === true,
           ],
         );
       },

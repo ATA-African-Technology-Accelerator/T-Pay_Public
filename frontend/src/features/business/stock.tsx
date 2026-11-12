@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { Minus, Plus, Trash2 } from 'lucide-react-native';
 import { color, icon, radius, space, touch, type } from '../../theme/tokens';
-import { Button, Panel, Press, T } from '../../components/ui';
+import { Button, Panel, Press, T, money } from '../../components/ui';
 import { CurvedHeader, Screen, Section } from '../../components/shell';
 import { t } from '../../i18n';
-import { LOW_STOCK, MAX_QUANTITY, stockStore, useStock, type StockItem } from './businessStore';
+import { LOW_STOCK, MAX_QUANTITY, salesToday, stockStore, useSales, useStock, type StockItem } from './businessStore';
 
 /** What a business has on its shelves. Tap minus when something sells, plus when more arrives. */
 export function Stock() {
   const items = useStock();
+  const today = salesToday(useSales(), new Date());
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
   const amount = Number(quantity);
@@ -17,7 +18,10 @@ export function Stock() {
   const add = () => { void stockStore.add(name, amount).then(() => { setName(''); setQuantity(''); }); };
 
   return (
-    <Screen tabsFor="stock" head={<CurvedHeader home title={t.stock} />}>
+    <Screen tabsFor="stock" head={<CurvedHeader home title={t.stockInventory} />}>
+      <Panel>
+        <T v="label" accessibilityLiveRegion="polite">{today.count ? t.salesToday(today.count, money(today.totalNgnMinor)) : t.noSalesToday}</T>
+      </Panel>
       <Panel>
         <T v="label">{t.addItem}</T>
         <TextInput accessibilityLabel={t.itemName} placeholder={t.itemName} placeholderTextColor={color.muted} value={name} onChangeText={setName} maxLength={60} style={s.input} />

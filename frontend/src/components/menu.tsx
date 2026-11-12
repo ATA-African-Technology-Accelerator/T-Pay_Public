@@ -14,10 +14,9 @@ type Item = { label: string; draw(c: string): React.ReactNode; to: Route; stack?
 const line = (Icon: typeof Globe) => (c: string) => <Icon size={icon.md} color={c} strokeWidth={1.7} />;
 const HOME: Item = { label: t.home, draw: c => <HomeIcon size={icon.md} c={c} w={1.7} />, to: { name: 'home' } };
 const VAULT: Item = { label: t.vaultTitle, draw: c => <BagIcon size={icon.md} c={c} w={1.7} />, to: { name: 'vault' } };
-const SHOP: Item[] = [
-  { label: t.stock, draw: line(Boxes), to: { name: 'stock' } },
-  { label: t.budget, draw: line(PiggyBank), to: { name: 'budget' } },
-];
+// A business keeps track of what is on its shelves; a person keeps track of what they spend.
+const STOCK: Item = { label: t.stockInventory, draw: line(Boxes), to: { name: 'stock' } };
+const BUDGET: Item = { label: t.personalBudget, draw: line(PiggyBank), to: { name: 'budget' } };
 const REST: Item[] = [
   { label: t.activity, draw: line(ReceiptText), to: { name: 'activity' } },
   { label: t.received, draw: line(Landmark), to: { name: 'ledger' }, stack: true },
@@ -82,7 +81,7 @@ export function SideMenu({ open, current, onClose }: { open: boolean; current: R
           </Pressable>
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={m.list} showsVerticalScrollIndicator={false}>
-          {[HOME, ...(business ? [...SHOP, VAULT] : [VAULT]), ...REST].map(row)}
+          {[HOME, ...(business ? [STOCK, VAULT] : [VAULT, BUDGET]), ...REST].map(row)}
           <View style={m.rule} />
           {[switchKind, ...MORE].map(row)}
         </ScrollView>

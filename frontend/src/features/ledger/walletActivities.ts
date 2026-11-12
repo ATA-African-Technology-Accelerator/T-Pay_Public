@@ -1,10 +1,13 @@
-// ACT-13 and ACT-14. The Active wallet is money collected from customers, held by
+// ACT-13 and ACT-14. The Wallet is money collected from customers, held by
 // T-Pay and sent to the account's PayPal email on request.
 import * as WebBrowser from 'expo-web-browser';
 import type { CompleteDepositResponse, TransactionView, WithdrawResponse } from '@tpay/shared/contracts/api';
 import { api, clock, random, store } from '../../composition';
 import { withSession } from '../../session/guard';
 import { refreshWallet } from '../../sync/syncCoordinator';
+import { DEPOSIT, DEPOSIT_KEY, forgetDeposit, loadDeposit, type PendingDeposit } from './pendingDeposit';
+
+export { forgetDeposit, loadDeposit, type PendingDeposit };
 
 const PENDING = 'wallet.withdrawal';
 
@@ -50,25 +53,12 @@ export async function withdraw(amountUsdMinor: number, amountNgnMinor: number, r
 }
 
 
-// ---- Add money (a PayPal checkout that lands in the Online wallet) ----------------------
+// ---- Add money (a PayPal checkout that lands in the Wallet) ----------------------
 
 export const DEPOSIT_RETURN = 'tpay://wallet/return';
-const DEPOSIT = 'wallet.deposit';
-const DEPOSIT_KEY = 'wallet.depositKey';
 
 /** A checkout the person has started. Kept so a closed app can finish it from the PayPal link. */
-export interface PendingDeposit {
-  depositId: string;
-  approvalUrl: string;
-  amountNgnMinor: number;
-  amountUsdMinor: number;
-  fxRate: string;
-  /** For the complete call, so a retry after a lost answer can't credit twice. */
-  completeKey: string;
-  createdAt: string;
-}
 
-export const loadDeposit = () => store.getMeta<PendingDeposit>(DEPOSIT);
 
 /** Creates the PayPal checkout. A retry for the same amount reuses its key, so it makes one checkout. */
 export async function startDeposit(amountNgnMinor: number): Promise<PendingDeposit> {
@@ -113,10 +103,6 @@ export async function openDepositApproval(pending: PendingDeposit): Promise<Depo
   return back.outcome;
 }
 
-export async function forgetDeposit() {
-  await store.setMeta(DEPOSIT, null);
-  await store.setMeta(DEPOSIT_KEY, null);
-}
 
 /** Captures the approved payment and credits the wallet. Safe to repeat: the backend credits once. */
 export async function completeDeposit(depositId: string): Promise<CompleteDepositResponse> {

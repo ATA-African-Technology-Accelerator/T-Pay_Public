@@ -15,6 +15,8 @@ export interface Device {
   payoutEmail: string;
   createdAt: Date;
   revokedAt: Date | null;
+  /** Send money received offline on to PayPal by itself. Undefined means on. */
+  autoCashOut?: boolean;
 }
 
 
@@ -275,6 +277,8 @@ export interface LedgerRecord {
   createdAt: Date;
   /** Set on VAULT_LOCK and VAULT_RETURN, the money moving between the Online wallet and a vault. */
   vaultId?: string | null;
+  /** On the WITHDRAWAL and WITHDRAWAL_RETURNED of an automatic cash-out. */
+  autoCashOut?: boolean;
 }
 
 export interface VaultSession {
@@ -328,9 +332,12 @@ export interface AssistantModelRequest {
 // validates before anything reaches a person. Throws AI_UNAVAILABLE when unreachable.
 export interface IAssistantModel {
   interpret(request: AssistantModelRequest): Promise<unknown>;
-  /** Reads a short reply aloud in a natural voice. Returns a WAV file. Throws AI_UNAVAILABLE when unreachable. */
-  speak(request: { text: string; language: Language }): Promise<{ audioBase64: string; audioMimeType: 'audio/wav' }>;
+  /** Reads a short reply aloud in a natural voice. Throws AI_UNAVAILABLE when unreachable. */
+  speak(request: { text: string; language: Language }): Promise<SpokenClip>;
 }
+
+/** A short spoken clip: WAV from Gemini, MP3 from ElevenLabs. */
+export interface SpokenClip { audioBase64: string; audioMimeType: 'audio/wav' | 'audio/mpeg' }
 
 
 export type WithdrawalStatus = PayoutStatus;
@@ -347,6 +354,8 @@ export interface Withdrawal {
   nextAttemptAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Made by T-Pay itself (automatic cash-out), not by the person. */
+  autoCashOut?: boolean;
 }
 
 export type WithdrawalChanges = Partial<Pick<
@@ -387,6 +396,8 @@ export interface WalletSession {
 
 export interface IWalletRepository {
   withWalletLock<T>(deviceId: string, work: (session: WalletSession) => Promise<T>): Promise<T>;
+  /** Devices that have ever been paid offline: the ones automatic cash-out looks at. */
+  listDevicesPaidOffline(): Promise<string[]>;
   findDeposit(id: string): Promise<Deposit | null>;
   /** The device's pay link token, made with `token` on the first call and the same one after. */
   findOrCreatePayLink(deviceId: string, token: string, now: Date): Promise<string>;

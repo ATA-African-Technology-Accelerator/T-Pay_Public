@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Vibration, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Path, Rect, Line } from 'react-native-svg';
 import { color, motion, radius, space, touch } from '../theme/tokens';
 import QRCode from 'react-native-qrcode-svg';
@@ -7,7 +7,6 @@ import { T, naira, native, useReduceMotion } from './ui';
 import { t } from '../i18n';
 
 const NOTES = [1000, 500, 200, 100, 50];
-export const noteValues = NOTES;
 const NOTE_W = 92, NOTE_H = 50, FAN = 6;
 
 /** Naira notes for an amount in kobo. Kobo below one naira is not shown as a note. */
@@ -62,40 +61,6 @@ function Pile({ value, count, delay }: { value: number; count: number; delay: nu
       </View>
       {count > 1 && <T v="small" c={color.muted} style={{ textAlign: 'center', marginTop: space.xs }}>{t.noteCount(count)}</T>}
     </Animated.View>
-  );
-}
-
-/** Paying is a press and hold. Letting go early cancels; letting go once the bar is full pays, so the release can never land on the next screen. */
-export function HoldToConfirm({ label, onDone, say, busy }: { label: string; onDone(): void; say?: string; busy?: boolean }) {
-  const a = useRef(new Animated.Value(0)).current;
-  const [holding, setHolding] = React.useState(false);
-  const [full, setFull] = React.useState(false);
-  const done = useRef(false);
-  const armed = useRef(false);
-  const finish = () => { if (done.current) return; done.current = true; if (native) Vibration.vibrate(40); onDone(); };
-  const start = () => {
-    setHolding(true); if (native) Vibration.vibrate(10);
-    Animated.timing(a, { toValue: 1, duration: motion.hold, easing: motion.ease.linear, useNativeDriver: native }).start(({ finished }) => {
-      if (!finished) return;
-      armed.current = true; setFull(true); if (native) Vibration.vibrate(20);
-    });
-  };
-  const stop = () => {
-    setHolding(false); if (done.current) return;
-    // A beat after release, so the same touch cannot also tap whatever appears next.
-    if (armed.current) { setTimeout(finish, motion.release); return; }
-    Animated.timing(a, { toValue: 0, duration: motion.base, useNativeDriver: native }).start();
-  };
-  return (
-    <Pressable
-      accessibilityRole="button" accessibilityLabel={say ?? label}
-      accessibilityActions={[{ name: 'activate', label }]} onAccessibilityAction={finish}
-      onPressIn={start} onPressOut={stop} disabled={busy} accessibilityState={{ busy: !!busy }} style={n.hold}
-    >
-      <Animated.View style={[n.fill, { transform: [{ scaleX: a }] }]} />
-      {busy && <ActivityIndicator size="small" color={color.ink} />}
-      <T v="heading" c={color.ink}>{busy ? t.sending : full ? t.letGoToPay : holding ? t.keepHolding : label}</T>
-    </Pressable>
   );
 }
 
@@ -183,8 +148,6 @@ const n = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.md, minHeight: 66 },
   note: { borderRadius: radius.sm, padding: space.xs },
   inner: { flex: 1, borderWidth: 1, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  hold: { height: touch.row, borderRadius: radius.md, backgroundColor: color.text, overflow: 'hidden', flexDirection: 'row', gap: space.sm, alignItems: 'center', justifyContent: 'center' },
-  fill: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 7, backgroundColor: color.blue, transformOrigin: 'left center' } as any,
   // Codes stay dark on white whatever the theme, or cameras cannot read them.
   code: { backgroundColor: color.white, padding: space.md, borderRadius: radius.md },
   steps: { flexDirection: 'row', gap: space.sm },

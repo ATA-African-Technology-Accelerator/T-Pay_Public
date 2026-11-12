@@ -84,3 +84,38 @@ describe('budget', () => {
     expect(await budgetStore.load()).toBeNull();
   });
 });
+
+describe('recording a sale', () => {
+  const { salesStore, salesToday, findItem } = require('../businessStore') as typeof import('../businessStore');
+  beforeEach(async () => {
+    await stockStore.save([]);
+    await mockStore.setMeta('biz.sales', null);
+  });
+
+  it('takes one off the shelf for the item named, whatever the capitals', async () => {
+    await stockStore.add('Coke', 5);
+    const left = await salesStore.record('coke', 500_00, new Date('2026-11-12T10:00:00'));
+    expect(left?.quantity).toBe(4);
+    expect((await stockStore.load())[0]?.quantity).toBe(4);
+  });
+
+  it('finds an item from part of its name', async () => {
+    await stockStore.add('Coke 50cl', 5);
+    expect(findItem(await stockStore.load(), 'coke')?.name).toBe('Coke 50cl');
+  });
+
+  it('still records the sale when the item is not on the shelf, and never goes below zero', async () => {
+    await stockStore.add('Bread', 0);
+    expect(await salesStore.record('Fanta', 300_00, new Date())).toBeNull();
+    expect((await salesStore.record('Bread', 300_00, new Date()))?.quantity).toBe(0);
+    expect(await salesStore.list()).toHaveLength(2);
+  });
+
+  it('adds up only today', async () => {
+    const now = new Date(2026, 10, 12, 18, 0, 0);
+    await salesStore.record(null, 500_00, new Date(2026, 10, 12, 9, 0, 0));
+    await salesStore.record(null, 200_00, new Date(2026, 10, 12, 17, 0, 0));
+    await salesStore.record(null, 900_00, new Date(2026, 10, 11, 23, 59, 0));
+    expect(salesToday(await salesStore.list(), now)).toEqual({ count: 2, totalNgnMinor: 700_00 });
+  });
+});

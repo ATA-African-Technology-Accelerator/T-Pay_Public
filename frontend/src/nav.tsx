@@ -4,26 +4,31 @@
 import { createContext, useContext } from 'react';
 import type { Proposal } from './features/assistant/assistant';
 import type { OpenRequest, PaymentRefusal, ScannedRequest } from './features/payment/payments';
+import type { OnlinePayment } from './features/payment/merchant';
 
 export type Side = 'merchant' | 'customer';
 
 export type Route =
   | { name: 'splash' } | { name: 'language'; edit?: boolean } | { name: 'details'; edit?: boolean } | { name: 'createPin' } | { name: 'lock' }
-  | { name: 'home' } | { name: 'activity' } | { name: 'vault' } | { name: 'speak'; auto?: boolean } | { name: 'settings' } | { name: 'help' }
-  | { name: 'ledger' } | { name: 'withdraw' } | { name: 'addMoney' } | { name: 'offlineAi' } | { name: 'stock' } | { name: 'budget' }
+  | { name: 'home' } | { name: 'activity' } | { name: 'vault' } | { name: 'speak'; auto?: boolean; attempt?: number; heard?: string; followUp?: boolean } | { name: 'settings' } | { name: 'help' }
+  | { name: 'ledger' } | { name: 'offlineAi' } | { name: 'stock' } | { name: 'budget' }
+  // `handsFree`: opened by the assistant, which reads the next step out and opens the PIN or
+  // fingerprint (or PayPal) by itself. The person still has to give it.
+  | { name: 'withdraw'; prefill?: number; handsFree?: boolean } | { name: 'addMoney'; prefill?: number; handsFree?: boolean }
   | { name: 'receipt'; id: string }
-  | { name: 'amount'; mode: 'lock' | 'collect' }
-  | { name: 'vaultReview'; amount: number; hours: number } | { name: 'vaultActive' } | { name: 'melt' }
-  | { name: 'request'; amount: number }
-  | { name: 'scan'; kind: 'request'; expected?: number }
+  | { name: 'amount'; mode: 'lock' | 'collect'; prefill?: number }
+  | { name: 'vaultReview'; amount: number; hours: number; handsFree?: boolean } | { name: 'vaultActive' } | { name: 'melt'; handsFree?: boolean }
+  | { name: 'request'; amount: number; handsFree?: boolean }
+  | { name: 'scan'; kind: 'request'; expected?: number; handsFree?: boolean }
   | { name: 'scan'; kind: 'voucher'; open: OpenRequest }
   | { name: 'scan'; kind: 'receipt'; voucherId: string }
-  | { name: 'review'; scanned: ScannedRequest; expected?: number }
+  | { name: 'review'; scanned: ScannedRequest; expected?: number; handsFree?: boolean }
   | { name: 'voucher'; voucherId: string }
   | { name: 'delivered'; voucherId: string }
   | { name: 'credit'; voucherId: string; bluetooth: boolean; again?: boolean }
+  | { name: 'paidOnline'; payment: OnlinePayment }
   | { name: 'refusal'; code: PaymentRefusal; side: Side; amount?: number; existingId?: string }
-  | { name: 'proposal'; proposal: Proposal; handsFree?: boolean } | { name: 'assist' };
+  | { name: 'proposal'; proposal: Proposal; handsFree?: boolean; attempt?: number } | { name: 'assist' };
 
 export type Nav = { go(r: Route): void; reset(r: Route): void; back(): void; openMenu(): void };
 export const NavCtx = createContext<Nav | null>(null);

@@ -15,31 +15,64 @@ import { profileStore } from '../../session/profileStore';
 import { sessionStore } from '../../session/sessionStore';
 import { withSession } from '../../session/guard';
 
-const LOGO = require('../../../assets/brand/splash-logo.png');
+const EMBLEM = require('../../../assets/brand/splash-emblem.png');
+const WORDMARK = require('../../../assets/brand/splash-wordmark.png');
+
+// The full logo is 2400 x 2208; on screen it is 300 wide. The emblem and the wordmark are cut from
+// it, so these place them back exactly where they sit in the logo.
+const LOGO_W = 300;
+const K = LOGO_W / 2400;
+const LOGO_H = 2208 * K;
+const EMBLEM_BOX = { left: 700 * K, top: 275 * K, width: 1000 * K, height: 1000 * K };
+const WORDMARK_BOX = { left: 560 * K, top: 1450 * K, width: 1280 * K, height: 530 * K };
+// How far the emblem starts below its place in the logo, so it begins in the middle of the screen,
+// right where Android's own splash showed it.
+const RISE = LOGO_H / 2 - (EMBLEM_BOX.top + EMBLEM_BOX.height / 2);
+// The opening: the circled T alone, then the screen fills with blue, then the T rises as the name
+// and tagline appear. Long enough to land, short enough not to keep anyone waiting.
+const HOLD_MS = 250;
+const BLUE_MS = 500;
+const REVEAL_MS = 550;
+const OPEN_DONE_MS = HOLD_MS + BLUE_MS + REVEAL_MS + 300;
 
 /** ACT-01. A phone with a PIN and an identity unlocks; anything less finishes setup. */
 export function Splash() {
   const nav = useNav();
   const reduce = useReduceMotion();
-  const a = useRef(new Animated.Value(reduce ? 1 : 0)).current;
+  const blue = useRef(new Animated.Value(reduce ? 1 : 0)).current;
+  const reveal = useRef(new Animated.Value(reduce ? 1 : 0)).current;
   useEffect(() => {
-    Animated.timing(a, { toValue: 1, duration: motion.slow, useNativeDriver: native }).start();
+    if (!reduce) {
+      Animated.sequence([
+        Animated.delay(HOLD_MS),
+        Animated.timing(blue, { toValue: 1, duration: BLUE_MS, easing: motion.ease.inOut, useNativeDriver: false }),
+      ]).start();
+      Animated.sequence([
+        Animated.delay(HOLD_MS + BLUE_MS * 0.6),
+        Animated.timing(reveal, { toValue: 1, duration: REVEAL_MS, easing: motion.ease.out, useNativeDriver: native }),
+      ]).start();
+    }
     let cancelled = false;
     const known = Promise.all([appLock.hasPin().catch(() => false), sessionStore.load().catch(() => null)]);
     const id = setTimeout(async () => {
       const [pin, session] = await known;
       if (cancelled) return;
       nav.reset({ name: session ? (pin ? 'lock' : 'createPin') : 'language' });
-    }, 1200);
+    }, reduce ? 900 : OPEN_DONE_MS);
     return () => { cancelled = true; clearTimeout(id); };
   }, []);
-  // The same logo, size and navy as Android's own splash before it, so the hand-over is seamless.
+  const background = blue.interpolate({ inputRange: [0, 1], outputRange: [color.night, color.brand] });
   return (
-    <View style={o.splash} accessible accessibilityRole="image" accessibilityLabel={`T-Pay. ${t.tagline}`}>
-      <Animated.Image source={LOGO} resizeMode="contain" style={[o.logoImage, { opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }]} />
-    </View>
+    <Animated.View style={[o.splash, { backgroundColor: background }]} accessible accessibilityRole="image" accessibilityLabel={`T-Pay. ${t.tagline}`}>
+      <View style={o.logoBox}>
+        <Animated.Image source={EMBLEM} resizeMode="contain" style={[o.part, EMBLEM_BOX, { transform: [{ translateY: reveal.interpolate({ inputRange: [0, 1], outputRange: [RISE, 0] }) }] }]} />
+        <Animated.Image source={WORDMARK} resizeMode="contain" style={[o.part, WORDMARK_BOX, { opacity: reveal, transform: [{ translateY: reveal.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]} />
+      </View>
+    </Animated.View>
   );
 }
+
+const OFFERED = ['en', 'pcm'];
 
 export function Language({ edit: asked }: { edit?: boolean }) {
   const nav = useNav();
@@ -47,6 +80,9 @@ export function Language({ edit: asked }: { edit?: boolean }) {
   // A phone that already has an account only ever edits it. Setup would register it again.
   const edit = asked || !!session;
   const [picked, setPicked] = useState<string | null>(edit ? languages[languageCodes.indexOf(language)] ?? null : null);
+  // Sign-up offers English and Nigerian Pidgin only. The other catalogues stay, so a phone already
+  // set to one of them still shows it when the language is changed later.
+  const shown = languageCodes.map((code, i) => i).filter(i => OFFERED.includes(languageCodes[i] as string) || (edit && languageCodes[i] === language));
   const choose = (i: number) => {
     setPicked(languages[i] as string);
     void setLanguage(languageCodes[i] as (typeof languageCodes)[number]);
@@ -55,10 +91,11 @@ export function Language({ edit: asked }: { edit?: boolean }) {
   return (
     <Screen head={<CurvedHeader back={edit} bell={false} title={t.chooseLanguage} />}>
       <View style={{ gap: space.sm }}>
-        {languages.map((name, i) => {
+        {shown.map(i => {
+          const name = languages[i] as string;
           const on = picked === name;
           return (
-            <Rise key={name} delay={i * motion.stagger} style={o.langRow}>
+            <Rise key={name} delay={shown.indexOf(i) * motion.stagger} style={o.langRow}>
               <Pressable accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={name} onPress={() => choose(i)} style={[o.lang, on && { backgroundColor: color.panelHigh }]}>
                 <T v="heading">{name}</T>
                 {on && <Check size={icon.md} color={color.blue} strokeWidth={2.4} />}
@@ -177,9 +214,9 @@ function setupMessage(e: unknown): string {
 }
 
 const o = StyleSheet.create({
-  splash: { flex: 1, backgroundColor: color.brand, alignItems: 'center', justifyContent: 'center' },
-  // Android's splash shows the logo 300 wide; matching it means nothing moves when this screen takes over.
-  logoImage: { width: 300, height: 300 * (2208 / 2400) },
+  splash: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  logoBox: { width: LOGO_W, height: LOGO_H },
+  part: { position: 'absolute' },
   langRow: { flexDirection: 'row', gap: space.sm },
   lang: { flex: 1, minHeight: touch.row, paddingHorizontal: space.xl, borderRadius: radius.md, backgroundColor: color.panel, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   ear: { width: touch.row, height: touch.row, borderRadius: radius.md, backgroundColor: color.panel, alignItems: 'center', justifyContent: 'center' },

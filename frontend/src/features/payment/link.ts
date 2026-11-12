@@ -6,6 +6,8 @@ import { nearby } from '../../composition';
 
 /** How long the customer's phone waits after Pay before showing the voucher QR. */
 export const JOIN_DEADLINE_MS = 8_000;
+/** After Pay, how long the voucher screen keeps waiting for Bluetooth before only the QR is left. */
+export const LATE_LINK_MS = 60_000;
 /** How long to wait for the other phone's reply on an open channel. */
 export const REPLY_DEADLINE_MS = 12_000;
 

@@ -11,10 +11,6 @@ import type { Language, VaultStatus, VoucherStatus } from './statuses';
 
 
 
-export interface ApiSuccess<T> {
-  data: T;
-}
-
 export type SignedDeviceCertificate = SignedEnvelope<DeviceCertificatePayload>;
 export type SignedVaultCertificate = SignedEnvelope<VaultCertificatePayload>;
 
@@ -36,11 +32,22 @@ export interface RegisterDeviceResponse {
 }
 
 
+/** GET /health: whether the server can reach its database and PayPal, and which PayPal it uses. */
+export interface HealthResponse {
+  status: 'ok' | 'degraded';
+  database: 'ok' | 'down';
+  paypal: 'ok' | 'down';
+  mode: 'sandbox' | 'live';
+}
+
+
 export interface ProfileView {
   deviceId: string;
   displayName: string;
   language: Language;
   payoutEmail: string;
+  /** Money received offline goes on to this PayPal email by itself. On unless turned off. */
+  autoCashOut: boolean;
   assuranceTier: 'B';
   createdAt: string;
 }
@@ -50,6 +57,7 @@ export interface UpdateProfileRequest {
   displayName?: string;
   language?: Language;
   payoutEmail?: string;
+  autoCashOut?: boolean;
 }
 
 export type TransactionType =
@@ -165,6 +173,8 @@ export interface VoucherView {
   counterpartyName: string;
   paypalCaptureId: string | null;
   updatedAt: string;
+  /** The nonce of the payment request it pays, so the seller's phone can tell its own request was paid. */
+  requestNonce?: string;
 }
 
 
@@ -182,6 +192,8 @@ export interface LedgerEntry {
   voucherId: string | null;
   paypalCaptureId: string | null;
   createdAt: string;
+  /** A withdrawal T-Pay made by itself, sending money received offline on to PayPal. */
+  autoCashOut?: boolean;
 }
 
 
@@ -247,7 +259,28 @@ export type AssistantIntent =
   | 'PAY_AMOUNT'
   | 'RECORD_SALE'
   | 'CHECK_BALANCE'
+  | 'HELP'
+  // Everything else a person can do with their hands. Each one only opens or fills a screen:
+  // money still moves only after the PIN, fingerprint or PayPal sign-in on that screen.
+  | 'LOCK_MONEY'
+  | 'UNLOCK_MONEY'
+  | 'ADD_MONEY'
+  | 'WITHDRAW'
+  | 'SHARE_PAY_LINK'
+  | 'ADD_STOCK'
+  | 'CHECK_STOCK'
+  | 'SET_BUDGET'
+  | 'CHECK_BUDGET'
+  | 'OPEN_SCREEN'
   | 'UNKNOWN';
+
+/** Where OPEN_SCREEN goes. */
+export type AssistantScreen = 'HOME' | 'ACTIVITY' | 'WALLET' | 'VAULT' | 'STOCK' | 'BUDGET' | 'SETTINGS' | 'HELP';
+export const ASSISTANT_SCREENS: readonly AssistantScreen[] = ['HOME', 'ACTIVITY', 'WALLET', 'VAULT', 'STOCK', 'BUDGET', 'SETTINGS', 'HELP'];
+
+/** What a HELP question is about. The app answers it itself, from what the phone knows. */
+export type HelpTopic = 'PAY' | 'GET_PAID' | 'LOCK' | 'WITHDRAW' | 'SAFETY' | 'WHAT_CAN_YOU_DO';
+export const HELP_TOPICS: readonly HelpTopic[] = ['PAY', 'GET_PAID', 'LOCK', 'WITHDRAW', 'SAFETY', 'WHAT_CAN_YOU_DO'];
 
 export interface InterpretRequest {
   text: string | null;
@@ -264,10 +297,10 @@ export interface SpeakRequest {
 }
 
 
-/** A short spoken clip, as a base64 WAV file. */
+/** A short spoken clip, base64: WAV (Gemini) or MP3 (ElevenLabs). */
 export interface SpeakResponse {
   audioBase64: string;
-  audioMimeType: 'audio/wav';
+  audioMimeType: 'audio/wav' | 'audio/mpeg';
 }
 
 
@@ -276,6 +309,12 @@ export interface InterpretResponse {
     intent: AssistantIntent;
     amountNgnMinor: number | null;
     itemName: string | null;
+    /** Only on a HELP proposal. */
+    helpTopic?: HelpTopic;
+    /** Only on ADD_STOCK: how many came in. */
+    quantity?: number | null;
+    /** Only on OPEN_SCREEN. */
+    screen?: AssistantScreen | null;
   };
   transcript: string;
   spokenReply: string;

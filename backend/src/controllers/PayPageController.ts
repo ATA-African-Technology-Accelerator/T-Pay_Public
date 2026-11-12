@@ -7,6 +7,7 @@ import type { IDeviceRepository } from '../services/ports';
 
 
 
+const PAY_TOKEN = /^[A-Za-z0-9_-]{1,64}$/;
 const escape = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 // "12", "12.5" or "12.50" dollars, never more than two decimals, as whole cents.
@@ -60,6 +61,11 @@ export class PayPageController {
   }
 
   private async owner(token: string) {
+    // Links are made from base64url nonces. Anything else (a null byte, a 5,000-character path)
+    // is unknown without asking the database, which would refuse some of it with an error.
+    if (!PAY_TOKEN.test(token)) {
+      return null;
+    }
     const deviceId = await this.deposits.linkOwner(token);
     const device = deviceId ? await this.devices.findById(deviceId) : null;
     return device && !device.revokedAt ? { deviceId: device.id, name: device.displayName } : null;

@@ -8,18 +8,44 @@ jest.mock('expo-crypto', () => ({ randomUUID: () => 'uuid' }));
 jest.mock('../../../session/guard', () => ({ withSession: (call: () => unknown) => call() }));
 
 let mockState: { kind: string } = { kind: 'ready' };
+let mockOnline = false;
+const mockInterpret = jest.fn();
 const mockPropose = jest.fn();
 const mockStore = new LocalStore(Promise.resolve(new MemoryKv()));
 jest.mock('../../../composition', () => ({
-  api: {}, store: mockStore, clock: { now: () => new Date('2026-11-10T10:00:00Z') },
-  connectivity: { isOnline: async () => false },
+  api: { interpret: (...args: unknown[]) => mockInterpret(...args) }, store: mockStore, clock: { now: () => new Date('2026-11-10T10:00:00Z') },
+  connectivity: { isOnline: async () => mockOnline },
   localModel: { refresh: async () => mockState, propose: (...args: unknown[]) => mockPropose(...args) },
 }));
 
 const { interpretText } = require('../assistant') as typeof import('../assistant');
 const LEFT = 500_000;
 
-beforeEach(() => { mockState = { kind: 'ready' }; mockPropose.mockReset(); });
+beforeEach(() => { mockState = { kind: 'ready' }; mockOnline = false; mockPropose.mockReset(); mockInterpret.mockReset(); });
+
+describe('online', () => {
+  beforeEach(() => { mockOnline = true; });
+
+  it('answers a clear request on the phone at once, with no wait for the server', async () => {
+    expect(await interpretText('collect 2k', 'en', LEFT)).toMatchObject({ intent: 'CREATE_PAYMENT_REQUEST', amountNgnMinor: 200_000, offline: false, spokenReply: null });
+    expect(await interpretText('pay five hundred naira', 'en', LEFT)).toMatchObject({ intent: 'PAY_AMOUNT', amountNgnMinor: 50_000, offline: false });
+    expect(await interpretText('how much do I have', 'en', LEFT)).toMatchObject({ intent: 'CHECK_BALANCE', offline: false });
+    expect(mockInterpret).not.toHaveBeenCalled();
+  });
+
+  it('still refuses a payment above what the vault has left', async () => {
+    expect(await interpretText('pay 9000', 'en', LEFT)).toMatchObject({ intent: 'UNKNOWN', overCapacity: true });
+    expect(mockInterpret).not.toHaveBeenCalled();
+  });
+
+  it('asks the server for what the rules can’t read in full: a sale, a missing amount, another language', async () => {
+    mockInterpret.mockResolvedValue({ proposal: { intent: 'RECORD_SALE', amountNgnMinor: 100_000, itemName: 'Coke' }, transcript: 't', spokenReply: 'You sold Coke?' });
+    await interpretText('I sold two Coke for 1000', 'en', LEFT);
+    await interpretText('collect money', 'en', LEFT);
+    await interpretText('gba ẹgbẹ̀rún kan', 'yo', LEFT);
+    expect(mockInterpret).toHaveBeenCalledTimes(3);
+  });
+});
 
 it('uses the phone model for what the rules can’t read', async () => {
   mockPropose.mockResolvedValue('{"intent":"CREATE_PAYMENT_REQUEST","amountNaira":1500,"itemName":null}');
@@ -62,4 +88,24 @@ it('uses only the rules when the model was never downloaded', async () => {
   mockState = { kind: 'absent' };
   expect(await interpretText('collect 50', 'en', LEFT)).toMatchObject({ intent: 'CREATE_PAYMENT_REQUEST', amountNgnMinor: 5_000, onDevice: false });
   expect(mockPropose).not.toHaveBeenCalled();
+});
+
+describe('questions about the app', () => {
+  it('answers "how do I pay" on the phone, online or not, with no trip to the server', async () => {
+    mockOnline = true;
+    expect(await interpretText('how do I pay', 'en', 0)).toMatchObject({ intent: 'HELP', helpTopic: 'PAY', spokenReply: null });
+    expect(mockInterpret).not.toHaveBeenCalled();
+  });
+
+  it('never reads out the model\'s own words for a question', async () => {
+    mockOnline = true;
+    mockInterpret.mockResolvedValue({
+      proposal: { intent: 'HELP', amountNgnMinor: null, itemName: null, helpTopic: 'LOCK' }, transcript: 'abeg explain am', spokenReply: 'anything', needsConfirmation: true,
+    });
+    expect(await interpretText('abeg explain am', 'pcm', 0)).toMatchObject({ intent: 'HELP', helpTopic: 'LOCK', spokenReply: null });
+  });
+
+  it('keeps the amount of a payment refused for having no vault, so it can offer to lock it', async () => {
+    expect(await interpretText('pay 2000', 'en', 0)).toMatchObject({ overCapacity: true, requestedNgnMinor: 200_000 });
+  });
 });

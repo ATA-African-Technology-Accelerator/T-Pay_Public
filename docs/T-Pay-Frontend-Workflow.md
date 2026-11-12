@@ -58,7 +58,7 @@ frontend/
       vault/               screens and vault activities (ACT-03 to ACT-05, ACT-12)
       payment/             screens, payment activities and the Bluetooth link (ACT-06 to ACT-09)
       transactions/        history and receipts (ACT-11)
-      ledger/              Active wallet and withdraw (ACT-13, ACT-14)
+      ledger/              Wallet and withdraw (ACT-13, ACT-14)
       assistant/           speak, proposals and typed input (ACT-15)
       settings/            profile, language, security and help (ACT-16)
     state/                 app state read from SQLite and the last sync
@@ -149,9 +149,9 @@ If delivery fails, resend the same voucher frame, which `encodeFrame` makes iden
 | ACT-10 | Background, on connectivity or app open | Upload unsettled vouchers, then read updates | `POST /vouchers`, `GET /vouchers` | Local status updated with no tap |
 | ACT-11 | Transaction list and detail | Read local data, refresh detail and history if online | `GET /vouchers/{id}`, `GET /transactions` | Shows status and capture ID |
 | ACT-12 | Customer melts the vault | Stop signing, create spend statement, submit | `POST /vaults/{id}/melt` | Released now, or shows scheduled release and blocking voucher |
-| ACT-13 | Active wallet | Read balance and entries | `GET /wallet` | Shows collected money linked to captures |
+| ACT-13 | Wallet | Read balance and entries | `GET /wallet` | Shows collected money linked to captures |
 | ACT-14 | Send or withdraw | Choose my PayPal or someone else's email, enter an amount in naira, confirm. The amount is turned into dollars with the wallet's `fxRate`, and the whole balance is sent as exactly the dollars held | `POST /wallet/withdrawals` | Pending withdrawal |
-| ACT-18 | Add money | Enter an amount, open PayPal in the in-app browser, return through `tpay://wallet/return`, then complete. A half-finished checkout is kept, so the link can finish it after the app was closed | `POST /wallet/deposits`, `POST /wallet/deposits/{id}/complete` | Online wallet credited, once |
+| ACT-18 | Add money | Enter an amount, open PayPal in the in-app browser, return through `tpay://wallet/return`, then complete. A half-finished checkout is kept, so the link can finish it after the app was closed | `POST /wallet/deposits`, `POST /wallet/deposits/{id}/complete` | Wallet credited, once |
 | ACT-19 | Get paid by link | Fetch the account's pay link and share or copy it | `GET /wallet/pay-link` | A public page anyone can pay through |
 
 Only a backend response may set `SETTLED`. The phone must never decide this itself.
