@@ -28,13 +28,14 @@ export const updateProfileSchema = z
     displayName: displayName.optional(),
     language: language.optional(),
     payoutEmail: payoutEmail.optional(),
+    autoCashOut: z.boolean().optional(),
   })
   .strict();
 
 
 
 export const listTransactionsQuerySchema = z
-  .object({ since: z.string().regex(/^\d+$/).optional() })
+  .object({ since: z.string().regex(/^\d{1,15}$/).optional() })
   .strict();
 
   
@@ -47,11 +48,22 @@ export const createVaultSchema = z
   .strict();
 
 
-export const paypalReturnQuerySchema = z.object({
-  vaultId: z.string().min(1),
-  outcome: z.enum(['approved', 'cancelled']),
-  token: z.string().optional(),
-});
+// PayPal sends the payer back here after a vault lock or an Add money checkout.
+export const paypalReturnQuerySchema = z
+  .object({
+    vaultId: z.string().min(1).optional(),
+    depositId: z.string().min(1).optional(),
+    outcome: z.enum(['approved', 'cancelled']),
+    token: z.string().optional(),
+  })
+  .refine(({ depositId, vaultId }) => (vaultId === undefined) !== (depositId === undefined), {
+    message: 'Send exactly one of vaultId or depositId',
+  });
+
+
+export const createDepositSchema = z
+  .object({ amountNgnMinor: z.number().int().positive().max(MAX_VAULT_NGN_MINOR) })
+  .strict();
 
 
 const envelope = <T extends z.ZodRawShape>(payload: T) =>
@@ -116,14 +128,14 @@ export const meltVaultSchema = z
 
 export const listVouchersQuerySchema = z
   .object({
-    since: z.string().regex(/^\d+$/).optional(),
+    since: z.string().regex(/^\d{1,15}$/).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
   })
   .strict();
 
 
 export const withdrawSchema = z
-  .object({ amountUsdMinor: minorUnits.positive() })
+  .object({ amountUsdMinor: minorUnits.positive(), recipientEmail: z.string().trim().toLowerCase().email().max(254).optional() })
   .strict();
 
 
@@ -135,6 +147,9 @@ const AUDIO_MIME_TYPES = [
   'audio/wav', 'audio/x-wav', 'audio/mp3', 'audio/mpeg', 'audio/aac', 'audio/mp4', 'audio/m4a',
   'audio/x-m4a', 'audio/ogg', 'audio/webm', 'audio/flac', 'audio/aiff', 'audio/3gpp',
 ] as const;
+
+// A spoken reply is a sentence or two. A longer text is refused rather than paid for.
+const MAX_SPOKEN_REPLY = 300;
 
 export const interpretSchema = z
   .object({
@@ -153,17 +168,34 @@ export const interpretSchema = z
   });
 
 
+export const speakSchema = z
+  .object({ text: z.string().trim().min(1).max(MAX_SPOKEN_REPLY), language })
+  .strict();
+
+
 // What the model must return. Amounts come back in whole naira, which models
 // handle more reliably than kobo, and are converted by the backend.
 const MAX_SPOKEN_LENGTH = 300;
 const MAX_ITEM_LENGTH = 80;
-export const ASSISTANT_INTENTS = ['CREATE_PAYMENT_REQUEST', 'PAY_AMOUNT', 'RECORD_SALE', 'CHECK_BALANCE', 'UNKNOWN'] as const;
+export const ASSISTANT_INTENTS = [
+  'CREATE_PAYMENT_REQUEST', 'PAY_AMOUNT', 'RECORD_SALE', 'CHECK_BALANCE', 'HELP',
+  'LOCK_MONEY', 'UNLOCK_MONEY', 'ADD_MONEY', 'WITHDRAW', 'SHARE_PAY_LINK',
+  'ADD_STOCK', 'CHECK_STOCK', 'SET_BUDGET', 'CHECK_BUDGET', 'OPEN_SCREEN', 'UNKNOWN',
+] as const;
+export const ASSISTANT_SCREENS = ['HOME', 'ACTIVITY', 'WALLET', 'VAULT', 'STOCK', 'BUDGET', 'SETTINGS', 'HELP'] as const;
+const MAX_STOCK_QUANTITY = 100_000;
+export const HELP_TOPICS = ['PAY', 'GET_PAID', 'LOCK', 'WITHDRAW', 'SAFETY', 'WHAT_CAN_YOU_DO'] as const;
 
 export const modelProposalSchema = z
   .object({
     intent: z.enum(ASSISTANT_INTENTS),
     amountNaira: z.number().int().positive().max(MAX_VAULT_NGN_MINOR / 100).nullable(),
     itemName: z.string().trim().min(1).max(MAX_ITEM_LENGTH).nullable(),
+    // Older answers, and every intent but HELP, have none.
+    helpTopic: z.enum(HELP_TOPICS).nullable().default(null),
+    // Only ADD_STOCK has a quantity, and only OPEN_SCREEN a screen. Older answers have neither.
+    quantity: z.number().int().positive().max(MAX_STOCK_QUANTITY).nullable().default(null),
+    screen: z.enum(ASSISTANT_SCREENS).nullable().default(null),
     transcript: z.string().trim().max(MAX_UTTERANCE_LENGTH),
     spokenReply: z.string().trim().min(1).max(MAX_SPOKEN_LENGTH),
   })

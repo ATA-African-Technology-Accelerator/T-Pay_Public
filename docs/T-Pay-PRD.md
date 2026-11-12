@@ -404,8 +404,8 @@ Only what the Android app needs. Every mutating client endpoint is authenticated
 | GET /vouchers | List vouchers for the calling device with payer or payee view | Read only |
 | GET /vouchers/{id} | Read one voucher including capture identifier | Read only |
 | POST /vaults/{id}/melt | Stop signing, accept the signed spend statement, and release or schedule release of the remaining hold | Keyed on vault |
-| GET /wallet | Read the Active wallet: collected credits, withdrawals and balance | Read only |
-| POST /wallet/withdrawals | Pay out the Active wallet balance through PayPal Payouts | Keyed on `Idempotency-Key` |
+| GET /wallet | Read the Wallet: collected credits, withdrawals and balance | Read only |
+| POST /wallet/withdrawals | Pay out the Wallet balance through PayPal Payouts | Keyed on `Idempotency-Key` |
 | POST /assistant/interpret | Turn audio or text into a validated, typed proposal | Read only; signs nothing |
 | POST /webhooks/paypal | Receive PayPal events, verified and idempotent | Keyed on event identifier |
 | GET /health | Report liveness and dependency reachability | Read only |

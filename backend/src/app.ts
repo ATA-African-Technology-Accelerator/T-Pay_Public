@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import { createServices } from './composition/createServices';
 import { AssistantController } from './controllers/AssistantController';
 import { DeviceController } from './controllers/DeviceController';
+import { PayPageController } from './controllers/PayPageController';
 import { PayPalReturnController } from './controllers/PayPalReturnController';
 import { PayPalWebhookController, type RequestWithRawBody } from './controllers/PayPalWebhookController';
 import { ProfileController } from './controllers/ProfileController';
@@ -12,15 +13,18 @@ import { WalletController } from './controllers/WalletController';
 import { authenticate } from './middleware/authenticate';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { idempotent } from './middleware/idempotent';
+import { rateLimit } from './middleware/rateLimit';
 import { requestLog } from './middleware/requestLog';
 import { assistantBodyParser, createAssistantRouter } from './routes/assistant.routes';
 import { createDeviceRouter } from './routes/device.routes';
 import { createHealthRouter } from './routes/health.routes';
+import { createPayRouter } from './routes/pay.routes';
 import { createTransactionRouter } from './routes/transaction.routes';
 import { createVaultRouter } from './routes/vault.routes';
 import { createVoucherRouter } from './routes/voucher.routes';
 import { createWalletRouter } from './routes/wallet.routes';
 import { AuthorizeVault } from './services/AuthorizeVault';
+import { LockFromWallet } from './services/LockFromWallet';
 import { CreateVaultOrder } from './services/CreateVaultOrder';
 import { GetActiveWallet } from './services/GetActiveWallet';
 import { GetCurrentVault } from './services/GetCurrentVault';
@@ -54,6 +58,8 @@ export interface AppDependencies extends RegisterDeviceDependencies {
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
+  // Behind Render's proxy: the caller's address, which the pay page's limiter keys on.
+  app.set('trust proxy', 1);
   const {
     checkDatabase, devices, gateway, idempotency, paypalMode, signer, transactions, vaults, vouchers,
   } = dependencies;
@@ -89,8 +95,9 @@ export function createApp(dependencies: AppDependencies): Express {
         new AuthorizeVault(dependencies),
         new GetCurrentVault(vaults, vouchers),
         services.meltVault,
+        new LockFromWallet(dependencies),
       ),
-      new PayPalReturnController(vaults),
+      new PayPalReturnController(vaults, services.deposits),
       requireDevice,
       idempotent(idempotency, signer),
     ),
@@ -99,15 +106,16 @@ export function createApp(dependencies: AppDependencies): Express {
   app.use(
     '/api',
     createWalletRouter(
-      new WalletController(new GetActiveWallet(vouchers), services.withdrawToPayPal),
+      new WalletController(new GetActiveWallet(vouchers, dependencies.fxRate), services.withdrawToPayPal, services.deposits, services.payLinks),
       requireDevice,
       idempotent(idempotency, signer),
     ),
   );
   app.use(
     '/api',
-    createAssistantRouter(new AssistantController(new InterpretRequest(dependencies.assistant)), requireDevice),
+    createAssistantRouter(new AssistantController(new InterpretRequest(dependencies.assistant), dependencies.assistant), requireDevice),
   );
+  app.use('/pay', createPayRouter(new PayPageController(services.deposits, devices), rateLimit({ max: 10, windowMs: 60_000 })));
   app.post('/api/webhooks/paypal', new PayPalWebhookController(gateway, services.applyPayPalEvent).handle);
   app.use(notFound);
   app.use(errorHandler);

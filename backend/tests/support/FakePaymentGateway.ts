@@ -1,6 +1,7 @@
 import { ApiError } from '../../src/services/ApiError';
 import type {
-  AuthorizeOrderInput, CaptureInput, CaptureResult, CreateOrderInput, FindCaptureInput,
+  AuthorizeOrderInput, CaptureInput, CaptureOrderInput, CaptureResult, CreateCaptureOrderInput, CreateOrderInput,
+  FindCaptureInput, OrderCaptureResult,
   IPaymentGateway, PaymentAuthorization, PaymentOrder, PayoutInput, PayoutResult, PayoutStatus,
   ReauthorizeInput, ReauthorizeResult, VoidResult, WebhookNotification,
 } from '../../src/services/ports';
@@ -37,6 +38,36 @@ export class FakePaymentGateway implements IPaymentGateway {
     this.orders.push(input);
     const orderId = `ORDER-${this.orders.length}`;
     return { orderId, approvalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}` };
+  }
+
+  public readonly captureOrders: CreateCaptureOrderInput[] = [];
+  public readonly orderCaptureCalls: CaptureOrderInput[] = [];
+  public readonly plannedOrderCaptures: OrderCaptureResult[] = [];
+  private readonly orderCaptures = new Map<string, string>();
+  // Counts every order ever made, so an id is never reused even when a test empties captureOrders.
+  private ordersMade = 0;
+
+  public async createCaptureOrder(input: CreateCaptureOrderInput): Promise<PaymentOrder> {
+    this.assertAvailable();
+    this.captureOrders.push(input);
+    this.ordersMade += 1;
+    const orderId = `DEP-ORDER-${this.ordersMade}`;
+    return { orderId, approvalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}` };
+  }
+
+  // A repeat of the same order returns the capture it already made, as PayPal does.
+  public async captureOrder(input: CaptureOrderInput): Promise<OrderCaptureResult> {
+    this.orderCaptureCalls.push(input);
+    const planned = this.plannedOrderCaptures.shift();
+    if (planned) {
+      return planned;
+    }
+    if (!this.approved.has(input.orderId)) {
+      return { outcome: 'NOT_APPROVED' };
+    }
+    const captureId = this.orderCaptures.get(input.orderId) ?? `DEP-CAPTURE-${this.orderCaptures.size + 1}`;
+    this.orderCaptures.set(input.orderId, captureId);
+    return { outcome: 'COMPLETED', captureId };
   }
 
   public async authorizeOrder(input: AuthorizeOrderInput): Promise<PaymentAuthorization | null> {

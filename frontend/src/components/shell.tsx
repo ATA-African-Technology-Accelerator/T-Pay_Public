@@ -1,5 +1,6 @@
-import React from 'react';
-import { Platform, Pressable, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { ArrowLeft, Bell, Mic, ReceiptText } from 'lucide-react-native';
 import { Aurora } from './aurora';
@@ -11,7 +12,15 @@ import { useApp } from '../state/appState';
 import { t } from '../i18n';
 
 const web = Platform.OS === 'web';
-export const inset = { top: web ? 54 : (StatusBar.currentHeight ?? 24) + 8, bottom: web ? 26 : 12 };
+/**
+ * The room the system takes: status bar on top, and at the bottom the gesture bar, the
+ * three-button bar or a tablet's taskbar. The app draws edge to edge, so anything pinned to
+ * an edge must keep clear of these. The web preview keeps its phone mock-up margins.
+ */
+export function useInset() {
+  const real = useSafeAreaInsets();
+  return web ? { top: 54, bottom: 26 } : { top: real.top + 8, bottom: Math.max(real.bottom, 12) };
+}
 
 export function BellButton() {
   const nav = useNav();
@@ -30,8 +39,9 @@ export function BellButton() {
 
 export function CurvedHeader({ title, back, home, bell = true }: { title?: string; back?: boolean; home?: boolean; bell?: boolean }) {
   const nav = useNav();
+  const inset = useInset();
   return (
-    <View style={l.header}>
+    <View style={[l.header, { paddingTop: inset.top + 2 }]}>
       <Aurora />
       {back || home ? (
         <Pressable accessibilityRole="button" accessibilityLabel={t.goBack} onPress={home ? () => nav.reset({ name: 'home' }) : nav.back} style={l.round}>
@@ -52,17 +62,32 @@ export function Avatar({ name, size = 46, tone = color.panelHigh }: { name: stri
   );
 }
 
-export function Screen({ children, head, hero, footer, tabsFor }: {
-  children: React.ReactNode; head?: React.ReactNode; hero?: React.ReactNode; tabsFor?: Route['name']; footer?: React.ReactNode;
+/**
+ * `refreshable` lets the person pull the screen down to sync with the backend and reload what
+ * the phone shows. The main tabs are refreshable unless they say otherwise.
+ */
+export function Screen({ children, head, hero, footer, tabsFor, refreshable = !!tabsFor }: {
+  children: React.ReactNode; head?: React.ReactNode; hero?: React.ReactNode; tabsFor?: Route['name']; footer?: React.ReactNode; refreshable?: boolean;
 }) {
+  const inset = useInset();
+  const { sync, reload } = useApp();
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    void sync().catch(() => undefined).then(() => reload()).catch(() => undefined).finally(() => setRefreshing(false));
+  }, [sync, reload]);
   return (
     <View style={l.root}>
+      <Aurora kind="body" />
       {head}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ flexGrow: 1 }, tabsFor && { paddingBottom: 72 + inset.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }} contentContainerStyle={[{ flexGrow: 1 }, tabsFor && { paddingBottom: 72 + inset.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+        refreshControl={refreshable ? <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={color.text} colors={[color.ink]} progressBackgroundColor={color.text} /> : undefined}
+      >
         {hero}
         <View style={l.body}>{children}</View>
       </ScrollView>
-      {footer && <View style={l.footer}>{footer}</View>}
+      {footer && <View style={[l.footer, { paddingBottom: inset.bottom + space.xs }]}>{footer}</View>}
       {tabsFor && <Tabs active={tabsFor} />}
     </View>
   );
@@ -84,10 +109,13 @@ export function Section({ title, action, onAction }: { title: string; action?: s
 /** Docked menu. Every item keeps its word: an icon alone means nothing to a first-time user. */
 function Tabs({ active }: { active: Route['name'] }) {
   const nav = useNav();
+  const inset = useInset();
   type Item = { key: Route['name']; label: string; Icon: typeof HomeIcon; to?: Route };
   const Rec: typeof HomeIcon = ({ size, c, w }) => <ReceiptText size={size} color={c} strokeWidth={w} />;
   const Me: typeof HomeIcon = ({ size, c, w }) => <ProfileGlyph size={size} c={c} w={w} />;
-  const left: Item[] = [{ key: 'home', label: t.home, Icon: HomeIcon }, { key: 'vault', label: t.vault, Icon: BagIcon }];
+  const { accountKind } = useApp();
+  // A business has no money to lock, so its second tab is the shelf instead of the vault.
+  const left: Item[] = [{ key: 'home', label: t.home, Icon: HomeIcon }, accountKind === 'business' ? { key: 'stock', label: t.stock, Icon: BagIcon } : { key: 'vault', label: t.vault, Icon: BagIcon }];
   const right: Item[] = [{ key: 'activity', label: t.activity, Icon: Rec }, { key: 'settings', label: t.profile, Icon: Me }];
   const tab = ({ key, label, Icon, to }: Item) => {
     const on = key === active;
@@ -103,7 +131,7 @@ function Tabs({ active }: { active: Route['name'] }) {
   };
   const onMic = active === 'speak';
   return (
-    <View style={l.tabs} accessibilityRole="tablist">
+    <View style={[l.tabs, { paddingBottom: Math.max(inset.bottom - 6, space.xs) }]} accessibilityRole="tablist">
       {left.map(tab)}
       <Pressable
         accessibilityRole="tab" accessibilityState={{ selected: onMic }} accessibilityLabel={t.speak}
@@ -133,16 +161,16 @@ function ProfileGlyph({ size = 23, c = color.muted }: { size?: number; c?: strin
 
 const l = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.page },
-  header: { paddingTop: inset.top + 2, paddingBottom: space.md, paddingHorizontal: space.xl, overflow: 'hidden', borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  header: { paddingBottom: space.md, paddingHorizontal: space.xl, overflow: 'hidden', borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, flexDirection: 'row', alignItems: 'center', gap: space.sm },
   round: { width: 46, height: 46, borderRadius: radius.pill, borderWidth: 1, borderColor: glass.line, backgroundColor: glass.fill, alignItems: 'center', justifyContent: 'center' },
   badge: { position: 'absolute', top: 4, right: 3, minWidth: 16, height: 16, borderRadius: radius.sm, backgroundColor: color.amber, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, textAlign: 'center' },
   body: { flexGrow: 1, paddingHorizontal: space.md, paddingTop: space.md, paddingBottom: space.xl, gap: space.md },
-  footer: { paddingHorizontal: space.md, paddingBottom: inset.bottom + space.xs, paddingTop: space.sm, gap: space.sm, backgroundColor: color.page },
+  footer: { paddingHorizontal: space.md, paddingTop: space.sm, gap: space.sm },
   section: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 30, marginTop: space.xs },
   tabs: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', backgroundColor: color.page, borderTopWidth: 1, borderTopColor: color.line,
-    paddingHorizontal: space.xs, paddingTop: space.sm, paddingBottom: inset.bottom - 6,
+    position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', backgroundColor: color.sheet, borderTopWidth: 1, borderTopColor: color.line,
+    paddingHorizontal: space.xs, paddingTop: space.sm,
   },
   tab: { flex: 1, height: 56, alignItems: 'center', justifyContent: 'center', gap: space.hair },
   // The mic sits above the bar on real glass, so the list is seen blurred behind it.

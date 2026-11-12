@@ -1,6 +1,0 @@
-{
-  "name": "T-Pay - Hybrid AI & Offline Escrow Payment OS",
-  "description": "Offline-first financial OS powered by PayPal with multi-lingual voice AI (Pidgin/Yoruba/Igbo), smart resource tracker for merchants & commuters, and offline cryptographic escrow.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

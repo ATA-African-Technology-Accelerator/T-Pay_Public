@@ -131,6 +131,10 @@ export class VoucherSettlement {
 
 
   private async capture(vault: Vault, voucher: Voucher): Promise<CaptureResult> {
+    if (vault.fundedBy === 'WALLET') {
+      // The money left the customer's Online wallet when the vault opened, so settling is only bookkeeping.
+      return { outcome: 'COMPLETED', captureId: `WALLET-${voucher.id}` };
+    }
     const { gateway } = this.dependencies;
     const result = await gateway.capture({
       authorizationId: vault.paypalAuthorizationId as string,
@@ -200,6 +204,7 @@ export class VoucherSettlement {
       amountNgnMinor: settled.amountNgnMinor,
       voucherId,
       withdrawalId: null,
+      depositId: null,
       paypalCaptureId: captureId,
       createdAt: now,
     });
@@ -253,6 +258,7 @@ export class VoucherSettlement {
       amountNgnMinor: reversed.amountNgnMinor,
       voucherId,
       withdrawalId: null,
+      depositId: null,
       paypalCaptureId: reversed.paypalCaptureId,
       createdAt: now,
     });

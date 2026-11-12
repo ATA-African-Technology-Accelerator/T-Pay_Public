@@ -1,0 +1,69 @@
+# Runs every test and type check on each push and pull request, so a merge
+# can't quietly break another part of the app.
+name: Tests
+
+on:
+  push:
+    branches: [frontend, main]
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend and shared
+    runs-on: ubuntu-latest
+    services:
+      # A throwaway database for the Postgres tests. Not the deployed one.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tpay
+          POSTGRES_PASSWORD: tpay
+          POSTGRES_DB: tpay
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U tpay"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Type check (backend and shared)
+        run: npm run lint
+      - name: Tests in memory
+        run: npm test
+      - name: Tests on Postgres, migrations included
+        run: npm run test:db
+        env:
+          TEST_DATABASE_URL: postgres://tpay:tpay@localhost:5433/tpay
+
+  app:
+    name: App
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Tests
+        run: npm test -- --ci

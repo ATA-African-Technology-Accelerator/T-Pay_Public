@@ -21,6 +21,7 @@ function toVoucherView(voucher: Voucher, deviceId: string): VoucherView {
     counterpartyName: isPayer ? voucher.payeeName : voucher.payerName,
     paypalCaptureId: voucher.paypalCaptureId,
     updatedAt: voucher.updatedAt.toISOString(),
+    requestNonce: voucher.payload.requestNonce,
   };
 }
 

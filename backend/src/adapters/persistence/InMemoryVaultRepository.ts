@@ -7,7 +7,8 @@ export class InMemoryVaultRepository implements IVaultRepository {
     if (await this.findOpenForDevice(vault.deviceId)) {
       return false;
     }
-    this.vaults.set(vault.id, vault);
+    // Same defaults as the database, so both stores read back alike.
+    this.vaults.set(vault.id, { ...vault, fundedBy: vault.fundedBy ?? 'PAYPAL' });
     return true;
   }
 

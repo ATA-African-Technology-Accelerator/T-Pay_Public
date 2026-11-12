@@ -13,7 +13,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/adaptive-icon.png",
-        "backgroundColor": "#050608"
+        "backgroundColor": "#061A42"
       },
       "package": "com.tpay.mobile",
       "versionCode": 1
@@ -28,9 +28,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#050608",
-          "image": "./assets/brand/splash-icon.png",
-          "imageWidth": 96
+          "backgroundColor": "#000D20",
+          "image": "./assets/brand/splash-emblem.png",
+          "imageWidth": 125
         }
       ],
       "expo-secure-store",
@@ -74,7 +74,8 @@
           "enableEntitlements": false,
           "enableOpenCLAndHexagon": false
         }
-      ]
+      ],
+      "./plugins/withVolumeKeys"
     ],
     "extra": {
       "eas": {

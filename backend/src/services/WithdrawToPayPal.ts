@@ -12,6 +12,15 @@ import { balanceNgn, balanceUsd } from './walletBalance';
 
 
 const CENTS_PER_DOLLAR = 100;
+// A new withdrawal is sent to PayPal straight away by the request that made it. The background job
+// leaves it alone for this long, so the two never send the same payout at the same moment.
+const SUBMIT_GRACE_MS = 2 * 60 * 1000;
+// PayPal's answers that mean "this payout is already being handled", never "it failed".
+const DUPLICATE = /DUPLICATE|ALREADY|SENDER_BATCH_ID|IDEMPOTEN|CONFLICT/i;
+// Automatic cash-out: nothing under a dollar is sent, and after one fails (an email with no PayPal
+// account, say) the account is left alone for a day instead of failing every half minute.
+const MIN_CASH_OUT_USD_MINOR = 100;
+const CASH_OUT_PAUSE_MS = 24 * 60 * 60 * 1000;
 
 
 export interface WithdrawToPayPalDependencies {
@@ -27,12 +36,42 @@ export interface WithdrawToPayPalDependencies {
 export class WithdrawToPayPal {
   constructor(private readonly dependencies: WithdrawToPayPalDependencies) {}
 
-  public async execute(device: Device, { amountUsdMinor }: WithdrawRequest): Promise<WithdrawResponse> {
+  public async execute(device: Device, { amountUsdMinor, recipientEmail }: WithdrawRequest): Promise<WithdrawResponse> {
     const { wallet } = this.dependencies;
     const reserved = await wallet.withWalletLock(device.id, (session) =>
-      this.reserve(session, device, amountUsdMinor));
+      this.reserve(session, device, amountUsdMinor, recipientEmail ?? device.payoutEmail));
     const withdrawal = await this.submit(reserved);
     return { withdrawalId: withdrawal.id, status: withdrawal.status, paypalBatchId: withdrawal.paypalBatchId };
+  }
+
+
+  /**
+   * Sends money received offline on to the person's own PayPal, all of it in one payout. It never
+   * sends money they added themselves, never more than the balance, and never the same money twice:
+   * what is due is what was received offline less what was already sent this way.
+   */
+  public async cashOutReceived(device: Device): Promise<Withdrawal | null> {
+    if (device.autoCashOut === false || device.revokedAt) return null;
+    const reserved = await this.dependencies.wallet.withWalletLock<Withdrawal | null>(device.id, async (session) => {
+      const due = Math.min(this.dueForCashOut(session.ledger), balanceUsd(session.ledger));
+      if (due < MIN_CASH_OUT_USD_MINOR || this.recentlyFailed(session.ledger)) return null;
+      return this.reserve(session, device, due, device.payoutEmail, true);
+    });
+    return reserved ? this.submit(reserved) : null;
+  }
+
+
+  private dueForCashOut(ledger: LedgerRecord[]): number {
+    const sum = (match: (entry: LedgerRecord) => boolean) => ledger.filter(match).reduce((total, entry) => total + entry.amountUsdMinor, 0);
+    const received = sum((e) => e.type === 'CREDIT') - sum((e) => e.type === 'REVERSAL');
+    const sent = sum((e) => e.type === 'WITHDRAWAL' && e.autoCashOut === true) - sum((e) => e.type === 'WITHDRAWAL_RETURNED' && e.autoCashOut === true);
+    return received - sent;
+  }
+
+
+  private recentlyFailed(ledger: LedgerRecord[]): boolean {
+    const now = this.dependencies.clock.now().getTime();
+    return ledger.some((e) => e.type === 'WITHDRAWAL_RETURNED' && e.autoCashOut === true && now - e.createdAt.getTime() < CASH_OUT_PAUSE_MS);
   }
 
 
@@ -48,7 +87,7 @@ export class WithdrawToPayPal {
   }
 
 
-  private async reserve(session: WalletSession, device: Device, amountUsdMinor: number): Promise<Withdrawal> {
+  private async reserve(session: WalletSession, device: Device, amountUsdMinor: number, receiverEmail: string, autoCashOut = false): Promise<Withdrawal> {
     const { clock, random } = this.dependencies;
     const available = balanceUsd(session.ledger);
     if (amountUsdMinor > available) {
@@ -59,15 +98,16 @@ export class WithdrawToPayPal {
     const withdrawal: Withdrawal = {
       id: `wdr_${random.uuid()}`,
       deviceId: device.id,
-      receiverEmail: device.payoutEmail,
+      receiverEmail,
       amountUsdMinor,
       amountNgnMinor: this.toNgnMinor(amountUsdMinor, available, balanceNgn(session.ledger)),
       status: 'PENDING',
       paypalBatchId: null,
       attempts: 0,
-      nextAttemptAt: now,
+      nextAttemptAt: new Date(now.getTime() + SUBMIT_GRACE_MS),
       createdAt: now,
       updatedAt: now,
+      autoCashOut,
     };
     await session.insertWithdrawal(withdrawal);
     await session.addLedgerEntry(this.ledgerEntry(withdrawal, 'WITHDRAWAL'));
@@ -97,9 +137,15 @@ export class WithdrawToPayPal {
 
 
   private applyPayoutResult(session: WalletSession, withdrawal: Withdrawal, result: PayoutResult): Promise<Withdrawal> {
-    if (result.outcome === 'REJECTED') {
+    // Money only goes back to the wallet when PayPal clearly refused this payout. A refusal that
+    // says the payout already exists means it is on its way: returning the money then would let
+    // the same money be withdrawn twice.
+    if (result.outcome === 'REJECTED' && !DUPLICATE.test(result.reason)) {
       console.error(`PayPal refused ${withdrawal.id}: ${result.reason}`);
       return this.fail(session, withdrawal);
+    }
+    if (result.outcome === 'REJECTED') {
+      console.error(`PayPal says ${withdrawal.id} already exists (${result.reason}); checking again, not refunding`);
     }
     return this.scheduleCheck(
       session,
@@ -170,8 +216,10 @@ export class WithdrawToPayPal {
       amountNgnMinor: withdrawal.amountNgnMinor,
       voucherId: null,
       withdrawalId: withdrawal.id,
+      depositId: null,
       paypalCaptureId: null,
       createdAt: clock.now(),
+      ...(withdrawal.autoCashOut ? { autoCashOut: true } : {}),
     };
   }
 

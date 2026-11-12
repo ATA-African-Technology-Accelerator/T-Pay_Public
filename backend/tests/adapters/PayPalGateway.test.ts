@@ -186,6 +186,67 @@ describe('PayPalGateway', () => {
     it('is reachable when it can log in', async () => {
       expect(await gateway.isReachable()).toBe(true);
     });
+
+    it('tries the login again once when the first try drops, as on a cold start', async () => {
+      let logins = 0;
+      fetchMock.mockImplementation(async (url) => {
+        if (String(url).endsWith('/v1/oauth2/token')) {
+          logins += 1;
+          if (logins === 1) throw new Error('socket hang up');
+          return json(200, { access_token: 'token-1', expires_in: 3600 });
+        }
+        return route(String(url), {} as RequestInit);
+      });
+
+      await expect(gateway.createOrder(CREATE_INPUT)).resolves.toMatchObject({ orderId: 'ORDER-1' });
+      expect(logins).toBe(2);
+    });
+
+    it('also retries a login PayPal answers with a server error, but not a refused one', async () => {
+      let logins = 0;
+      fetchMock.mockImplementation(async (url) => {
+        if (String(url).endsWith('/v1/oauth2/token')) {
+          logins += 1;
+          return logins === 1 ? json(503, {}) : json(200, { access_token: 'token-1', expires_in: 3600 });
+        }
+        return route(String(url), {} as RequestInit);
+      });
+      await expect(gateway.createOrder(CREATE_INPUT)).resolves.toBeDefined();
+      expect(logins).toBe(2);
+
+      logins = 0;
+      fetchMock.mockImplementation(async () => { logins += 1; return json(401, { error: 'invalid_client' }); });
+      await expect(new PayPalGateway({ clientId: 'c', clientSecret: 's', baseUrl: BASE_URL }, fetchMock).createOrder(CREATE_INPUT))
+        .rejects.toMatchObject({ code: 'PAYPAL_UNAVAILABLE' });
+      expect(logins).toBe(1);
+    });
+
+    it('gives up after one retry', async () => {
+      let logins = 0;
+      fetchMock.mockImplementation(async () => { logins += 1; throw new Error('timeout'); });
+      await expect(gateway.createOrder(CREATE_INPUT)).rejects.toMatchObject({ code: 'PAYPAL_UNAVAILABLE' });
+      expect(logins).toBe(2);
+    });
+  });
+
+  describe('retries', () => {
+    it('retries a call that carries a PayPal-Request-Id, using the same id', async () => {
+      const ids: string[] = [];
+      route = (_url, init) => {
+        ids.push((init.headers as Record<string, string>)['PayPal-Request-Id'] as string);
+        return ids.length === 1 ? json(503, {}) : json(200, { id: 'ORDER-1', links: [{ rel: 'payer-action', href: 'https://paypal.test' }] });
+      };
+      await expect(gateway.createOrder(CREATE_INPUT)).resolves.toMatchObject({ orderId: 'ORDER-1' });
+      expect(ids).toEqual(['vlt_1-order', 'vlt_1-order']);
+    });
+
+    it('never retries a call with no PayPal-Request-Id, which could repeat a payment', async () => {
+      let sent = 0;
+      route = () => { sent += 1; return json(503, {}); };
+      // verifyWebhook sends a signed body with no request id
+      await gateway.verifyWebhook({ headers: {}, rawBody: '{}', body: {} } as never).catch(() => undefined);
+      expect(sent).toBeLessThanOrEqual(1);
+    });
   });
 
   describe('authorizeOrder', () => {
@@ -406,6 +467,7 @@ describe('PayPalGateway', () => {
 
       const { url, init } = lastCall();
       expect(url).toBe(`${BASE_URL}/v1/payments/payouts`);
+      expect((init.headers as Record<string, string>)['PayPal-Request-Id']).toBe('wdr_1');
       expect(JSON.parse(init.body as string)).toEqual({
         sender_batch_header: {
           sender_batch_id: 'wdr_1',

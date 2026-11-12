@@ -11,7 +11,8 @@ import type { RegisteredDevice, createApiFixture } from './apiFixture';
 type Fixture = Awaited<ReturnType<typeof createApiFixture>>;
 export const HOUR_MS = 60 * 60 * 1000;
 
-export async function createPaymentScenario(fixture: Fixture) {
+/** `fromWallet` funds the customer's Online wallet with N15,000 first and locks from it, with no PayPal hold. */
+export async function createPaymentScenario(fixture: Fixture, { fromWallet = false }: { fromWallet?: boolean } = {}) {
   const payer = await fixture.registerDevice('Customer');
   const payee = await fixture.registerDevice('Mama Nkechi');
 
@@ -24,11 +25,19 @@ export async function createPaymentScenario(fixture: Fixture) {
   const get = (path: string, device: RegisteredDevice) =>
     request(fixture.app).get(path).set('Authorization', `Bearer ${device.deviceToken}`);
 
-  const created = await post('/api/vaults', payer, { amountNgnMinor: 1_000_000, durationHours: 24 });
-  const { vaultId } = created.body.data;
-  fixture.gateway.approve(`ORDER-${fixture.gateway.orders.length}`);
-  const locked = await post(`/api/vaults/${vaultId}/authorize`, payer);
+  let locked: request.Response;
+  if (fromWallet) {
+    const deposit = await post('/api/wallet/deposits', payer, { amountNgnMinor: 1_500_000 });
+    fixture.gateway.approve(`DEP-ORDER-${fixture.gateway.captureOrders.length}`);
+    await post(`/api/wallet/deposits/${deposit.body.data.depositId}/complete`, payer);
+    locked = await post('/api/vaults/from-wallet', payer, { amountNgnMinor: 1_000_000, durationHours: 24 });
+  } else {
+    const created = await post('/api/vaults', payer, { amountNgnMinor: 1_000_000, durationHours: 24 });
+    fixture.gateway.approve(`ORDER-${fixture.gateway.orders.length}`);
+    locked = await post(`/api/vaults/${created.body.data.vaultId}/authorize`, payer);
+  }
   const { vault, vaultCertificate } = locked.body.data;
+  const vaultId: string = vault.vaultId;
 
   const voucher = (sequence: number, overrides: Partial<VoucherPayload> = {}, privateKey = payer.privateKey) =>
     signMessage<VoucherPayload>(

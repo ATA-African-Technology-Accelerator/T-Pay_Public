@@ -1,6 +1,7 @@
 import type {
-  AuthorizeVaultResponse, CreateVaultRequest, CreateVaultResponse,
-  CurrentVaultResponse, InterpretRequest, InterpretResponse,
+  AuthorizeVaultResponse, CompleteDepositResponse, CreateDepositRequest, CreateDepositResponse,
+  CreateVaultRequest, CreateVaultResponse, PayLinkResponse,
+  CurrentVaultResponse, HealthResponse, InterpretRequest, InterpretResponse, SpeakRequest, SpeakResponse,
   ListTransactionsResponse, ListVouchersResponse, MeltVaultRequest,
   MeltVaultResponse, ActiveWalletResponse, ProfileView,
   RegisterDeviceRequest, RegisterDeviceResponse, SubmitVoucherRequest,
@@ -25,13 +26,21 @@ export interface ITPayApi {
   updateProfile(request: UpdateProfileRequest): Promise<ProfileView>;
   createVault(request: CreateVaultRequest, options?: MutationOptions): Promise<CreateVaultResponse>;
   authorizeVault(vaultId: string, options?: MutationOptions): Promise<AuthorizeVaultResponse>;
+  /** Locks money from the Online wallet. No PayPal step: the vault is ready at once. */
+  lockFromWallet(request: CreateVaultRequest, options?: MutationOptions): Promise<AuthorizeVaultResponse>;
   getCurrentVault(): Promise<CurrentVaultResponse>;
   meltVault(vaultId: string, request: MeltVaultRequest, options?: MutationOptions): Promise<MeltVaultResponse>;
   submitVoucher(request: SubmitVoucherRequest): Promise<SubmitVoucherResponse>;
   listVouchers(since?: string): Promise<ListVouchersResponse>;
   getVoucher(voucherId: string): Promise<VoucherView>;
+  /** Null when the server can't be reached at all. */
+  getHealth(): Promise<HealthResponse | null>;
   listTransactions(since?: string): Promise<ListTransactionsResponse>;
   getActiveWallet(): Promise<ActiveWalletResponse>;
+  getPayLink(): Promise<PayLinkResponse>;
+  createDeposit(request: CreateDepositRequest, options?: MutationOptions): Promise<CreateDepositResponse>;
+  completeDeposit(depositId: string, options?: MutationOptions): Promise<CompleteDepositResponse>;
   withdraw(request: WithdrawRequest, options?: MutationOptions): Promise<WithdrawResponse>;
   interpret(request: InterpretRequest): Promise<InterpretResponse>;
+  speak(request: SpeakRequest): Promise<SpeakResponse>;
 }

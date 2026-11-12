@@ -28,8 +28,9 @@ const mockApi = {
   submitVoucher: jest.fn(),
   listVouchers: jest.fn(async () => ({ items: [], nextCursor: null })),
   getCurrentVault: jest.fn(async () => ({ vault: null })),
-  getActiveWallet: jest.fn(async () => ({ balanceUsdMinor: 0, balanceNgnMinor: 0, pendingNgnMinor: 0, payoutEmail: 'a@example.com', entries: [] })),
+  getActiveWallet: jest.fn(async () => ({ balanceUsdMinor: 0, balanceNgnMinor: 0, pendingNgnMinor: 0, payoutEmail: 'a@example.com', fxRate: '1500.00', entries: [] })),
   listTransactions: jest.fn(async () => ({ items: [], nextCursor: null })),
+  completeDeposit: jest.fn(),
   meltVault: jest.fn(async (vaultId: string) => ({ vaultId, status: 'CLOSED' as const, releasedAt: mockNow.toISOString(), releaseScheduledFor: null, blockingVoucherIds: [] as string[] })),
 } satisfies Partial<ITPayApi>;
 jest.mock('../../composition', () => ({
@@ -39,7 +40,7 @@ jest.mock('../../composition', () => ({
   signer: { sign: async () => 'sig' },
 }));
 
-const { syncNow, WALLET } = require('../syncCoordinator') as typeof import('../syncCoordinator');
+const { syncNow, WALLET, onMoneyArrived } = require('../syncCoordinator') as typeof import('../syncCoordinator');
 
 const vault: AppVault = {
   vaultId: 'vlt_1',
@@ -112,4 +113,76 @@ it('waits to melt while a signed voucher has not reached the backend', async () 
   mockNow = new Date('2026-11-11T11:00:00.000Z');
   await syncNow();
   expect(mockApi.meltVault).not.toHaveBeenCalled();
+});
+
+
+describe('money that adds itself', () => {
+  const pending = { depositId: 'dep_1', approvalUrl: 'u', amountNgnMinor: 1_500_000, amountUsdMinor: 1000, fxRate: '1500.00', completeKey: 'key-dep-1', createdAt: '2026-11-10T09:59:00.000Z' };
+  const wallet = (entries: object[]) => ({ balanceUsdMinor: 0, balanceNgnMinor: 0, pendingNgnMinor: 0, payoutEmail: 'a@example.com', fxRate: '1500.00', entries });
+  const entry = (entryId: string, type: string, amountNgnMinor: number) => ({ entryId, type, amountUsdMinor: 1, amountNgnMinor, voucherId: null, paypalCaptureId: null, createdAt: mockNow.toISOString() });
+
+  it('finishes an Add money the person approved in PayPal, with the same key every time', async () => {
+    await mockStore.setMeta('wallet.deposit', pending);
+    mockApi.completeDeposit.mockResolvedValue({ depositId: 'dep_1', status: 'COMPLETED', amountNgnMinor: 1_500_000, amountUsdMinor: 1000, paypalCaptureId: 'C1' });
+
+    await syncNow();
+
+    expect(mockApi.completeDeposit).toHaveBeenCalledWith('dep_1', { idempotencyKey: 'key-dep-1' });
+    expect(await mockStore.getMeta('wallet.deposit')).toBeNull();
+  });
+
+  it('keeps waiting while the person has not approved yet', async () => {
+    await mockStore.setMeta('wallet.deposit', pending);
+    mockApi.completeDeposit.mockRejectedValue(new MockApiRequestError('ORDER_NOT_APPROVED'));
+
+    await syncNow();
+
+    expect(await mockStore.getMeta('wallet.deposit')).toEqual(pending);
+  });
+
+  it('lets go of a checkout nobody approved within a day', async () => {
+    await mockStore.setMeta('wallet.deposit', pending);
+    mockNow = new Date('2026-11-11T11:00:00.000Z');
+
+    await syncNow();
+
+    expect(mockApi.completeDeposit).not.toHaveBeenCalled();
+    expect(await mockStore.getMeta('wallet.deposit')).toBeNull();
+  });
+
+  it('announces money that is new since the last look, and only that', async () => {
+    const heard: unknown[] = [];
+    const off = onMoneyArrived(arrivals => heard.push(arrivals));
+    await mockStore.setMeta(WALLET, wallet([entry('led_old', 'CREDIT', 100_00)]));
+    mockApi.getActiveWallet.mockResolvedValueOnce(wallet([entry('led_new', 'CREDIT', 5_000_00), entry('led_out', 'WITHDRAWAL', 1_000_00), entry('led_old', 'CREDIT', 100_00)]) as never);
+
+    await syncNow();
+    off();
+
+    expect(heard).toEqual([[{ kind: 'CREDIT', amountNgnMinor: 5_000_00 }]]);
+  });
+
+  it('announces money T-Pay sent on to PayPal by itself, but not withdrawals the person made', async () => {
+    const heard: unknown[] = [];
+    const off = onMoneyArrived(arrivals => heard.push(arrivals));
+    await mockStore.setMeta(WALLET, wallet([]));
+    mockApi.getActiveWallet.mockResolvedValueOnce(wallet([{ ...entry('led_auto', 'WITHDRAWAL', 2_000_00), autoCashOut: true }, entry('led_mine', 'WITHDRAWAL', 1_000_00)]) as never);
+
+    await syncNow();
+    off();
+
+    expect(heard).toEqual([[{ kind: 'CASHED_OUT', amountNgnMinor: 2_000_00 }]]);
+  });
+
+  it('announces nothing on the very first look, when everything would seem new', async () => {
+    const heard: unknown[] = [];
+    const off = onMoneyArrived(arrivals => heard.push(arrivals));
+    await mockStore.setMeta(WALLET, null);
+    mockApi.getActiveWallet.mockResolvedValueOnce(wallet([entry('led_1', 'CREDIT', 5_000_00)]) as never);
+
+    await syncNow();
+    off();
+
+    expect(heard).toEqual([]);
+  });
 });

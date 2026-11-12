@@ -27,8 +27,15 @@ export const pinStore = new SecurePinStore();
 export const appLock = new AppLock({ store: pinStore, biometrics, signer, random, clock });
 export const store = new LocalStore(openKv());
 export const connectivity = new NetInfoConnectivity();
-export const nearby = new NearbyTransport(loadNearbyDriver(), loadRadio());
+/** Bluetooth and its permissions. Null off Android and in Expo Go. */
+export const radio = loadRadio();
+export const nearby = new NearbyTransport(loadNearbyDriver(), radio);
 export const speechIn = new ExpoSpeechInput();
-export const speechOut = new ExpoSpeechOutput();
+// The assistant speaks in the server's natural voice (ElevenLabs), saved on the phone once made.
+// With no network, or a slow one, the phone's own voice reads it instead.
+export const speechOut = new ExpoSpeechOutput(async (text, language) => {
+  if (!(await connectivity.isOnline())) return null;
+  return api.speak({ text, language });
+});
 /** The offline assistant model. Nothing is downloaded unless the person asks in Settings. */
 export const localModel = loadOnDeviceModel();

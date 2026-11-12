@@ -18,7 +18,7 @@ export class InMemoryVoucherRepository implements IVoucherRepository {
   private readonly locks = new Map<string, Promise<unknown>>();
 
   constructor(
-    private readonly vaults: InMemoryVaultRepository,
+    public readonly vaults: InMemoryVaultRepository,
     private readonly transactions: InMemoryTransactionRepository,
   ) {}
 
@@ -76,18 +76,25 @@ export class InMemoryVoucherRepository implements IVoucherRepository {
   }
 
 
+  public devicesWithLedgerType(type: LedgerRecord['type']): string[] {
+    return [...new Set(this.ledger.filter((entry) => entry.type === type).map((entry) => entry.deviceId))];
+  }
+
+
   public ledgerFor(deviceId: string): LedgerRecord[] {
     return this.ledger.filter((entry) => entry.deviceId === deviceId);
   }
 
 
   public appendLedger(entry: LedgerRecord): void {
-    const exists = this.ledger.some(({ type, voucherId, withdrawalId }) =>
+    const exists = this.ledger.some(({ type, voucherId, withdrawalId, depositId, vaultId }) =>
       type === entry.type
       && ((voucherId !== null && voucherId === entry.voucherId)
-        || (withdrawalId !== null && withdrawalId === entry.withdrawalId)));
+        || (withdrawalId !== null && withdrawalId === entry.withdrawalId)
+        || (depositId !== null && depositId === entry.depositId)
+        || (vaultId != null && vaultId === entry.vaultId)));
     if (!exists) {
-      this.ledger.push(entry);
+      this.ledger.push({ ...entry, vaultId: entry.vaultId ?? null, autoCashOut: entry.autoCashOut === true });
     }
   }
 

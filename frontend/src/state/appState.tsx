@@ -5,7 +5,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { ActiveWalletResponse, LedgerEntry, TransactionView } from '@tpay/shared/contracts/api';
 import type { Language, VaultStatus, VoucherStatus } from '@tpay/shared/contracts/statuses';
 import type { AppVault, AppVoucher, PendingVault } from '../adapters/storage/localStore';
-import { api, connectivity, store } from '../composition';
+import { api, connectivity, localModel, store } from '../composition';
 import { setCatalogue } from '../i18n';
 import { profileStore, type LocalProfile } from '../session/profileStore';
 import { sessionStore, type DeviceSession } from '../session/sessionStore';
@@ -17,6 +17,9 @@ import { loadWithdrawal, withdrawalOpen, type PendingWithdrawal } from '../featu
 export type Status = 'paid' | 'locked' | 'pending' | 'sent' | 'refused' | 'blocked';
 export type Dir = 'in' | 'out' | 'lock' | 'release' | 'withdraw';
 export type Wallet = 'active' | 'offline';
+/** Personal pays; Business gets paid. It only changes what the app puts first, never the money. */
+export type AccountKind = 'personal' | 'business';
+const ACCOUNT_KIND = 'ui.accountKind';
 
 /** One line of history. Amounts are in kobo. */
 export type Entry = {
@@ -50,6 +53,8 @@ export interface ActiveSummary {
   balanceUsd: number;
   pendingNgn: number;
   payoutEmail: string;
+  /** Naira per dollar, as text like "1500.00". Empty until the wallet has been read once. */
+  fxRate: string;
   entries: LedgerEntry[];
 }
 
@@ -79,6 +84,8 @@ type AppStateValue = {
   setWallet(wallet: Wallet): void;
   hidden: boolean;
   toggleHidden(): void;
+  accountKind: AccountKind;
+  setAccountKind(kind: AccountKind): Promise<void>;
   reload(): Promise<void>;
   sync(): Promise<void>;
 };
@@ -141,6 +148,8 @@ function historyOf(vouchers: AppVoucher[], transactions: TransactionView[], word
     switch (tx.type) {
       case 'VAULT_LOCKED': return [{ ...base, who: words.locked, dir: 'lock', status: 'locked' }];
       case 'VAULT_RELEASED': return [{ ...base, who: words.released, dir: 'release', status: 'paid' }];
+      case 'PAYMENT_LINK_RECEIVED': return [{ ...base, who: words.paymentLink, dir: 'in', status: 'paid', ref: tx.transactionId }];
+      case 'DEPOSIT_COMPLETED': return [{ ...base, who: words.deposit, dir: 'in', status: 'paid', ref: tx.transactionId }];
       case 'WITHDRAWAL_REQUESTED': return [{ ...base, who: words.withdrawal, dir: 'withdraw', status: 'pending', ref: tx.transactionId }];
       case 'WITHDRAWAL_COMPLETED': return [{ ...base, who: words.withdrawn, dir: 'withdraw', status: 'paid', ref: tx.transactionId }];
       case 'WITHDRAWAL_FAILED': return [{ ...base, who: words.withdrawalFailed, dir: 'withdraw', status: 'refused', ref: tx.transactionId }];
@@ -150,13 +159,16 @@ function historyOf(vouchers: AppVoucher[], transactions: TransactionView[], word
   return [...fromVouchers, ...fromTransactions].sort((a, b) => b.at.localeCompare(a.at));
 }
 
-export type HistoryWords = { merchant: string; customer: string; locked: string; released: string; withdrawal: string; withdrawn: string; withdrawalFailed: string };
+export type HistoryWords = { paymentLink: string; deposit: string; merchant: string; customer: string; locked: string; released: string; withdrawal: string; withdrawn: string; withdrawalFailed: string };
 
-const EMPTY_ACTIVE: ActiveSummary = { known: false, balanceNgn: 0, balanceUsd: 0, pendingNgn: 0, payoutEmail: '', entries: [] };
+const EMPTY_ACTIVE: ActiveSummary = { known: false, balanceNgn: 0, balanceUsd: 0, pendingNgn: 0, payoutEmail: '', fxRate: '', entries: [] };
 
 export function AppStateProvider({ children, words }: { children: React.ReactNode; words: HistoryWords }) {
   const [ready, setReady] = useState(false);
   const [online, setOnline] = useState(true);
+  // The phone's own model answers offline. Loading it takes seconds, so it starts the moment the
+  // network goes, not when the person first asks something.
+  useEffect(() => { if (!online) void localModel.warmUp(); }, [online]);
   const [session, setSession] = useState<DeviceSession | null>(null);
   const [profile, setProfile] = useState<LocalProfile | null>(null);
   const [draft, setDraftState] = useState<Draft>({ displayName: '', payoutEmail: '', language: 'en' });
@@ -169,6 +181,7 @@ export function AppStateProvider({ children, words }: { children: React.ReactNod
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [wallet, setWallet] = useState<Wallet>('offline');
   const [hidden, setHidden] = useState(false);
+  const [accountKind, setKind] = useState<AccountKind>('personal');
   const loading = useRef<Promise<void> | null>(null);
   const stale = useRef(false);
 
@@ -176,10 +189,11 @@ export function AppStateProvider({ children, words }: { children: React.ReactNod
     // A change while reading means what was read may be old, so read once more after.
     if (loading.current) { stale.current = true; return loading.current; }
     loading.current = (async () => {
-      const [s, p, v, pv, list, w, tx, wd, last] = await Promise.all([
+      const [s, p, v, pv, list, w, tx, wd, last, kind] = await Promise.all([
         sessionStore.load(), profileStore.load(), store.vaults.findCurrent(), loadPending(), store.vouchers.list(),
-        store.getMeta<ActiveWalletResponse>(WALLET), store.getMeta<TransactionView[]>(TRANSACTIONS), loadWithdrawal(), store.getMeta<string>(LAST_SYNC),
+        store.getMeta<ActiveWalletResponse>(WALLET), store.getMeta<TransactionView[]>(TRANSACTIONS), loadWithdrawal(), store.getMeta<string>(LAST_SYNC), store.getMeta<AccountKind>(ACCOUNT_KIND),
       ]);
+      setKind(kind === 'business' ? 'business' : 'personal');
       setSession(s); setProfile(p); setVault(v); setPendingVault(pv); setVouchers(list);
       setWalletCache(w); setTransactions(tx ?? []); setWithdrawal(wd); setLastSyncAt(last);
       if (p) setCatalogue(p.language);
@@ -209,10 +223,15 @@ export function AppStateProvider({ children, words }: { children: React.ReactNod
     void withSession(() => api.updateProfile({ language })).catch(() => undefined);
   }, []);
 
+  const setAccountKind = useCallback(async (kind: AccountKind) => {
+    setKind(kind);
+    await store.setMeta(ACCOUNT_KIND, kind);
+  }, []);
+
   const value = useMemo<AppStateValue>(() => {
     const offline = summarise(vault, vouchers);
     const active: ActiveSummary = walletCache
-      ? { known: true, balanceNgn: walletCache.balanceNgnMinor, balanceUsd: walletCache.balanceUsdMinor, pendingNgn: walletCache.pendingNgnMinor, payoutEmail: walletCache.payoutEmail, entries: walletCache.entries }
+      ? { known: true, balanceNgn: walletCache.balanceNgnMinor, balanceUsd: walletCache.balanceUsdMinor, pendingNgn: walletCache.pendingNgnMinor, payoutEmail: walletCache.payoutEmail, fxRate: walletCache.fxRate ?? '', entries: walletCache.entries }
       : EMPTY_ACTIVE;
     return {
       ready, online, session, profile,
@@ -225,9 +244,10 @@ export function AppStateProvider({ children, words }: { children: React.ReactNod
       history: historyOf(vouchers, transactions, words),
       lastSyncAt,
       wallet, setWallet, hidden, toggleHidden: () => setHidden(x => !x),
+      accountKind, setAccountKind,
       reload, sync: syncNow,
     };
-  }, [ready, online, session, profile, draft, vault, pendingVault, vouchers, walletCache, transactions, withdrawal, lastSyncAt, wallet, hidden, words, reload, setLanguage]);
+  }, [ready, online, session, profile, draft, vault, pendingVault, vouchers, walletCache, transactions, withdrawal, lastSyncAt, wallet, hidden, accountKind, words, reload, setLanguage, setAccountKind]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

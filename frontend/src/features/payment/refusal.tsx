@@ -56,7 +56,7 @@ export function Refusal({ code, side, amount, existingId }: { code: PaymentRefus
           <Panel><T v="label">{money(amount)}</T></Panel>
         )}
       </Animated.View>
-      <HearIt say={`${copy.title}. ${copy.body}`} />
+      <HearIt auto say={`${copy.title}. ${copy.body}`} />
       <View />
     </Screen>
   );

@@ -1,4 +1,5 @@
-import { DEFAULT_GEMINI_MODEL, GeminiAssistantModel } from '../adapters/ai/GeminiAssistantModel';
+import { ElevenLabsVoice } from '../adapters/ai/ElevenLabsVoice';
+import { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_TTS_MODEL, GeminiAssistantModel } from '../adapters/ai/GeminiAssistantModel';
 import { NodeP256Signer } from '../adapters/crypto/NodeP256Signer';
 import { PayPalGateway } from '../adapters/paypal/PayPalGateway';
 import { createPool, isDatabaseReachable } from '../adapters/persistence/database';
@@ -43,10 +44,19 @@ export function createDependencies(env: NodeJS.ProcessEnv): AppDependencies {
       ...(env.PAYPAL_WEBHOOK_ID ? { webhookId: env.PAYPAL_WEBHOOK_ID } : {}),
     }),
     // Optional: without a key the server still runs and the app uses its offline assistant.
-    assistant: new GeminiAssistantModel({
-      apiKey: env.GEMINI_API_KEY || undefined,
-      model: env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
-    }),
+    // Optional too: with an ElevenLabs key and voice, replies in English and Pidgin are read in that voice.
+    assistant: new ElevenLabsVoice(
+      {
+        apiKey: env.ELEVENLABS_API_KEY || undefined,
+        voiceId: env.ELEVENLABS_VOICE_ID || undefined,
+        ...(env.ELEVENLABS_MODEL ? { model: env.ELEVENLABS_MODEL } : {}),
+      },
+      new GeminiAssistantModel({
+        apiKey: env.GEMINI_API_KEY || undefined,
+        model: env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+        speechModel: env.GEMINI_TTS_MODEL || DEFAULT_GEMINI_TTS_MODEL,
+      }),
+    ),
     checkDatabase: () => isDatabaseReachable(pool),
     paypalMode: paypalBaseUrl.includes('sandbox') ? 'sandbox' : 'live',
     fxRate: env.FX_RATE ?? DEFAULT_FX_RATE,

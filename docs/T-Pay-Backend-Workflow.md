@@ -210,7 +210,7 @@ Each ticket needs a branch, a pull request, tests, and the activity or endpoint 
 | BE-06 | PayPal sandbox proof, vault creation, return page, authorisation and current vault endpoints | BE-05 | 6–7 Nov |
 | BE-07 | Melt, spend statement, release job and hold rules | BE-06 | 7 Nov |
 | BE-08 | Voucher submission, settlement, retries, conflict handling, webhooks and list endpoints | BE-06 | 8 Nov |
-| BE-09 | Active wallet endpoint | BE-08 | 9 Nov |
+| BE-09 | Wallet endpoint | BE-08 | 9 Nov |
 | BE-10 | Withdraw to PayPal | BE-09 | 9 Nov |
 | BE-11 | Gemini interpret endpoint and prompt-injection tests | BE-02 | 9 Nov |
 | BE-12 | Concurrency tests, Postman collection, logs and README setup | BE-08 | 10 Nov |

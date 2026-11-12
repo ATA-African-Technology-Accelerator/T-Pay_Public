@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { Fingerprint } from 'lucide-react-native';
 import { color, glass, icon, radius, space, touch } from '../../theme/tokens';
-import { Press, T } from '../../components/ui';
+import { Button, Press, T } from '../../components/ui';
 import { Aurora } from '../../components/aurora';
 import { Keypad } from '../../components/keypad';
-import { inset } from '../../components/shell';
+import { useInset } from '../../components/shell';
 import { useNav } from '../../nav';
 import { useApp } from '../../state/appState';
 import { appLock, biometrics } from '../../composition';
@@ -14,6 +14,8 @@ import { t } from '../../i18n';
 
 const LENGTH = 4;
 const SECOND = 1000;
+// How long the lock screen settles before the fingerprint prompt is shown.
+const FINGERPRINT_SETTLE_MS = 600;
 
 /** Set up during onboarding: pick a PIN, then type it again to confirm. */
 export function CreatePin() {
@@ -45,33 +47,47 @@ export function CreatePin() {
   );
 }
 
-/** Opens the app: fingerprint first if the phone has it, the PIN always works. */
-export function Lock() {
+/**
+ * The rules for checking a person's PIN or fingerprint, shared by unlocking the app and by
+ * confirming a send: wrong PINs count down, five wrong ones lock the pad for 30 seconds, and the
+ * fingerprint is offered once on arrival, never in a loop.
+ */
+function usePinCheck(onPassed: () => void, offerFingerprint = true) {
   const nav = useNav();
-  const store = useApp();
-  const [name, setName] = useState(store.name);
   const [fingerprint, setFingerprint] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [retryAt, setRetryAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const asked = useRef(false);
 
-  const open = () => nav.reset({ name: 'home' });
-
-  const tryFingerprint = async () => {
+  // `quiet` is the automatic offer when the screen opens. If Android turns that one down, the
+  // person did nothing wrong, so no error shows: the fingerprint button is right there.
+  const tryFingerprint = async (quiet = false) => {
     const result = await appLock.unlockWithBiometrics();
-    if (result.status === 'UNLOCKED') open();
+    if (result.status === 'UNLOCKED') onPassed();
     else if (result.status === 'NO_PIN') nav.reset({ name: 'createPin' });
-    else setNote(t.fingerprintFailed);
+    else if (!quiet) setNote(t.fingerprintFailed);
   };
 
   useEffect(() => {
-    sessionStore.load().then(s => { if (s) setName(s.deviceCertificate.payload.displayName); }).catch(() => {});
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Android cancels a fingerprint prompt asked for while the screen is still changing (from the
+    // loading screen, or coming back from the background). Offer it once the lock screen has
+    // settled and the app is in front.
+    const offer = () => {
+      if (cancelled || asked.current || AppState.currentState !== 'active') return;
+      asked.current = true;
+      void tryFingerprint(true);
+    };
     biometrics.isAvailable().then(ok => {
+      if (cancelled) return;
       setFingerprint(ok);
-      // Offer it once on arrival, like a bank app. Never loop the prompt.
-      if (ok && !asked.current) { asked.current = true; tryFingerprint(); }
+      if (!ok || !offerFingerprint) return;
+      requestAnimationFrame(() => { timer = setTimeout(offer, FINGERPRINT_SETTLE_MS); });
     });
+    const sub = AppState.addEventListener('change', state => { if (state === 'active') timer = setTimeout(offer, FINGERPRINT_SETTLE_MS); });
+    return () => { cancelled = true; if (timer) clearTimeout(timer); sub.remove(); };
   }, []);
 
   // Count down a lockout so people can see when to try again.
@@ -84,12 +100,10 @@ export function Lock() {
     return () => clearInterval(id);
   }, [retryAt]);
 
-  const lockedFor = retryAt === null ? 0 : Math.max(1, Math.ceil((retryAt - now) / SECOND));
-
   const complete = async (pin: string) => {
     const result = await appLock.unlockWithPin(pin);
     switch (result.status) {
-      case 'UNLOCKED': open(); return false;
+      case 'UNLOCKED': onPassed(); return false;
       case 'NO_PIN': nav.reset({ name: 'createPin' }); return false;
       case 'WRONG_PIN': setNote(t.wrongPin(result.attemptsLeft)); return true;
       case 'LOCKED_OUT': setRetryAt(new Date(result.retryAt).getTime()); setNow(Date.now()); return true;
@@ -97,20 +111,65 @@ export function Lock() {
     }
   };
 
+  const locked = retryAt !== null;
+  const lockedFor = locked ? Math.max(1, Math.ceil(((retryAt as number) - now) / SECOND)) : 0;
+  return { fingerprint, locked, tryFingerprint, complete, note: locked ? t.lockedOut(lockedFor) : note };
+}
+
+const FingerprintButton = ({ disabled, onPress }: { disabled: boolean; onPress(): void }) => (
+  <Press accessibilityRole="button" accessibilityLabel={t.useFingerprint} disabled={disabled} onPress={onPress} style={l.finger}>
+    <Fingerprint size={icon.md} color={color.blue} strokeWidth={1.8} />
+    <T v="label">{t.useFingerprint}</T>
+  </Press>
+);
+
+/** Opens the app: fingerprint first if the phone has it, the PIN always works. */
+export function Lock() {
+  const nav = useNav();
+  const store = useApp();
+  const [name, setName] = useState(store.name);
+  useEffect(() => {
+    sessionStore.load().then(s => { if (s) setName(s.deviceCertificate.payload.displayName); }).catch(() => {});
+  }, []);
+  const check = usePinCheck(() => nav.reset({ name: 'home' }));
+
   return (
     <PinPad
       eyebrow={t.welcome}
       heading={name}
       title={t.enterPin}
-      note={retryAt !== null ? t.lockedOut(lockedFor) : note}
-      disabled={retryAt !== null}
-      onComplete={complete}
-      footer={fingerprint ? (
-        <Press accessibilityRole="button" accessibilityLabel={t.useFingerprint} disabled={retryAt !== null} onPress={tryFingerprint} style={l.finger}>
-          <Fingerprint size={icon.md} color={color.blue} strokeWidth={1.8} />
-          <T v="label">{t.useFingerprint}</T>
-        </Press>
-      ) : null}
+      note={check.note}
+      disabled={check.locked}
+      onComplete={check.complete}
+      footer={check.fingerprint ? <FingerprintButton disabled={check.locked} onPress={() => { void check.tryFingerprint(); }} /> : null}
+    />
+  );
+}
+
+/**
+ * Asks for the PIN (or fingerprint) again before something that moves money, so a phone left
+ * unlocked in someone else's hands can't send the balance away. It shows what is about to happen.
+ */
+export function ConfirmPin({ heading, onConfirmed, onCancel, offerFingerprint = false }: {
+  heading: string; onConfirmed(): void; onCancel(): void;
+  /** Open the fingerprint prompt by itself, for a payment started by voice. */
+  offerFingerprint?: boolean;
+}) {
+  const check = usePinCheck(onConfirmed, offerFingerprint);
+  return (
+    <PinPad
+      eyebrow={t.confirmWithPin}
+      heading={heading}
+      title={t.enterPin}
+      note={check.note}
+      disabled={check.locked}
+      onComplete={check.complete}
+      footer={(
+        <View style={{ gap: space.sm }}>
+          {check.fingerprint ? <FingerprintButton disabled={check.locked} onPress={() => { void check.tryFingerprint(); }} /> : null}
+          <Button kind="quiet" label={t.cancel} onPress={onCancel} />
+        </View>
+      )}
     />
   );
 }
@@ -123,6 +182,7 @@ type PadProps = {
 };
 
 function PinPad({ eyebrow, heading, title, hint, note, disabled, onComplete, footer }: PadProps) {
+  const inset = useInset();
   const [pin, setPin] = useState('');
   const checking = useRef(false);
 
@@ -142,7 +202,7 @@ function PinPad({ eyebrow, heading, title, hint, note, disabled, onComplete, foo
 
   return (
     <View style={l.root}>
-      <View style={l.head}>
+      <View style={[l.head, { paddingTop: inset.top + 26 }]}>
         <Aurora />
         <T v="small" c={color.white}>{eyebrow}</T>
         {heading ? <T v="hello" c={color.white} accessibilityRole="header" numberOfLines={1}>{heading}</T> : null}
@@ -169,7 +229,7 @@ function PinPad({ eyebrow, heading, title, hint, note, disabled, onComplete, foo
 
 const l = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.page },
-  head: { paddingTop: inset.top + 26, paddingBottom: space.xxl, paddingHorizontal: space.xl, overflow: 'hidden', borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
+  head: { paddingBottom: space.xxl, paddingHorizontal: space.xl, overflow: 'hidden', borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
   body: { flex: 1, padding: space.md, gap: space.lg, justifyContent: 'center' },
   titles: { gap: space.xs },
   center: { textAlign: 'center' },
