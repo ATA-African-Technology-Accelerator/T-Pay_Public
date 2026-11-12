@@ -12,7 +12,7 @@
 
 Lock money while you are online, then pay or get paid phone to phone with no internet at all, by QR code, Bluetooth or voice.
 
-[Live API](https://t-pay-public.onrender.com/api/health) · [User guide](docs/T-Pay-User-Guide.md) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
+[Download the app](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) · [Live API](https://t-pay-public.onrender.com/api/health) · [User guide](docs/T-Pay-User-Guide.md) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/OlayiwolaSherrifSalawu/T-Pay_Public/ci.yml?branch=frontend&style=flat-square&label=tests)](https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -377,7 +377,8 @@ To report a vulnerability, please do **not** open a public issue. See [SECURITY.
 - [x] Personal Budget and Stock & Inventory
 - [x] CI for backend, shared rules and app
 - [ ] Native-speaker review of Yoruba, Igbo and Hausa text
-- [ ] Public Android APK and demo video
+- [x] Public Android build
+- [ ] Demo video
 - [ ] Live PayPal mode, with KYC
 - [ ] Hardware-backed device keys
 - [ ] Market exchange rates instead of a fixed demo rate
