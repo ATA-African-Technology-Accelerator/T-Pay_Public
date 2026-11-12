@@ -150,8 +150,12 @@ export function Lock() {
  * Asks for the PIN (or fingerprint) again before something that moves money, so a phone left
  * unlocked in someone else's hands can't send the balance away. It shows what is about to happen.
  */
-export function ConfirmPin({ heading, onConfirmed, onCancel }: { heading: string; onConfirmed(): void; onCancel(): void }) {
-  const check = usePinCheck(onConfirmed, false);
+export function ConfirmPin({ heading, onConfirmed, onCancel, offerFingerprint = false }: {
+  heading: string; onConfirmed(): void; onCancel(): void;
+  /** Open the fingerprint prompt by itself, for a payment started by voice. */
+  offerFingerprint?: boolean;
+}) {
+  const check = usePinCheck(onConfirmed, offerFingerprint);
   return (
     <PinPad
       eyebrow={t.confirmWithPin}
