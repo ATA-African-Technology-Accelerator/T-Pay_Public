@@ -47,7 +47,7 @@ describe('GeminiAssistantModel', () => {
     expect(constructed).toEqual([{ apiKey: 'test-key' }]);
     expect(name).toBe('gemini-test');
     expect(config).toMatchObject({ responseMimeType: 'application/json', temperature: 0 });
-    expect(config.responseJsonSchema.required).toEqual(['intent', 'amountNaira', 'itemName', 'transcript', 'spokenReply']);
+    expect(config.responseJsonSchema.required).toEqual(['intent', 'amountNaira', 'itemName', 'helpTopic', 'quantity', 'screen', 'transcript', 'spokenReply']);
     expect(config.responseJsonSchema.additionalProperties).toBe(false);
     expect(config.abortSignal).toBeInstanceOf(AbortSignal);
   });
