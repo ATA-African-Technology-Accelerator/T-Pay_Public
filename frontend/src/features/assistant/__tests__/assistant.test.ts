@@ -89,3 +89,23 @@ it('uses only the rules when the model was never downloaded', async () => {
   expect(await interpretText('collect 50', 'en', LEFT)).toMatchObject({ intent: 'CREATE_PAYMENT_REQUEST', amountNgnMinor: 5_000, onDevice: false });
   expect(mockPropose).not.toHaveBeenCalled();
 });
+
+describe('questions about the app', () => {
+  it('answers "how do I pay" on the phone, online or not, with no trip to the server', async () => {
+    mockOnline = true;
+    expect(await interpretText('how do I pay', 'en', 0)).toMatchObject({ intent: 'HELP', helpTopic: 'PAY', spokenReply: null });
+    expect(mockInterpret).not.toHaveBeenCalled();
+  });
+
+  it('never reads out the model\'s own words for a question', async () => {
+    mockOnline = true;
+    mockInterpret.mockResolvedValue({
+      proposal: { intent: 'HELP', amountNgnMinor: null, itemName: null, helpTopic: 'LOCK' }, transcript: 'abeg explain am', spokenReply: 'anything', needsConfirmation: true,
+    });
+    expect(await interpretText('abeg explain am', 'pcm', 0)).toMatchObject({ intent: 'HELP', helpTopic: 'LOCK', spokenReply: null });
+  });
+
+  it('keeps the amount of a payment refused for having no vault, so it can offer to lock it', async () => {
+    expect(await interpretText('pay 2000', 'en', 0)).toMatchObject({ overCapacity: true, requestedNgnMinor: 200_000 });
+  });
+});
