@@ -1,11 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AlertCircle } from 'lucide-react-native';
 import { convertNgnToUsd, convertUsdToNgn } from '@tpay/shared/domain/convertNgnToUsd';
 import { Money } from '@tpay/shared/shared/domain/Money';
 import { color, icon, space } from '../../theme/tokens';
 import { Keypad } from '../../components/keypad';
-import { Button, HearIt, Panel, Rise, T, money, naira, sayNaira, usd } from '../../components/ui';
+import { Button, HearIt, Panel, Rise, T, money, naira, sayNaira, speakNaturally, usd } from '../../components/ui';
 import { CurvedHeader, Screen } from '../../components/shell';
 import { StatusMark } from '../../components/money';
 import { useNav } from '../../nav';
@@ -30,10 +30,10 @@ type Stage =
  * Add money: the person pays with PayPal and the dollars are captured into the Wallet.
  * The wallet is credited by the backend, once, only after PayPal confirms the capture.
  */
-export function AddMoney() {
+export function AddMoney({ prefill, handsFree = false }: { prefill?: number; handsFree?: boolean }) {
   const nav = useNav();
   const { active, online } = useApp();
-  const [naraAmount, setNaira] = useState(0);
+  const [naraAmount, setNaira] = useState(prefill ? Math.min(Math.floor(prefill / 100), MAX_NGN) : 0);
   const [stage, setStage] = useState<Stage>({ kind: 'enter' });
   const [problem, setProblem] = useState<string | null>(null);
   const order = useRef<PendingDeposit | null>(null);
@@ -70,6 +70,14 @@ export function AddMoney() {
       setProblem(apiMessage(e));
     }
   };
+
+  // Asked by voice: go straight to PayPal, where the person signs in to approve it.
+  const started = useRef(false);
+  useEffect(() => {
+    if (!handsFree || started.current || !ready) return;
+    started.current = true;
+    void speakNaturally(t.signInPayPal).then(() => { void go(); });
+  }, [ready]);
 
   if (stage.kind === 'done' || stage.kind === 'pending') {
     const done = stage.kind === 'done';
