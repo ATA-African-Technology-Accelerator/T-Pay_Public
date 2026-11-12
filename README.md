@@ -12,7 +12,7 @@
 
 Lock money while you are online, then pay or get paid phone to phone with no internet at all, by QR code, Bluetooth or voice.
 
-[Live API](https://t-pay-public.onrender.com/api/health) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
+[Live API](https://t-pay-public.onrender.com/api/health) · [User guide](docs/T-Pay-User-Guide.md) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/OlayiwolaSherrifSalawu/T-Pay_Public/ci.yml?branch=frontend&style=flat-square&label=tests)](https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -35,6 +35,7 @@ Lock money while you are online, then pay or get paid phone to phone with no int
 - [Technology](#technology)
 - [Built with](#built-with)
 - [Quickstart](#quickstart)
+- [Using T-Pay](#using-t-pay)
 - [Configuration](#configuration)
 - [Repository layout](#repository-layout)
 - [Testing](#testing)
@@ -250,6 +251,22 @@ You approve one order in the browser. The script places a hold, makes two partia
 4. In the PayPal app, add a webhook to `https://<your-render-url>/api/webhooks/paypal` for `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.PENDING`, `PAYMENT.CAPTURE.DECLINED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`, `PAYMENT.AUTHORIZATION.VOIDED` and `CHECKOUT.PAYMENT-APPROVAL.REVERSED`, then set `PAYPAL_WEBHOOK_ID`.
 
 </details>
+
+## Using T-Pay
+
+The full walkthrough, including a ten-minute test script for judges, is in the **[user guide](docs/T-Pay-User-Guide.md)**. In short:
+
+1. **Set up** on each phone: language, name, PayPal (sandbox) email, a 4-digit PIN.
+2. **Lock money** while online: Offline vault → Lock → amount and hours → from the Wallet or with a PayPal approval.
+3. **Go offline.** Airplane mode on, Bluetooth on.
+4. **Get paid:** the seller taps Get paid, or says "collect one thousand", and shows the QR code.
+5. **Pay:** the customer taps Pay, scans it, and confirms with fingerprint or PIN. The payment reaches the seller over Bluetooth, or as a second QR code.
+6. **Reconnect** either phone. The payment settles into the seller's Wallet and, with cash-out on, goes to their PayPal. The customer closes the vault to get unspent money back.
+
+Say **"Hey T-Pay"** at any point to do any of this by voice.
+
+> [!IMPORTANT]
+> Hackathon submission rules: T-Pay runs on the PayPal **sandbox** only, needs **Android** phones, and every action that moves money ends with the person's fingerprint, PIN or PayPal sign-in. Judges' test accounts and the install link are listed in the [user guide](docs/T-Pay-User-Guide.md#for-judges-test-t-pay-in-ten-minutes).
 
 ## Configuration
 
