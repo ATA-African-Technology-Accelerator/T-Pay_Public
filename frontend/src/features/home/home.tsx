@@ -9,6 +9,7 @@ import { ActivityRows } from '../../components/rows';
 import { useNav } from '../../nav';
 import { useApp, type Entry } from '../../state/appState';
 import { store } from '../../composition';
+import { useHealth } from '../../state/health';
 import { useModelState } from '../settings/offlineAssistant';
 import { t } from '../../i18n';
 
@@ -75,6 +76,8 @@ export function HomeScreen() {
   const nav = useNav();
   const { name, offline, active, history, wallet, setWallet, pendingVault, withdrawal, withdrawalOpen, online, lastSyncAt, sync, accountKind, vault: lockedVault } = useApp();
   const business = accountKind === 'business';
+  const health = useHealth();
+  const paypalDown = online && !!health && (health.paypal === 'down' || health.database === 'down');
   // Home is where people look for news, so it asks for it: right after setup and each unlock.
   React.useEffect(() => { void sync(); }, []);
   // A business gets paid into the Wallet, so that is the page it opens on, once per visit to the app.
@@ -127,6 +130,7 @@ export function HomeScreen() {
 
   return (
     <Screen tabsFor="home" hero={<Hero name={name} pages={pages} wallet={wallet} onWallet={setWallet} />}>
+      {paypalDown && <Notice icon={<WifiOff {...mark} />} title={t.paypalDownTitle} note={t.paypalDownNote} />}
       {!online && <Notice icon={<WifiOff {...mark} />} title={t.noNetwork} note={lastSyncAt ? `${t.offlineNow} ${t.updatedAt(when(lastSyncAt, false))}` : t.offlineNow} />}
       <Rise key={wallet}>{isActive ? activeNotice : offlineNotice}</Rise>
       <OfflineAiOffer />

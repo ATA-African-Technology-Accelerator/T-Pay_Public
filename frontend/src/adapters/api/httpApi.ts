@@ -3,7 +3,7 @@ import type { ITPayApi, MutationOptions } from '@tpay/shared/application/ports/a
 import type {
   ActiveWalletResponse, AuthorizeVaultResponse, CompleteDepositResponse, CreateDepositRequest, CreateDepositResponse,
   CreateVaultRequest, CreateVaultResponse, PayLinkResponse,
-  CurrentVaultResponse, InterpretRequest, InterpretResponse, SpeakRequest, SpeakResponse, ListTransactionsResponse,
+  CurrentVaultResponse, HealthResponse, InterpretRequest, InterpretResponse, SpeakRequest, SpeakResponse, ListTransactionsResponse,
   ListVouchersResponse, MeltVaultRequest, MeltVaultResponse, ProfileView, RegisterDeviceRequest,
   RegisterDeviceResponse, SubmitVoucherRequest, SubmitVoucherResponse, UpdateProfileRequest,
   VoucherView, WithdrawRequest, WithdrawResponse,
@@ -19,6 +19,8 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 const SPEAK_TIMEOUT_MS = 8_000;
 // Gemini answers in a few seconds. Past this, the phone's own assistant answers instead of
 // leaving the person waiting.
+// The health check is a quick look, never worth waiting long for.
+const HEALTH_TIMEOUT_MS = 8_000;
 const ASSISTANT_TIMEOUT_MS = 20_000;
 
 /** A refusal from the backend, or `NETWORK` when it couldn't be reached. Screens switch on `code`. */
@@ -84,6 +86,20 @@ export class HttpTPayApi implements ITPayApi {
   // A short clip of the reply read aloud. Changes nothing, so no Idempotency-Key.
   speak(request: SpeakRequest) {
     return this.call<SpeakResponse>('/assistant/speak', { method: 'POST', body: request, timeoutMs: SPEAK_TIMEOUT_MS });
+  }
+
+  /**
+   * The server's own check of its database and PayPal. It answers 503 when one is down, with the same
+   * body, so this reads the body either way. Null means the server itself could not be reached.
+   */
+  async getHealth(): Promise<HealthResponse | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/health`, { method: 'GET', signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
+      const body = (await response.json()) as { data?: HealthResponse };
+      return body.data ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /** Wakes a sleeping server, and PayPal's login behind it, while the person is still typing. */

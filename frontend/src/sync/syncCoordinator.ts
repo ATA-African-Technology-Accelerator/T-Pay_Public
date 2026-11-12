@@ -12,6 +12,7 @@ import { DeviceRevoked, renewCertificateIfDue, withSession } from '../session/gu
 import { sessionStore } from '../session/sessionStore';
 import { autoMeltIfDue, refreshVault } from '../features/vault/vaultActivities';
 import { forgetDeposit, loadDeposit } from '../features/ledger/pendingDeposit';
+import { HEALTH } from '../state/health';
 
 export const WALLET = 'cache.wallet';
 export const TRANSACTIONS = 'cache.transactions';
@@ -67,6 +68,9 @@ async function pass(): Promise<void> {
     await refreshVault().catch(ignoreOffline);
     await autoMeltIfDue().catch(ignoreOffline);
     await refreshWallet().catch(ignoreOffline);
+    // Whether PayPal is answering, so the app can say so instead of failing quietly.
+    const health = await api.getHealth();
+    if (health) await store.setMeta(HEALTH, health);
     await store.setMeta(LAST_SYNC, clock.now().toISOString());
   } catch (e) {
     if (e instanceof DeviceRevoked) return;

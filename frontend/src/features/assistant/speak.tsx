@@ -11,6 +11,7 @@ import { api, localModel, speechIn, speechOut } from '../../composition';
 import { apiMessage } from '../errors';
 import { interpretSpeech, interpretText, offlineAnswer, rulesProposal, type Proposal } from './assistant';
 import { useModelState } from '../settings/offlineAssistant';
+import { salesStore } from '../business/businessStore';
 
 type Phase = 'idle' | 'listening' | 'thinking';
 // Held at least this long, letting go ends the recording. Shorter is a tap: it starts listening, and
@@ -122,7 +123,7 @@ function question(p: Proposal, leftNgn: number): string {
     case 'CREATE_PAYMENT_REQUEST': return p.amountNgnMinor ? t.askCollect(money(p.amountNgnMinor)) : t.askAmount;
     case 'PAY_AMOUNT': return p.amountNgnMinor ? t.askPay(money(p.amountNgnMinor)) : t.askAmount;
     case 'CHECK_BALANCE': return t.askBalance(money(leftNgn));
-    case 'RECORD_SALE': return t.salesLater;
+    case 'RECORD_SALE': return p.itemName ? t.askSale(p.itemName, p.amountNgnMinor ? money(p.amountNgnMinor) : null) : t.askSaleNoItem(p.amountNgnMinor ? money(p.amountNgnMinor) : null);
     default: return t.notUnderstood;
   }
 }
@@ -143,10 +144,20 @@ export function ProposalScreen({ proposal: first, handsFree = false, attempt = 0
     const amount = p.amountNgnMinor;
     if (p.intent === 'CREATE_PAYMENT_REQUEST') nav.go(amount ? { name: 'request', amount, handsFree } : { name: 'amount', mode: 'collect' });
     else if (p.intent === 'PAY_AMOUNT') nav.go({ name: 'scan', kind: 'request', expected: amount ?? undefined, handsFree });
+    else if (p.intent === 'RECORD_SALE') void recordSale(p);
     else nav.reset({ name: 'home' });
   };
+  // A sale goes on the day's sales and, when the item is on the shelf, takes one off it. The backend's
+  // assistant (or the phone's own model offline) names the item; the shelf itself stays on the phone.
+  const recordSale = async (p: Proposal) => {
+    const item = p.itemName?.trim() || null;
+    const left = await salesStore.record(item, p.amountNgnMinor, new Date());
+    const said = left ? t.saleRecorded(left.name, left.quantity) : item ? t.saleRecordedNotOnShelf(item) : t.saleRecordedPlain;
+    void speakNaturally(said);
+    nav.reset({ name: 'stock' });
+  };
   const yes = () => go(proposal);
-  const actionable = proposal.intent === 'CREATE_PAYMENT_REQUEST' || proposal.intent === 'PAY_AMOUNT' || proposal.intent === 'CHECK_BALANCE';
+  const actionable = proposal.intent === 'CREATE_PAYMENT_REQUEST' || proposal.intent === 'PAY_AMOUNT' || proposal.intent === 'CHECK_BALANCE' || proposal.intent === 'RECORD_SALE';
 
   // Hands free, the whole exchange is spoken: the question is read, and the person answers by voice.
   // A missing amount is asked for, a balance is just read out, and a misheard answer is asked once

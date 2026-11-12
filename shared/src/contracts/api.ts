@@ -36,6 +36,15 @@ export interface RegisterDeviceResponse {
 }
 
 
+/** GET /health: whether the server can reach its database and PayPal, and which PayPal it uses. */
+export interface HealthResponse {
+  status: 'ok' | 'degraded';
+  database: 'ok' | 'down';
+  paypal: 'ok' | 'down';
+  mode: 'sandbox' | 'live';
+}
+
+
 export interface ProfileView {
   deviceId: string;
   displayName: string;

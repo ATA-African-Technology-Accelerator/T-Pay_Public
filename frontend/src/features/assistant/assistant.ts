@@ -23,6 +23,8 @@ export interface Proposal {
   onDevice: boolean;
   /** The model asked to pay more than the vault has left, so it was refused. */
   overCapacity: boolean;
+  /** For a sale: the item named, in the person's words. */
+  itemName?: string | null;
 }
 
 /**
@@ -88,7 +90,7 @@ export async function offlineAnswer(text: string, language: Language, remainingN
     return refusedOverCapacity(rules, usedModel);
   }
   await record(usedModel ? 'phone' : 'rules', 'ACCEPTED', intent, amount).catch(() => undefined);
-  return { ...rules, intent, amountNgnMinor: amount, onDevice: usedModel };
+  return { ...rules, intent, amountNgnMinor: amount, onDevice: usedModel, itemName: intent === 'RECORD_SALE' ? model.proposal.itemName ?? null : null };
 }
 
 export async function interpretText(text: string, language: Language, remainingNgnMinor: number): Promise<Proposal> {

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import type { VoucherView } from '@tpay/shared/contracts/api';
 import { Share, StyleSheet } from 'react-native';
 import { Share2 } from 'lucide-react-native';
 import { color, icon, motion, space } from '../../theme/tokens';
@@ -7,7 +8,9 @@ import { CurvedHeader, Screen } from '../../components/shell';
 import { ActivityRows, Line, Segment } from '../../components/rows';
 import { StatusMark } from '../../components/money';
 import { useNav } from '../../nav';
-import { useApp } from '../../state/appState';
+import { statusOf, useApp } from '../../state/appState';
+import { api } from '../../composition';
+import { withSession } from '../../session/guard';
 import { t } from '../../i18n';
 
 type Filter = 'all' | 'in' | 'out' | 'pending';
@@ -33,8 +36,17 @@ export function Activity() {
 /** Every entry opens to one plain receipt. A settled payment shows its PayPal capture (FR-20). */
 export function Receipt({ id }: { id: string }) {
   const nav = useNav();
-  const { history } = useApp();
+  const { history, online } = useApp();
   const e = history.find(x => x.id === id);
+  // For a payment between phones, ask T-Pay for its own record: the phone's copy can be behind.
+  const [server, setServer] = useState<VoucherView | null>(null);
+  const voucherId = e?.voucher?.voucherId ?? null;
+  useEffect(() => {
+    if (!voucherId || !online) return;
+    let alive = true;
+    void withSession(() => api.getVoucher(voucherId)).then(v => { if (alive) setServer(v); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [voucherId, online]);
   if (!e) return <Screen head={<CurvedHeader back bell={false} title={t.receipt} />}><T v="body" c={color.muted}>{t.nothingHere}</T></Screen>;
   const word = t.status[e.status];
   const mark = e.status === 'locked' ? 'sent' : e.status;
@@ -61,6 +73,8 @@ export function Receipt({ id }: { id: string }) {
           <Line label={t.date} value={when(e.at)} />
           <Line label={t.reference} value={e.ref} mono />
           {e.capture && <Line label={e.voucher ? t.paypalCapture : t.paypalReference} value={e.capture} mono />}
+          {server && <Line label={t.confirmedByTPay} value={t.status[statusOf(server.status)]} />}
+          {server?.paypalCaptureId && !e.capture && <Line label={t.paypalCapture} value={server.paypalCaptureId} mono />}
         </Panel>
       </Rise>
       <HearIt say={`${word}. ${sayNaira(e.amount)}. ${e.who}`} />

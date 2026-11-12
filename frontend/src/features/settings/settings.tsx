@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
-import { ChevronRight, Cpu, Globe, HelpCircle, Lock, Send, ShieldCheck, UserRound } from 'lucide-react-native';
+import { Activity, ChevronRight, Cpu, Globe, HelpCircle, Lock, Send, ShieldCheck, UserRound } from 'lucide-react-native';
 import { color, icon, radius, space, touch } from '../../theme/tokens';
 import { Panel, Press, T } from '../../components/ui';
 import { Avatar, CurvedHeader, Screen } from '../../components/shell';
@@ -12,6 +12,7 @@ import { api, store } from '../../composition';
 import { profileStore } from '../../session/profileStore';
 import { withSession } from '../../session/guard';
 import { modelNote, useModelState } from './offlineAssistant';
+import { useHealth } from '../../state/health';
 
 const CASH_OUT = 'ui.autoCashOut';
 
@@ -20,6 +21,9 @@ export function SettingsScreen() {
   const nav = useNav();
   const { name, profile, language, online, reload } = useApp();
   const model = useModelState();
+  const health = useHealth();
+  const service = !health ? t.serviceUnknown : health.database === 'down' ? t.serviceDbDown : health.paypal === 'down' ? t.servicePayPalDown : t.serviceOk(health.mode);
+  const serviceOk = !!health && health.status === 'ok';
   // Whether money received offline goes on to PayPal by itself. The server holds the choice; the
   // phone keeps the last answer so it can show it with no network.
   const [cashOut, setCashOut] = useState<boolean | null>(null);
@@ -101,6 +105,13 @@ export function SettingsScreen() {
       </View>
       <View style={a.group}>
         <T v="smallStrong" c={color.muted}>{t.support}</T>
+        <View style={a.setting} accessible accessibilityLabel={`${t.serviceTitle}, ${service}`}>
+          <View style={a.rowIcon}><Activity size={icon.md} color={serviceOk ? color.green : color.amber} strokeWidth={1.7} /></View>
+          <View style={{ flex: 1, paddingVertical: space.sm }}>
+            <T v="label">{t.serviceTitle}</T>
+            <T v="small" c={color.muted}>{service}</T>
+          </View>
+        </View>
         <Row label={t.help} Icon={HelpCircle} onPress={() => nav.go({ name: 'help' })} />
         <T v="small" c={color.muted} style={{ textAlign: 'center', paddingTop: space.sm }}>{t.buildNote}</T>
       </View>

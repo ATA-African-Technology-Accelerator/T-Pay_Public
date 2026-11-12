@@ -1,7 +1,7 @@
 import type {
   AuthorizeVaultResponse, CompleteDepositResponse, CreateDepositRequest, CreateDepositResponse,
   CreateVaultRequest, CreateVaultResponse, PayLinkResponse,
-  CurrentVaultResponse, InterpretRequest, InterpretResponse, SpeakRequest, SpeakResponse,
+  CurrentVaultResponse, HealthResponse, InterpretRequest, InterpretResponse, SpeakRequest, SpeakResponse,
   ListTransactionsResponse, ListVouchersResponse, MeltVaultRequest,
   MeltVaultResponse, ActiveWalletResponse, ProfileView,
   RegisterDeviceRequest, RegisterDeviceResponse, SubmitVoucherRequest,
@@ -33,6 +33,8 @@ export interface ITPayApi {
   submitVoucher(request: SubmitVoucherRequest): Promise<SubmitVoucherResponse>;
   listVouchers(since?: string): Promise<ListVouchersResponse>;
   getVoucher(voucherId: string): Promise<VoucherView>;
+  /** Null when the server can't be reached at all. */
+  getHealth(): Promise<HealthResponse | null>;
   listTransactions(since?: string): Promise<ListTransactionsResponse>;
   getActiveWallet(): Promise<ActiveWalletResponse>;
   getPayLink(): Promise<PayLinkResponse>;
