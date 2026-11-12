@@ -332,9 +332,12 @@ export interface AssistantModelRequest {
 // validates before anything reaches a person. Throws AI_UNAVAILABLE when unreachable.
 export interface IAssistantModel {
   interpret(request: AssistantModelRequest): Promise<unknown>;
-  /** Reads a short reply aloud in a natural voice. Returns a WAV file. Throws AI_UNAVAILABLE when unreachable. */
-  speak(request: { text: string; language: Language }): Promise<{ audioBase64: string; audioMimeType: 'audio/wav' }>;
+  /** Reads a short reply aloud in a natural voice. Throws AI_UNAVAILABLE when unreachable. */
+  speak(request: { text: string; language: Language }): Promise<SpokenClip>;
 }
+
+/** A short spoken clip: WAV from Gemini, MP3 from ElevenLabs. */
+export interface SpokenClip { audioBase64: string; audioMimeType: 'audio/wav' | 'audio/mpeg' }
 
 
 export type WithdrawalStatus = PayoutStatus;
