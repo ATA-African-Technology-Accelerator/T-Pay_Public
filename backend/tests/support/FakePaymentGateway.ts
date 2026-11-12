@@ -44,11 +44,14 @@ export class FakePaymentGateway implements IPaymentGateway {
   public readonly orderCaptureCalls: CaptureOrderInput[] = [];
   public readonly plannedOrderCaptures: OrderCaptureResult[] = [];
   private readonly orderCaptures = new Map<string, string>();
+  // Counts every order ever made, so an id is never reused even when a test empties captureOrders.
+  private ordersMade = 0;
 
   public async createCaptureOrder(input: CreateCaptureOrderInput): Promise<PaymentOrder> {
     this.assertAvailable();
     this.captureOrders.push(input);
-    const orderId = `DEP-ORDER-${this.captureOrders.length}`;
+    this.ordersMade += 1;
+    const orderId = `DEP-ORDER-${this.ordersMade}`;
     return { orderId, approvalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}` };
   }
 
