@@ -85,6 +85,32 @@ describe('POST /api/assistant/interpret', () => {
       expect(data.proposal).toEqual({ intent: 'CHECK_BALANCE', amountNgnMinor: null, itemName: null });
     });
 
+    it('passes on a question about the app with its topic, and no amount', async () => {
+      const data = await proposalFor(reply({ intent: 'HELP', amountNaira: 5000, itemName: 'x', helpTopic: 'PAY' }));
+      expect(data.proposal).toEqual({ intent: 'HELP', amountNgnMinor: null, itemName: null, helpTopic: 'PAY' });
+    });
+
+    it('passes on stock that came in, with its quantity and no amount', async () => {
+      const data = await proposalFor(reply({ intent: 'ADD_STOCK', amountNaira: 10, itemName: 'Coke', quantity: 10 }));
+      expect(data.proposal).toEqual({ intent: 'ADD_STOCK', amountNgnMinor: null, itemName: 'Coke', quantity: 10 });
+    });
+
+    it('passes on a withdrawal with its amount, and nothing else', async () => {
+      const data = await proposalFor(reply({ intent: 'WITHDRAW', amountNaira: 5000, itemName: 'x', quantity: 3, screen: 'HOME' }));
+      expect(data.proposal).toEqual({ intent: 'WITHDRAW', amountNgnMinor: 500_000, itemName: null });
+    });
+
+    it('opens a screen only when the model names one', async () => {
+      expect((await proposalFor(reply({ intent: 'OPEN_SCREEN', amountNaira: null, screen: 'ACTIVITY' }))).proposal)
+        .toEqual({ intent: 'OPEN_SCREEN', amountNgnMinor: null, itemName: null, screen: 'ACTIVITY' });
+      expect((await proposalFor(reply({ intent: 'OPEN_SCREEN', amountNaira: null, screen: null }))).proposal.intent).toBe('UNKNOWN');
+    });
+
+    it('falls back to general help when the model names no topic', async () => {
+      const data = await proposalFor(reply({ intent: 'HELP', amountNaira: null, helpTopic: null }));
+      expect(data.proposal.helpTopic).toBe('WHAT_CAN_YOU_DO');
+    });
+
     it('accepts a payment of exactly what the vault has left', async () => {
       const data = await proposalFor(reply({ intent: 'PAY_AMOUNT', amountNaira: 8000 }));
 
@@ -135,6 +161,9 @@ describe('POST /api/assistant/interpret', () => {
       ['an amount larger than any vault', reply({ amountNaira: 10_000_001 })],
       ['an amount sent as text', reply({ amountNaira: '1000' })],
       ['an extra field', { ...reply(), signature: 'abc' }],
+      ['a help topic outside the contract', reply({ intent: 'HELP', amountNaira: null, helpTopic: 'SEND_ALL' })],
+      ['a screen outside the contract', reply({ intent: 'OPEN_SCREEN', amountNaira: null, screen: 'ADMIN' })],
+      ['a quantity that is not a whole count', reply({ intent: 'ADD_STOCK', amountNaira: null, itemName: 'Coke', quantity: 2.5 })],
       ['a missing reply', { ...reply(), spokenReply: undefined }],
       ['an empty reply', reply({ spokenReply: ' ' })],
       ['a reply that is too long', reply({ spokenReply: 'a'.repeat(301) })],
