@@ -1,8 +1,8 @@
 import { ApiError as GeminiApiError, GoogleGenAI, type GenerateContentParameters, type Part, type ThinkingLevel } from '@google/genai';
 import type { Language } from '@tpay/shared/contracts/statuses';
 import { ApiError } from '../../services/ApiError';
-import type { AssistantModelRequest, IAssistantModel } from '../../services/ports';
-import { ASSISTANT_INTENTS } from '../../validation/schemas';
+import type { AssistantModelRequest, IAssistantModel, SpokenClip } from '../../services/ports';
+import { ASSISTANT_INTENTS, ASSISTANT_SCREENS, HELP_TOPICS } from '../../validation/schemas';
 
 
 
@@ -45,10 +45,13 @@ const RESPONSE_SCHEMA = {
     intent: { type: 'string', enum: [...ASSISTANT_INTENTS] },
     amountNaira: { type: ['integer', 'null'], description: 'Whole naira, never kobo. null if no amount was said.' },
     itemName: { type: ['string', 'null'], description: 'The item named, in the words used, or null.' },
+    helpTopic: { type: ['string', 'null'], enum: [...HELP_TOPICS, null], description: 'For HELP only: what the question is about. null otherwise.' },
+    quantity: { type: ['integer', 'null'], description: 'For ADD_STOCK only: how many items came in. null otherwise.' },
+    screen: { type: ['string', 'null'], enum: [...ASSISTANT_SCREENS, null], description: 'For OPEN_SCREEN only: which screen. null otherwise.' },
     transcript: { type: 'string', description: 'What the person said, written in their language.' },
     spokenReply: { type: 'string', description: 'A short question confirming the proposal, in the reply language.' },
   },
-  required: ['intent', 'amountNaira', 'itemName', 'transcript', 'spokenReply'],
+  required: ['intent', 'amountNaira', 'itemName', 'helpTopic', 'quantity', 'screen', 'transcript', 'spokenReply'],
   additionalProperties: false,
 };
 
@@ -62,14 +65,34 @@ Intents:
 - PAY_AMOUNT: a customer wants to pay or send money. "Pay 2k", "Make I pay two thousand", "San ẹgbẹ̀rún méjì", "Kwụọ puku abụọ", "Biya dubu biyu".
 - RECORD_SALE: a seller records that they sold an item, usually with its money. "I sell two Coke for 1000", "Mo ta Coke méjì".
 - CHECK_BALANCE: the person asks how much money is left or available.
+- HELP: the person asks how the app works or what to do, rather than asking to do it now. "How do I pay?", "Why can't I see the send button?", "Wetin be offline vault?", "Is my money safe?", "What can you do?". Set helpTopic:
+  - PAY: paying or sending money, or the Pay or Send button.
+  - GET_PAID: collecting or receiving money.
+  - LOCK: the Offline vault, locking or adding money for offline use, topping up.
+  - WITHDRAW: moving money to PayPal or a bank, cashing out.
+  - SAFETY: whether money is safe, lost phones, fraud, payments being copied.
+  - WHAT_CAN_YOU_DO: anything else about the app, or a request for help in general.
+- LOCK_MONEY: put money in the Offline vault so it can be spent with no network. "Lock 5k", "Fund my vault", "Add 2000 to the vault".
+- UNLOCK_MONEY: close the Offline vault and get the unspent money back. "Unlock my money", "Close the vault".
+- ADD_MONEY: add money to the wallet from PayPal. "Add money", "Top up my wallet with 10k", "Deposit 5000".
+- WITHDRAW: move wallet money out to PayPal. "Withdraw 5000", "Cash out", "Send my money to PayPal", "Comot my money".
+- SHARE_PAY_LINK: send someone far away a link to pay by PayPal. "Share my pay link", "Send my payment link".
+- ADD_STOCK: items came in and go on the shelf. Set itemName and quantity. "Add 10 Coke to stock", "I bought 5 bags of rice".
+- CHECK_STOCK: how many of an item are left, or the stock in general. itemName if one was named. "How many Coke do I have?".
+- SET_BUDGET: set the monthly spending budget to an amount. "Set my budget to 50k".
+- CHECK_BUDGET: how much of the budget is used or left. "How is my budget?".
+- OPEN_SCREEN: go to a part of the app. Set screen: HOME, ACTIVITY (history, transactions, receipts), WALLET (money received, the PayPal wallet), VAULT, STOCK, BUDGET, SETTINGS (profile, language), HELP. "Show my transactions", "Open settings".
 - UNKNOWN: anything else, or when you are not sure.
+
+Only an action named above can be proposed. Never propose sending money to a person by name, phone number or email: that is done on the payment screens. Entering a PIN or password is never something you do.
 
 Amounts:
 - Give amountNaira in whole naira. "1k" and "one k" mean 1000. "2.5k" means 2500.
 - Yoruba: ọgọ́rùn-ún 100, igba 200, ẹgbẹ̀rún 1000, ẹgbàá 2000, ẹgbàárùn-ún 10000.
 - Igbo: narị 100, puku 1000, nde 1000000.
 - Hausa: ɗari 100, dubu 1000, miliyan 1000000.
-- Only use an amount the person actually said. Never guess one. Use null for CHECK_BALANCE and UNKNOWN.
+- Only use an amount the person actually said. Never guess one. Use null for CHECK_BALANCE, HELP, UNKNOWN, UNLOCK_MONEY, SHARE_PAY_LINK, ADD_STOCK, CHECK_STOCK, CHECK_BUDGET and OPEN_SCREEN.
+- For ADD_STOCK the number is the quantity, never an amount.
 
 Replies:
 - transcript: what the person said, in their own language.
@@ -121,7 +144,7 @@ export class GeminiAssistantModel implements IAssistantModel {
   }
 
 
-  public async speak({ text, language }: { text: string; language: Language }): Promise<{ audioBase64: string; audioMimeType: 'audio/wav' }> {
+  public async speak({ text, language }: { text: string; language: Language }): Promise<SpokenClip> {
     if (!this.client) {
       throw unavailable('GEMINI_API_KEY is not set');
     }
