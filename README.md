@@ -54,6 +54,8 @@ Lock money while you are online, then pay or get paid phone to phone with no int
 | **Android app** | [Download the build from Expo](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) |
 | **Live API** | [t-pay-public.onrender.com/api/health](https://t-pay-public.onrender.com/api/health) |
 | **User guide** | [docs/T-Pay-User-Guide.md](docs/T-Pay-User-Guide.md), with a ten-minute test script for judges |
+| **Explainer video** | [T-Pay explainer on YouTube](https://www.youtube.com/watch?v=xpTYEPPETxM) |
+| **Test accounts** | [docs/T-Pay-Test-Accounts.md](docs/T-Pay-Test-Accounts.md): the three sandbox logins, and which one is T-Pay's |
 
 > [!NOTE]
 > The API runs on Render's free plan and sleeps when idle. The first request after a quiet spell can take up to a minute.
