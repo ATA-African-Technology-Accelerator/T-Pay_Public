@@ -38,7 +38,7 @@ import { OfflineAssistant } from './features/settings/offlineAssistant';
 import { SideMenu } from './components/menu';
 import { ArrivalBanner } from './components/arrivalBanner';
 import { KeepBluetoothOn } from './features/business/keepBluetoothOn';
-import { api, appLock } from './composition';
+import { api, appLock, speechOut } from './composition';
 import { config } from './config';
 import { catalogueLanguage, t } from './i18n';
 import { onRevoked } from './session/guard';
@@ -113,6 +113,8 @@ export default function App() {
   useEffect(() => startSync(), []);
   // The free server sleeps when idle. Waking it now means setup and the first lock don't wait.
   useEffect(() => { if (!config.sampleOnly) void api.warmUp(); }, []);
+  // The phone's voice engine too, so the first spoken reply doesn't wait for it to start.
+  useEffect(() => { speechOut.warmUp(); }, []);
   // DEVICE_REVOKED: this identity is gone, so set the phone up again (contract section 6).
   useEffect(() => onRevoked(() => { setMenu(false); nav.reset({ name: 'language' }); }), []);
   // PayPal's return can arrive as a link if Android closed the in-app browser's caller.

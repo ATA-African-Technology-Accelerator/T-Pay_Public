@@ -26,12 +26,15 @@ const SPEECH_DB = -38;
 const QUIET_AFTER_SPEECH_MS = 900;
 const WAIT_FOR_SPEECH_MS = 7_000;
 const METER_EVERY_MS = 150;
+// A whole request has been heard and nothing new for this long: stop listening and answer.
+const SETTLE_AFTER_COMPLETE_MS = 700;
 
 /** A natural voice from the server: a base64 WAV clip, or null when it can't be had. */
 export type CloudVoice = (text: string, language: Language) => Promise<string | null>;
 
-// How long to wait for the server's voice before the phone's own voice reads it instead.
-const CLOUD_WAIT_MS = 1_500;
+// Only for a language the phone has no voice for (usually Yoruba, Igbo and Hausa): there the
+// server's voice is the only one, so it is worth waiting for. Anywhere else the phone speaks at once.
+const CLOUD_WAIT_MS = 8_000;
 const CACHE_LIMIT = 20;
 // A reply is a sentence. If playback never reports back, carry on after this.
 const MAX_SPEECH_MS = 25_000;
@@ -101,6 +104,15 @@ export class ExpoSpeechOutput implements ISpeechOutput {
     this.player = null;
   }
 
+  /**
+   * Starts the phone's voice engine in the background. The first time it is used it takes a few
+   * seconds to connect (measured: about four on an emulator), which would otherwise be added to
+   * the first reply. Asking for its voices connects it.
+   */
+  warmUp(): void {
+    void this.isAvailable('en');
+  }
+
   async isAvailable(language: Language): Promise<boolean> {
     this.voices ??= Speech.getAvailableVoicesAsync().then(v => v.map(x => x.language.toLowerCase())).catch(() => []);
     const want = VOICE[language].toLowerCase();
@@ -115,15 +127,23 @@ export class ExpoSpeechOutput implements ISpeechOutput {
     this.stop();
     const turn = this.turn;
     try {
-      if (natural && this.cloud && Platform.OS !== 'web') {
+      const phoneVoice = await this.isAvailable(language);
+      if (turn !== this.turn) return;
+      // Speed first: a reply starts the moment it is ready. The server's natural voice takes
+      // seconds to make, so it is used only when it is already saved for this exact sentence,
+      // or when the phone has no voice for the language at all.
+      const cached = this.clips.get(`${language}|${text}`);
+      if (natural && cached) { await this.play(cached); return; }
+      if (natural && !phoneVoice && this.cloud && Platform.OS !== 'web') {
         const uri = await Promise.race([
           this.clipFor(text, language).catch(() => null),
           new Promise<null>(resolve => setTimeout(() => resolve(null), CLOUD_WAIT_MS)),
         ]);
         if (turn !== this.turn) return; // something newer is being said
-        if (uri) { await this.play(uri); return; }
+        if (uri) await this.play(uri);
+        return;
       }
-      if (!(await this.isAvailable(language))) return;
+      if (!phoneVoice) return;
       await this.talk(done => Speech.speak(text, { language: VOICE[language], rate: 0.9, onDone: done, onStopped: done, onError: done }));
     } catch (e) {
       console.warn('Speech output failed', e);
@@ -202,7 +222,7 @@ export class ExpoSpeechInput implements ISpeechInput {
    * for the model to read. Null when this phone can't, so audio is sent instead; `text` is null
    * when it listened and heard nothing.
    */
-  async transcribeLive(language: Language): Promise<{ text: string | null } | null> {
+  async transcribeLive(language: Language, complete?: (text: string) => boolean): Promise<{ text: string | null } | null> {
     if (language !== 'en') return null;
     try {
       const module = require('expo-speech-recognition').ExpoSpeechRecognitionModule as typeof import('expo-speech-recognition').ExpoSpeechRecognitionModule;
@@ -210,14 +230,19 @@ export class ExpoSpeechInput implements ISpeechInput {
     } catch {
       return null;
     }
-    return { text: await this.listenShort(language, text => (text.trim() ? text.trim() : null), false, LIVE_SENTENCE_MS) };
+    return { text: await this.listenShort(language, text => (text.trim() ? text.trim() : null), false, LIVE_SENTENCE_MS, complete) };
   }
 
   /**
    * The phone's recogniser for a few seconds. `read` turns what was heard into an answer; with
    * `early`, it stops as soon as one is found instead of waiting for the end of the phrase.
+   * With `complete`, it stops a moment after the words heard so far make a whole request, instead
+   * of waiting for the phone to decide the person has finished (often a second or two of silence).
    */
-  private async listenShort<A>(language: Language, read: (text: string) => A | null, early = true, maxMs = LISTEN_FOR_ANSWER_MS): Promise<A | null> {
+  private async listenShort<A>(
+    language: Language, read: (text: string) => A | null, early = true, maxMs = LISTEN_FOR_ANSWER_MS,
+    complete?: (text: string) => boolean,
+  ): Promise<A | null> {
     let module: typeof import('expo-speech-recognition').ExpoSpeechRecognitionModule;
     try {
       module = require('expo-speech-recognition').ExpoSpeechRecognitionModule;
@@ -229,10 +254,18 @@ export class ExpoSpeechInput implements ISpeechInput {
     return new Promise<A | null>(resolve => {
       let answer: A | null = null;
       let settled = false;
-      const done = () => { if (settled) return; settled = true; clearTimeout(timer); subs.forEach(x => x.remove()); resolve(answer); };
+      let settle: ReturnType<typeof setTimeout> | undefined;
+      const done = () => { if (settled) return; settled = true; clearTimeout(timer); clearTimeout(settle); subs.forEach(x => x.remove()); resolve(answer); };
       const timer = setTimeout(() => { module.stop(); done(); }, maxMs);
       const subs = [
-        module.addListener('result', e => { answer = read(e.results[0]?.transcript ?? '') ?? answer; if ((early && answer) || e.isFinal) { module.stop(); } }),
+        module.addListener('result', e => {
+          const heard = e.results[0]?.transcript ?? '';
+          answer = read(heard) ?? answer;
+          if ((early && answer) || e.isFinal) { module.stop(); return; }
+          // More words push the stop back, so "collect two thousand five hundred" isn't cut at "two thousand".
+          clearTimeout(settle);
+          if (complete?.(heard)) settle = setTimeout(() => { module.stop(); done(); }, SETTLE_AFTER_COMPLETE_MS);
+        }),
         module.addListener('error', done),
         module.addListener('end', done),
       ];

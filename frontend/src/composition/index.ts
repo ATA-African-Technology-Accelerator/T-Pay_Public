@@ -31,8 +31,8 @@ export const connectivity = new NetInfoConnectivity();
 export const radio = loadRadio();
 export const nearby = new NearbyTransport(loadNearbyDriver(), radio);
 export const speechIn = new ExpoSpeechInput();
-// Online, replies are read in a natural voice from the server. Offline, or if that is slow or
-// fails, the phone's own voice reads them.
+// Replies are read by the phone's own voice, which starts at once. The server's natural voice is
+// used for a language the phone has no voice for, and for a sentence it has already made.
 export const speechOut = new ExpoSpeechOutput(async (text, language) => {
   if (!(await connectivity.isOnline())) return null;
   return (await api.speak({ text, language })).audioBase64;

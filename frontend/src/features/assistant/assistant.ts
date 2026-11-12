@@ -93,7 +93,29 @@ export async function offlineAnswer(text: string, language: Language, remainingN
   return { ...rules, intent, amountNgnMinor: amount, onDevice: usedModel, itemName: intent === 'RECORD_SALE' ? model.proposal.itemName ?? null : null };
 }
 
+/**
+ * Online or not, a request the simple rules read completely ("collect 2k", "pay five hundred naira",
+ * "how much do I have") is answered on the phone at once, with no trip to the server: the model
+ * would take one to five seconds to say the same thing. Only what the rules can't read in full
+ * goes to the model, such as a sale (it needs the item's name) or a Yoruba number word.
+ * Null when the rules didn't understand it all.
+ */
+export function quickAnswer(text: string, language: Language, remainingNgnMinor: number): Proposal | null {
+  const rules = rulesProposal(text, language);
+  const payment = rules.intent === 'PAY_AMOUNT' || rules.intent === 'CREATE_PAYMENT_REQUEST';
+  if (rules.intent !== 'CHECK_BALANCE' && !(payment && rules.amountNgnMinor !== null)) return null;
+  const answer = { ...rules, offline: false };
+  return tooMuch(answer.intent, answer.amountNgnMinor, remainingNgnMinor) ? refusedOverCapacity(answer, false) : answer;
+}
+
 export async function interpretText(text: string, language: Language, remainingNgnMinor: number): Promise<Proposal> {
+  // Before even asking whether there is a network: the rules need none, and asking takes a moment.
+  const quick = quickAnswer(text, language, remainingNgnMinor);
+  if (quick) {
+    // The log is written after the answer goes out, never before it.
+    void record('rules', quick.overCapacity ? 'REJECTED_OVER_CAPACITY' : 'ACCEPTED', quick.intent, quick.amountNgnMinor).catch(() => undefined);
+    return quick;
+  }
   if (!(await connectivity.isOnline())) return offlineAnswer(text, language, remainingNgnMinor);
   try {
     const r = await withSession(() => api.interpret({ text, audioBase64: null, audioMimeType: null, language, context: { remainingNgnMinor } }));

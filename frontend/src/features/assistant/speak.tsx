@@ -9,7 +9,7 @@ import { useApp } from '../../state/appState';
 import { t } from '../../i18n';
 import { api, localModel, speechIn, speechOut } from '../../composition';
 import { apiMessage } from '../errors';
-import { interpretSpeech, interpretText, offlineAnswer, rulesProposal, type Proposal } from './assistant';
+import { interpretSpeech, interpretText, offlineAnswer, quickAnswer, rulesProposal, type Proposal } from './assistant';
 import { useModelState } from '../settings/offlineAssistant';
 import { salesStore } from '../business/businessStore';
 
@@ -73,7 +73,7 @@ export function Speak({ auto = false, attempt = 0 }: { auto?: boolean; attempt?:
       if (!online) { await offlinePath(); return; }
       setPhase('listening');
       // English: the phone writes down the words as they are said, and only text is sent.
-      const live = await speechIn.transcribeLive(language);
+      const live = await speechIn.transcribeLive(language, heard => quickAnswer(heard, language, offline.leftNgn) !== null);
       if (live) {
         if (!live.text) throw new Error('NO_SPEECH');
         setPhase('thinking');
