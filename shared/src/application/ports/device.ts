@@ -67,7 +67,8 @@ export interface ISpeechInput {
   record(): Promise<RecordedSpeech>;
   /** Listens for a short spoken answer: yes, no, or neither (null). */
   listenYesNo(language: Language): Promise<'yes' | 'no' | null>;
-  transcribeOffline(language: Language): Promise<string | null>;
+  /** Null when the phone can't recognise speech offline; `text` is null when nothing was heard. */
+  transcribeOffline(language: Language, complete?: (text: string) => boolean): Promise<{ text: string | null } | null>;
 }
 
 
