@@ -4,7 +4,7 @@ name: Tests
 
 on:
   push:
-    branches: [frontend, main]
+    branches: [frontend, main, main-copy]
   pull_request:
 
 concurrency:
