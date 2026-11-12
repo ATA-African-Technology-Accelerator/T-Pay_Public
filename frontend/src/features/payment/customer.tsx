@@ -3,9 +3,9 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { AlertCircle, Check, Copy } from 'lucide-react-native';
 import { color, icon, motion, space } from '../../theme/tokens';
-import { Button, HearIt, Panel, Rise, T, money, rate, sayNaira, usd } from '../../components/ui';
+import { Button, HearIt, Panel, Rise, T, money, rate, sayNaira, speakNaturally, usd } from '../../components/ui';
 import { Avatar, CurvedHeader, Screen } from '../../components/shell';
-import { FrameCode, HoldToConfirm, NoteStack, StatusMark, Steps } from '../../components/money';
+import { FrameCode, NoteStack, StatusMark, Steps } from '../../components/money';
 import { CheckDisc } from '../../components/icons';
 import { Line } from '../../components/rows';
 import { useNav } from '../../nav';
@@ -13,6 +13,7 @@ import { useApp } from '../../state/appState';
 import { t } from '../../i18n';
 import { syncNow } from '../../sync/syncCoordinator';
 import { store } from '../../composition';
+import { ConfirmPin } from '../onboarding/lock';
 import { pay, takeReceipt, type ScannedRequest } from './payments';
 import { JOIN_DEADLINE_MS, LATE_LINK_MS, REPLY_DEADLINE_MS, bluetoothReady, closeLink, hasLink, joinLink, linkChannel, receiveFrame, sendFrame } from './link';
 
@@ -23,6 +24,9 @@ export function Review({ scanned, expected, handsFree = false }: { scanned: Scan
   const nav = useNav();
   const { offline } = useApp();
   const [busy, setBusy] = useState(false);
+  // Paying asks for the PIN or fingerprint, so a phone in someone else's hand, or a voice nearby,
+  // can't spend the vault. Started by voice, the fingerprint prompt opens once the summary is read.
+  const [asking, setAsking] = useState(false);
   const paid = useRef(false);
   const { review } = scanned;
   const amount = review.amountNgnMinor;
@@ -58,10 +62,26 @@ export function Review({ scanned, expected, handsFree = false }: { scanned: Scan
   };
 
   const say = t.sayPay(sayNaira(amount), review.merchantName);
+  useEffect(() => {
+    if (!handsFree) return;
+    let gone = false;
+    void speakNaturally(`${say}. ${t.confirmToPay}`).then(() => { if (!gone) setAsking(true); });
+    return () => { gone = true; };
+  }, []);
+  if (asking) {
+    return (
+      <ConfirmPin
+        heading={`${t.pay} ${money(amount)} · ${review.merchantName}`}
+        offerFingerprint={handsFree}
+        onCancel={() => setAsking(false)}
+        onConfirmed={() => { setAsking(false); void go(); }}
+      />
+    );
+  }
   return (
     <Screen
       head={<CurvedHeader back bell={false} title={t.checkPay} />}
-      footer={<HoldToConfirm label={t.holdToPay} say={say} busy={busy} onDone={() => { void go(); }} />}
+      footer={<Button label={busy ? t.paying : `${t.pay} ${money(amount)}`} loading={busy} onPress={() => setAsking(true)} />}
     >
       {expected !== undefined && expected !== amount && (
         <Panel style={s.warn}>
@@ -74,7 +94,7 @@ export function Review({ scanned, expected, handsFree = false }: { scanned: Scan
           <T v="body" c={color.muted}>{t.youPay}</T>
           <T v="moneyL" numberOfLines={1} adjustsFontSizeToFit>{money(amount)}</T>
           <NoteStack amount={amount} />
-          <HearIt auto={handsFree} say={`${say}. ${t.holdToPay}`} />
+          <HearIt say={`${say}. ${t.confirmToPay}`} />
         </Panel>
       </Rise>
       <Rise delay={motion.stagger * 2}>
