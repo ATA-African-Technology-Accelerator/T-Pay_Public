@@ -31,3 +31,9 @@ describe('Hey T-Pay', () => {
     expect(afterWakeWord(said, { alone: true })).toBeNull();
   });
 });
+
+describe('Hey T-Pay, as speech engines spell it', () => {
+  it.each(['hey tea bay', 'hey T P', 'hey tee pee', 'hey typay', 'okay deepay', 'hey T. Pay.'])('hears "%s"', said => {
+    expect(afterWakeWord(said)).toBe('');
+  });
+});
