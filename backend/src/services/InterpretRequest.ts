@@ -13,7 +13,12 @@ type Refusal = Exclude<Outcome, 'ACCEPTED'>;
 
 const KOBO_PER_NAIRA = 100;
 const NO_PROPOSAL: Proposal = { intent: 'UNKNOWN', amountNgnMinor: null, itemName: null };
-const HAS_NO_AMOUNT: Proposal['intent'][] = ['CHECK_BALANCE', 'UNKNOWN'];
+// Asking, opening a screen or naming stock moves no money, so an amount there is dropped.
+const HAS_NO_AMOUNT: Proposal['intent'][] = [
+  'CHECK_BALANCE', 'HELP', 'UNKNOWN', 'UNLOCK_MONEY', 'SHARE_PAY_LINK', 'ADD_STOCK', 'CHECK_STOCK', 'CHECK_BUDGET', 'OPEN_SCREEN',
+];
+// Only these name an item.
+const HAS_ITEM: Proposal['intent'][] = ['RECORD_SALE', 'ADD_STOCK', 'CHECK_STOCK'];
 
 // Spoken when the model's answer is refused, so the model's own words, which an
 // injected instruction could have shaped, never reach the person.
@@ -53,10 +58,24 @@ export class InterpretRequest {
       return this.refuse(device, body, input, 'REJECTED_INVALID', input.kind === 'text' ? input.text : '', null, modelMs);
     }
 
-    const { amountNaira, intent, itemName, spokenReply, transcript } = parsed.data;
-    const proposal: Proposal = HAS_NO_AMOUNT.includes(intent)
-      ? { intent, amountNgnMinor: null, itemName: null }
-      : { intent, amountNgnMinor: amountNaira === null ? null : amountNaira * KOBO_PER_NAIRA, itemName };
+    const { amountNaira, helpTopic, intent, itemName, quantity, screen, spokenReply, transcript } = parsed.data;
+    // A question about the app. The app answers it from its own words, never the model's.
+    if (intent === 'HELP') {
+      const proposal: Proposal = { intent, amountNgnMinor: null, itemName: null, helpTopic: helpTopic ?? 'WHAT_CAN_YOU_DO' };
+      log(device, body, input, 'ACCEPTED', proposal, modelMs);
+      return { proposal, transcript, spokenReply, needsConfirmation: true };
+    }
+    // Opening a screen needs to know which one; without it there is nothing to do.
+    if (intent === 'OPEN_SCREEN' && !screen) {
+      return this.refuse(device, body, input, 'REJECTED_INVALID', transcript, null, modelMs);
+    }
+    const proposal: Proposal = {
+      intent,
+      amountNgnMinor: HAS_NO_AMOUNT.includes(intent) || amountNaira === null ? null : amountNaira * KOBO_PER_NAIRA,
+      itemName: HAS_ITEM.includes(intent) ? itemName : null,
+      ...(intent === 'ADD_STOCK' ? { quantity } : {}),
+      ...(intent === 'OPEN_SCREEN' ? { screen } : {}),
+    };
 
     if (overCapacity(proposal, body.context.remainingNgnMinor)) {
       return this.refuse(device, body, input, 'REJECTED_OVER_CAPACITY', transcript, proposal, modelMs);
