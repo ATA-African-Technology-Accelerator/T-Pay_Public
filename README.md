@@ -388,9 +388,9 @@ To report a vulnerability, please do **not** open a public issue. See [SECURITY.
 
 | | Name | Role | GitHub |
 | :---: | :--- | :--- | :--- |
-| <img src="https://github.com/OlayiwolaSherrifSalawu.png" width="56" alt=""> | Olayiwola Salawu | <!-- Frontend/backend--> | [@OlayiwolaSherrifSalawu](https://github.com/OlayiwolaSherrifSalawu) |
-| <img src="https://github.com/BramTechxxvi.png" width="56" alt=""> | <!-- TODO: full name --> BramTechxxvi | <!-- Backend/System Architect --> | [@BramTechxxvi](https://github.com/BramTechxxvi) |
-| <img src="https://github.com/Maximoi22.png" width="56" alt=""> | Abdulmalik Olajuwon | <!-- Team Lead --> | [@Maximoi22](https://github.com/Maximoi22) |
+| <img src="https://github.com/OlayiwolaSherrifSalawu.png" width="56" alt=""> | Olayiwola Salawu | Frontend/backend | [@OlayiwolaSherrifSalawu](https://github.com/OlayiwolaSherrifSalawu) |
+| <img src="https://github.com/BramTechxxvi.png" width="56" alt=""> | <!-- TODO: full name --> BramTechxxvi |  Backend/System Architect | [@BramTechxxvi](https://github.com/BramTechxxvi) |
+| <img src="https://github.com/Maximoi22.png" width="56" alt=""> | Abdulmalik Olajuwon | Team Lead | [@Maximoi22](https://github.com/Maximoi22) |
 
 ## Contributing
 
