@@ -12,7 +12,7 @@ export type Route =
   | { name: 'home' } | { name: 'activity' } | { name: 'vault' } | { name: 'speak'; auto?: boolean; attempt?: number } | { name: 'settings' } | { name: 'help' }
   | { name: 'ledger' } | { name: 'withdraw' } | { name: 'addMoney' } | { name: 'offlineAi' } | { name: 'stock' } | { name: 'budget' }
   | { name: 'receipt'; id: string }
-  | { name: 'amount'; mode: 'lock' | 'collect' }
+  | { name: 'amount'; mode: 'lock' | 'collect'; prefill?: number }
   | { name: 'vaultReview'; amount: number; hours: number } | { name: 'vaultActive' } | { name: 'melt' }
   | { name: 'request'; amount: number; handsFree?: boolean }
   | { name: 'scan'; kind: 'request'; expected?: number; handsFree?: boolean }

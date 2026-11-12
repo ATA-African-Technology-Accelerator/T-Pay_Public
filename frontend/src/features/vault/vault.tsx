@@ -13,6 +13,8 @@ import { t } from '../../i18n';
 import type { PendingVault } from '../../adapters/storage/localStore';
 import { apiMessage, isCode } from '../errors';
 import { completeVault, lockFromWallet, meltVault, openApproval, startVault } from './vaultActivities';
+import { useCashOut, useTopUp } from './topUp';
+import { ConfirmPin } from '../onboarding/lock';
 import { convertNgnToUsd } from '@tpay/shared/domain/convertNgnToUsd';
 import { Money } from '@tpay/shared/shared/domain/Money';
 
@@ -30,6 +32,8 @@ export function VaultScreen() {
   const nav = useNav();
   const { offline, history, vault } = useApp();
   const mine = history.filter(e => e.dir === 'out' && e.voucher?.voucher.payload.vaultId === vault?.vaultId);
+  const topUp = useTopUp();
+  const cashOut = useCashOut();
   return (
     <Screen tabsFor="vault" head={<CurvedHeader home title={t.vaultTitle} />}>
       <Rise style={v.total}>
@@ -51,8 +55,25 @@ export function VaultScreen() {
           </Panel>
         </>
       )}
+      {!offline.open && topUp.kobo > 0 && (
+        <Panel style={v.gap}>
+          <T v="label">{t.topUpTitle(money(topUp.kobo))}</T>
+          <T v="small" c={color.muted}>{t.topUpNote}</T>
+          <Button label={t.lockShort} onPress={() => nav.go({ name: 'amount', mode: 'lock', prefill: topUp.kobo })} />
+          <Button kind="quiet" label={t.notNow} onPress={() => { void topUp.dismiss(); }} />
+        </Panel>
+      )}
+      <Panel style={v.gap}>
+        {offline.incomingNgn > 0 ? (
+          <>
+            <T v="label">{t.receivedOffline(money(offline.incomingNgn))}</T>
+            <T v="small" c={color.muted}>{cashOut ? t.receivedQueuedCashOut : t.receivedQueuedNote}</T>
+          </>
+        ) : <T v="small" c={color.muted}>{t.receiveHere}</T>}
+        <Button kind="soft" label={t.getPaid} onPress={() => nav.go({ name: 'amount', mode: 'collect' })} />
+      </Panel>
       {offline.open && !offline.melted && <Button kind="soft" label={t.closeVault} onPress={() => nav.go({ name: 'melt' })} />}
-      {!offline.open && <Button label={t.addMoney} onPress={() => nav.go({ name: 'amount', mode: 'lock' })} />}
+      {!offline.open && !topUp.kobo && <Button label={t.addMoney} onPress={() => nav.go({ name: 'amount', mode: 'lock' })} />}
       {offline.melted && offline.releaseAt && (
         <Panel>
           <T v="label">{t.stillHeld}</T>
@@ -200,6 +221,9 @@ export function Melt() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const before = useRef({ left: offline.leftNgn, pending: offline.pendingOutNgn });
+  // Closing gives the unspent part back, so it asks for the PIN or fingerprint first, like
+  // sending money. Money already paid out stays locked for the people holding it either way.
+  const [asking, setAsking] = useState(false);
 
   const close = async () => {
     setBusy(true); setProblem(null);
@@ -233,8 +257,11 @@ export function Melt() {
       </Screen>
     );
   }
+  if (asking) {
+    return <ConfirmPin heading={t.stopSpending} onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void close(); }} />;
+  }
   return (
-    <Screen head={<CurvedHeader back bell={false} title={t.closeVault} />} footer={<Button label={busy ? t.closing : t.closeVault} loading={busy} onPress={() => { void close(); }} />}>
+    <Screen head={<CurvedHeader back bell={false} title={t.closeVault} />} footer={<Button label={busy ? t.closing : t.closeVault} loading={busy} onPress={() => setAsking(true)} />}>
       <T v="hello">{t.stopSpending}</T>
       <Panel>
         <Line label={t.unspent} value={money(offline.leftNgn)} strong />
@@ -253,4 +280,5 @@ const v = StyleSheet.create({
   center: { textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   problem: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  gap: { gap: space.sm },
 });

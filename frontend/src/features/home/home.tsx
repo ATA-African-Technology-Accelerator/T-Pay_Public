@@ -9,8 +9,9 @@ import { ActivityRows } from '../../components/rows';
 import { useNav } from '../../nav';
 import { useApp, type Entry } from '../../state/appState';
 import { store } from '../../composition';
-import { useHealth } from '../../state/health';
 import { useModelState } from '../settings/offlineAssistant';
+import { useHealth } from '../../state/health';
+import { useTopUp } from '../vault/topUp';
 import { t } from '../../i18n';
 
 const ic = { size: icon.md, color: color.white, strokeWidth: 1.8 };
@@ -92,15 +93,20 @@ export function HomeScreen() {
   const withdraw: HeroAction = { label: t.withdraw, icon: <Banknote {...ic} />, onPress: () => nav.go({ name: 'withdraw' }) };
   const received: HeroAction = { label: t.received, icon: <Landmark {...ic} />, onPress: () => nav.go({ name: 'ledger' }) };
 
-  // The Offline vault only locks and sends money. Money people receive lands in the Main
-  // wallet: a payment taken offline shows there as coming in until the phone syncs.
+  // The Offline vault pays out of locked money and takes payments with no network. Money it
+  // takes is queued, then lands in the Wallet when the phone syncs: a payment not yet settled
+  // can still be refused, so it is never spent again offline (see topUp.ts).
   // Lock money only while no vault is open: the backend allows one (decision 8).
-  const offlineActions = offline.canSpend ? [pay, vault, activity] : offline.open ? [vault, activity] : [lock, activity];
+  const offlineActions = offline.canSpend ? [pay, receive, vault, activity] : offline.open ? [receive, vault, activity] : [lock, receive, activity];
+  const topUp = useTopUp();
   const comingIn = active.pendingNgn + offline.incomingNgn;
   const pages: WalletPage[] = [
     {
       key: 'offline', name: t.walletOffline, label: t.canSpend, amount: offline.leftNgn, actions: offlineActions,
-      note: offline.pendingOutNgn ? `${money(offline.pendingOutNgn)} ${t.onTheWay}` : '',
+      note: [
+        offline.pendingOutNgn ? `${money(offline.pendingOutNgn)} ${t.onTheWay}` : '',
+        offline.incomingNgn ? `${money(offline.incomingNgn)} ${t.receivedQueued}` : '',
+      ].filter(Boolean).join(' · '),
       status: offline.canSpend ? t.readyOffline : offline.open ? t.spendingEnded : t.noVault,
     },
     {
@@ -115,6 +121,8 @@ export function HomeScreen() {
   const linkNotice = <Notice icon={<Landmark {...mark} />} title={t.shareLinkTitle} note={t.shareLinkNote} onPress={() => nav.go({ name: 'ledger' })} />;
   const offlineNotice = pendingVault && !offline.open
     ? <Notice icon={<Lock {...mark} />} title={t.finishLock} note={t.finishLockHint} onPress={() => nav.go({ name: 'vaultReview', amount: pendingVault.amountNgnMinor, hours: pendingVault.durationHours })} />
+    : !offline.open && topUp.kobo
+      ? <Notice icon={<Lock {...mark} />} title={t.topUpTitle(money(topUp.kobo))} note={t.topUpNote} onPress={() => nav.go({ name: 'amount', mode: 'lock', prefill: topUp.kobo })} />
     : !offline.open
       ? <Notice icon={<Lock {...mark} />} title={t.noVault} note={t.noVaultHint} onPress={lockMoney} />
       : offline.canSpend

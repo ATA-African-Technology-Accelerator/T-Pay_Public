@@ -59,7 +59,7 @@ function render(r: Route) {
     case 'activity': return <Activity />;
     case 'receipt': return <Receipt id={r.id} />;
     case 'vault': return <VaultScreen />;
-    case 'amount': return <Amount mode={r.mode} />;
+    case 'amount': return <Amount mode={r.mode} prefill={r.prefill} />;
     case 'vaultReview': return <VaultReview amount={r.amount} hours={r.hours} />;
     case 'vaultActive': return <VaultActive />;
     case 'melt': return <Melt />;

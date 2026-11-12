@@ -14,10 +14,11 @@ const HOURS = [6, 12, 24];
  * Amount entry, in whole naira. Locking is limited only by what the backend allows,
  * because PayPal holds the money: the Wallet plays no part.
  */
-export function Amount({ mode }: { mode: 'lock' | 'collect' }) {
+export function Amount({ mode, prefill }: { mode: 'lock' | 'collect'; prefill?: number }) {
   const nav = useNav();
   const lock = mode === 'lock';
-  const [nairaAmount, setNaira] = useState(0);
+  // A top-up arrives with the amount already filled in; the person can still change it.
+  const [nairaAmount, setNaira] = useState(prefill ? Math.floor(Math.min(prefill, MAX_REQUEST_NGN_MINOR) / 100) : 0);
   const [hours, setHours] = useState(24);
   const capNaira = MAX_REQUEST_NGN_MINOR / 100;
   const kobo = nairaAmount * 100;

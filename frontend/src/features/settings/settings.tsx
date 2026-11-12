@@ -14,7 +14,7 @@ import { withSession } from '../../session/guard';
 import { modelNote, useModelState } from './offlineAssistant';
 import { useHealth } from '../../state/health';
 
-const CASH_OUT = 'ui.autoCashOut';
+import { CASH_OUT } from '../vault/topUp';
 
 /** ACT-16. Read from the phone; when online, the backend's copy wins and is saved here. */
 export function SettingsScreen() {
