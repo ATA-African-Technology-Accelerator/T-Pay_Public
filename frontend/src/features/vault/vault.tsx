@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { AlertCircle } from 'lucide-react-native';
 import type { MeltVaultResponse } from '@tpay/shared/contracts/api';
 import { color, icon, motion, space } from '../../theme/tokens';
-import { Button, HearIt, Panel, Rise, RollingMoney, T, money, rate, sayNaira, usd, when } from '../../components/ui';
+import { Button, HearIt, Panel, Rise, RollingMoney, T, money, rate, sayNaira, speakNaturally, usd, when } from '../../components/ui';
 import { CurvedHeader, Screen, Section } from '../../components/shell';
 import { ActivityRows, Duo, Line } from '../../components/rows';
 import { StatusMark } from '../../components/money';
@@ -15,6 +15,7 @@ import { apiMessage, isCode } from '../errors';
 import { completeVault, lockFromWallet, meltVault, openApproval, startVault } from './vaultActivities';
 import { useCashOut, useTopUp } from './topUp';
 import { ConfirmPin } from '../onboarding/lock';
+import { payHelp } from '../assistant/help';
 import { convertNgnToUsd } from '@tpay/shared/domain/convertNgnToUsd';
 import { Money } from '@tpay/shared/shared/domain/Money';
 
@@ -43,6 +44,8 @@ export function VaultScreen() {
           {!offline.open ? t.noVault : offline.canSpend ? t.spendByDate(when(offline.spendBy)) : offline.settleBy ? t.releaseByDate(when(offline.settleBy)) : t.spendingEnded}
         </T>
       </Rise>
+      {/* Always shown. With nothing to pay from, the assistant says why and offers to lock money. */}
+      <Button kind={offline.canSpend ? 'solid' : 'soft'} label={t.pay} onPress={() => nav.go(offline.canSpend ? { name: 'scan', kind: 'request' } : payHelp())} />
       {offline.open && (
         <>
           <Duo items={[{ label: t.spent, value: money(offline.spentNgn) }, { label: t.waitingToFinish, value: money(offline.pendingOutNgn) }]} />
@@ -92,7 +95,7 @@ export function VaultScreen() {
  * ACT-04. Asks PayPal first, so the dollar amount and rate shown are the ones the
  * order will hold (FR-10). Then ACT-05: approve in PayPal and come back through tpay://.
  */
-export function VaultReview({ amount, hours }: { amount: number; hours: number }) {
+export function VaultReview({ amount, hours, handsFree = false }: { amount: number; hours: number; handsFree?: boolean }) {
   const nav = useNav();
   const { active, online } = useApp();
   const [order, setOrder] = useState<PendingVault | null>(null);
@@ -104,6 +107,10 @@ export function VaultReview({ amount, hours }: { amount: number; hours: number }
   const covered = online && active.known && active.balanceUsd >= need && active.balanceNgn >= amount;
   const [viaPayPal, setViaPayPal] = useState(!covered);
   const started = useRef(false);
+  // Asked by voice, locking from the Wallet still needs the PIN or fingerprint, and locking with
+  // PayPal still needs the PayPal sign-in. The assistant only opens them.
+  const [asking, setAsking] = useState(false);
+  const spoke = useRef(false);
 
   const prepare = async () => {
     setProblem(null);
@@ -143,6 +150,21 @@ export function VaultReview({ amount, hours }: { amount: number; hours: number }
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!handsFree || spoke.current) return;
+    if (!viaPayPal) {
+      spoke.current = true;
+      void speakNaturally(t.confirmToLock).then(() => setAsking(true));
+    } else if (order) {
+      spoke.current = true;
+      void speakNaturally(t.signInPayPal).then(() => { void approve(); });
+    }
+  }, [order, viaPayPal]);
+
+  if (asking) {
+    return <ConfirmPin heading={`${t.lockFromWallet} · ${money(amount)}`} offerFingerprint onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void fromWallet(); }} />;
+  }
 
   const footer = !viaPayPal
     ? (
@@ -213,7 +235,7 @@ export function VaultActive() {
 }
 
 /** ACT-12. Unspent money goes back to PayPal; money owed to sellers stays held until it settles. */
-export function Melt() {
+export function Melt({ handsFree = false }: { handsFree?: boolean }) {
   const nav = useNav();
   const { offline, vault } = useApp();
   const backTo = vault?.view?.fundedBy === 'WALLET' ? t.unspentToWallet : t.unspentReturns;
@@ -224,6 +246,13 @@ export function Melt() {
   // Closing gives the unspent part back, so it asks for the PIN or fingerprint first, like
   // sending money. Money already paid out stays locked for the people holding it either way.
   const [asking, setAsking] = useState(false);
+  // Asked by voice: say what happens, then open the fingerprint (the person still has to give it).
+  useEffect(() => {
+    if (!handsFree) return;
+    let gone = false;
+    void speakNaturally(t.confirmToUnlock).then(() => { if (!gone) setAsking(true); });
+    return () => { gone = true; };
+  }, []);
 
   const close = async () => {
     setBusy(true); setProblem(null);
@@ -258,7 +287,7 @@ export function Melt() {
     );
   }
   if (asking) {
-    return <ConfirmPin heading={t.stopSpending} onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void close(); }} />;
+    return <ConfirmPin heading={t.stopSpending} offerFingerprint={handsFree} onCancel={() => setAsking(false)} onConfirmed={() => { setAsking(false); void close(); }} />;
   }
   return (
     <Screen head={<CurvedHeader back bell={false} title={t.closeVault} />} footer={<Button label={busy ? t.closing : t.closeVault} loading={busy} onPress={() => setAsking(true)} />}>
