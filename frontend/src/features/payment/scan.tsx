@@ -8,10 +8,18 @@ import { CurvedHeader, Screen } from '../../components/shell';
 import { Steps } from '../../components/money';
 import { useNav, type Route } from '../../nav';
 import { t } from '../../i18n';
+import { File } from 'expo-file-system';
 import { readRequest, takeReceipt, takeVoucher } from './payments';
+import { pickPictureSize, readQrFromJpeg } from './qrDecode';
 import { closeLink } from './link';
 
 type ScanRoute = Extract<Route, { name: 'scan' }>;
+
+// The phone's built-in reader usually finds a code at once. When it hasn't after this long (some
+// phones have none, or it misses dense codes), T-Pay's own reader looks at a still photo instead,
+// one every so often, until a code is read.
+const OWN_READER_AFTER_MS = 2_000;
+const OWN_READER_EVERY_MS = 1_500;
 
 const COPY = {
   request: { at: 1 as const, title: t.scanSeller, hint: t.noNetworkNeeded },
@@ -28,6 +36,9 @@ export function Scan({ route }: { route: ScanRoute }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const handling = useRef(false);
+  const cam = useRef<CameraView>(null);
+  const [ready, setReady] = useState(false);
+  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
   const copy = COPY[route.kind];
 
   useEffect(() => { if (permission && !permission.granted && permission.canAskAgain) void requestPermission(); }, [permission?.granted]);
@@ -63,6 +74,32 @@ export function Scan({ route }: { route: ScanRoute }) {
     }
   };
 
+  // T-Pay's own reader, for phones whose built-in one is missing or keeps missing the code.
+  useEffect(() => {
+    if (!ready) return;
+    let live = true;
+    let looking = false;
+    const look = async () => {
+      if (!live || looking || handling.current || !cam.current) return;
+      looking = true;
+      try {
+        const photo = await cam.current.takePictureAsync({ base64: true, quality: 0.7, skipProcessing: true, shutterSound: false });
+        try { if (photo?.uri) new File(photo.uri).delete(); } catch { /* the cache is cleared anyway */ }
+        const text = photo?.base64 && live ? readQrFromJpeg(photo.base64) : null;
+        if (text && live) void handle(text);
+      } catch { /* the camera was busy or closing; try again next time */ }
+      finally { looking = false; }
+    };
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const wait = setTimeout(() => { timer = setInterval(() => { void look(); }, OWN_READER_EVERY_MS); }, OWN_READER_AFTER_MS);
+    return () => { live = false; clearTimeout(wait); clearInterval(timer); };
+  }, [ready]);
+
+  const onReady = () => {
+    setReady(true);
+    void cam.current?.getAvailablePictureSizesAsync().then(sizes => setPictureSize(pickPictureSize(sizes))).catch(() => undefined);
+  };
+
   const paste = async () => { const clip = await Clipboard.getStringAsync().catch(() => ''); if (clip) setText(clip); setPasting(true); };
   const camera = Platform.OS !== 'web' && permission?.granted;
 
@@ -72,6 +109,7 @@ export function Scan({ route }: { route: ScanRoute }) {
       {camera ? (
         <Card w={w} h={300} fill={color.panel} pill={<T v="smallStrong" c={color.white}>{t.noNetwork}</T>}>
           <CameraView
+            ref={cam} onCameraReady={onReady} pictureSize={pictureSize} animateShutter={false}
             style={StyleSheet.absoluteFill} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
             onBarcodeScanned={busy ? undefined : ({ data }) => { void handle(data); }}
           />
