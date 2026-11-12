@@ -8,6 +8,7 @@ import { useNav } from '../../nav';
 import { useApp } from '../../state/appState';
 import { languageCodes, languages, t } from '../../i18n';
 import { softwareOnly } from '../../adapters/crypto/deviceSigner';
+import type { WakeCheck } from '../../adapters/speech/speech';
 import { api, speechIn, store } from '../../composition';
 import { profileStore } from '../../session/profileStore';
 import { withSession } from '../../session/guard';
@@ -37,6 +38,10 @@ export function SettingsScreen() {
     return speechIn.onWakeWordStatus(check);
   }, []);
   const canWake = wake === null ? null : wake !== 'unsupported';
+  // What "Hey T-Pay" is doing right now, and the last words it heard: so anyone can see why it does
+  // or doesn't answer, on their own phone.
+  const [check, setCheck] = useState<WakeCheck | null>(null);
+  useEffect(() => speechIn.onWakeCheck(setCheck), []);
   const getPack = async () => {
     setWake('downloading');
     const ok = await speechIn.downloadWakeWordPack();
@@ -112,6 +117,19 @@ export function SettingsScreen() {
           <View style={{ flex: 1, paddingVertical: space.sm }}>
             <T v="label">{t.wakeWord}</T>
             <T v="small" c={color.muted}>{canWake === false ? t.wakeWordUnavailable : wake === 'download' || wake === 'downloading' ? t.wakeWordNeedsPack : speechIn.wakeWordOnDevice() ? t.wakeWordNote : t.wakeWordNoteOnline}</T>
+            {wakeOn && canWake !== false && check && (
+              <View style={{ gap: space.hair, marginTop: space.xs }} accessibilityLiveRegion="polite">
+                <T v="small" c={check.state === 'listening' ? color.green : check.state === 'no-permission' || check.state === 'no-recogniser' ? color.coral : color.muted}>
+                  {check.state === 'listening' ? t.wakeCheckListening(check.mode === 'phone')
+                    : check.state === 'restarting' ? t.wakeCheckRestarting
+                    : check.state === 'no-permission' ? t.wakeCheckNoPermission
+                    : check.state === 'no-recogniser' ? t.wakeCheckNoRecogniser
+                    : t.wakeCheckOff}
+                </T>
+                {check.heard && <T v="small" c={color.text}>{t.wakeCheckHeard(check.heard)}</T>}
+                {check.error && <T v="small" c={color.amber}>{t.wakeCheckError(check.error)}</T>}
+              </View>
+            )}
             {(wake === 'download' || wake === 'downloading') && (
               <Button kind="soft" label={wake === 'downloading' ? t.wakeWordDownloading : t.wakeWordDownload} loading={wake === 'downloading'} onPress={() => { void getPack(); }} />
             )}
