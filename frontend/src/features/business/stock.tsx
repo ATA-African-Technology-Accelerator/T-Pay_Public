@@ -18,7 +18,7 @@ export function Stock() {
   const add = () => { void stockStore.add(name, amount).then(() => { setName(''); setQuantity(''); }); };
 
   return (
-    <Screen tabsFor="stock" head={<CurvedHeader home title={t.stock} />}>
+    <Screen tabsFor="stock" head={<CurvedHeader home title={t.stockInventory} />}>
       <Panel>
         <T v="label" accessibilityLiveRegion="polite">{today.count ? t.salesToday(today.count, money(today.totalNgnMinor)) : t.noSalesToday}</T>
       </Panel>
