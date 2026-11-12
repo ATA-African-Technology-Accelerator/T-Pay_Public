@@ -299,6 +299,27 @@ svg.i { width: 1em; height: 1em; }
 .ratio-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border-soft); font-size: 0.9rem; color: var(--ink-soft); }
 .ratio-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
 
+/* ---- videos ---- */
+.videos { padding-top: 10vh; }
+.vid-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; margin-top: 40px; align-items: start; }
+.vid { border-radius: 22px; border: 1px solid var(--border-soft); background: var(--surface); padding: 12px; display: flex; flex-direction: column; gap: 14px; }
+.vid-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #000D20; }
+.vid-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.vid-poster { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; padding: 0; cursor: pointer; display: grid; place-items: center; color: #F3F5F9; font: inherit;
+  background: radial-gradient(70% 60% at 30% 20%, rgba(242,238,238,0.16), transparent 70%), radial-gradient(60% 70% at 80% 90%, rgba(90,12,12,0.9), transparent 70%), linear-gradient(160deg, #000D20, #160D0E); }
+.vid-poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .85; transition: opacity .3s, transform .6s cubic-bezier(.2,.7,.2,1); }
+.vid-poster:hover img { opacity: 1; transform: scale(1.03); }
+.vid-play { position: relative; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: rgba(242,238,238,0.92); color: #160D0E; box-shadow: 0 18px 40px -16px rgba(0,0,0,.7); transition: transform .3s cubic-bezier(.2,.9,.2,1.2); }
+.vid-poster:hover .vid-play { transform: scale(1.08); }
+.vid-play svg { width: 26px; height: 26px; margin-left: 3px; }
+.vid-soon { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 16px; }
+.vid-soon small { color: #C9D0DD; font-size: 0.85rem; }
+.vid-body { padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+.vid-body h3 { font-size: 1.45rem; font-weight: 400; }
+.vid-body p { color: var(--ink-soft); font-size: 0.95rem; }
+.vid-body .mono { color: var(--ink-faint); }
+.channel { margin-top: 14px; }
+
 /* ---- download ---- */
 .download { padding-top: 10vh; }
 .dl-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; margin-top: 40px; align-items: stretch; }
@@ -371,6 +392,7 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
 /* ---- responsive ---- */
 @media (max-width: 1100px) { .swatches { grid-template-columns: repeat(3, 1fr); } .spec-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 900px) {
+  .vid-grid { grid-template-columns: 1fr; }
   .bar-nav { display: none; }
   .story { grid-template-columns: 1fr; }
   .col.after { order: -1; position: sticky; top: 0; z-index: 5; }
@@ -415,6 +437,7 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
     <a href="#idea">The problem</a>
     <a href="#moments">Moments</a>
     <a href="#system">System</a>
+    <a href="#watch">Watch</a>
     <a href="#download">Download</a>
   </nav>
   <div class="bar-right">
@@ -711,8 +734,27 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
   </div>
 </section>
 
+<!-- Videos. Put each YouTube link in data-video, and the channel link in data-channel.
+     A video with no link shows a "Watch on YouTube" card instead. -->
+<section id="watch" class="full videos" aria-labelledby="watchTitle" data-channel="https://www.youtube.com/@ATA_AfricanTech">
+  <p class="section-label mono reveal"><i>04</i> Watch</p>
+  <h2 id="watchTitle" class="reveal">See it work, <em>with no signal.</em></h2>
+  <p class="intro reveal">A short explainer on why T-Pay exists, and a full demo on two phones: locking money, paying in airplane mode, and the money landing when one phone reconnects.</p>
+  <div class="vid-grid">
+    <article class="vid reveal" data-video="https://www.youtube.com/watch?v=xpTYEPPETxM" data-title="T-Pay explainer">
+      <div class="vid-frame"></div>
+      <div class="vid-body"><span class="mono">Explainer</span><h3>Why T-Pay, in a few minutes</h3><p>The problem in Nigerian markets, and how locking money ahead of time solves it.</p></div>
+    </article>
+    <article class="vid reveal" data-video="" data-title="T-Pay demo">
+      <div class="vid-frame"></div>
+      <div class="vid-body"><span class="mono">Demo · two phones</span><h3>The whole payment, start to finish</h3><p>Lock, go offline, pay with a fingerprint, receive over Bluetooth, settle with PayPal.</p></div>
+    </article>
+  </div>
+  <a class="pill-btn channel reveal" id="channelLink" href="#watch" target="_blank" rel="noopener" hidden><span class="pi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg></span>More on our YouTube channel</a>
+</section>
+
 <section id="download" class="full download" aria-labelledby="dlTitle">
-  <p class="section-label mono reveal"><i>04</i> Try it</p>
+  <p class="section-label mono reveal"><i>05</i> Try it</p>
   <h2 id="dlTitle" class="reveal">Put it on <em>two phones.</em></h2>
   <p class="intro reveal">One to pay, one to get paid. It runs on the PayPal sandbox during the pilot, so no real money moves and you can try every refusal without worry.</p>
   <div class="dl-grid">
@@ -833,6 +875,33 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
       setTimeout(function () { requestAnimationFrame(drift); }, 90);
     })();
   }
+
+  // ---- videos: a still with a play button; the YouTube player loads only when pressed ----
+  function videoId(url) {
+    var m = (url || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+  var watch = document.getElementById('watch'), channel = watch.getAttribute('data-channel');
+  var channelLink = document.getElementById('channelLink');
+  if (channel) { channelLink.href = channel; channelLink.hidden = false; }
+  watch.querySelectorAll('.vid').forEach(function (card) {
+    var frame = card.querySelector('.vid-frame'), title = card.getAttribute('data-title'), id = videoId(card.getAttribute('data-video'));
+    var playIcon = '<span class="vid-play" aria-hidden="true"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>';
+    if (!id) {
+      var soon = channel
+        ? '<a class="vid-poster" href="' + channel + '" target="_blank" rel="noopener" aria-label="' + title + ' on YouTube"><span class="vid-soon">' + playIcon + '<small>Watch on our YouTube channel</small></span></a>'
+        : '<div class="vid-poster" style="cursor:default"><span class="vid-soon">' + playIcon + '<small>Video coming soon</small></span></div>';
+      frame.innerHTML = soon;
+      return;
+    }
+    var btn = document.createElement('button');
+    btn.className = 'vid-poster'; btn.type = 'button'; btn.setAttribute('aria-label', 'Play: ' + title);
+    btn.innerHTML = '<img alt="" loading="lazy" src="https://i.ytimg.com/vi/' + id + '/hqdefault.jpg">' + playIcon;
+    btn.addEventListener('click', function () {
+      frame.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&modestbranding=1" title="' + title + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    });
+    frame.appendChild(btn);
+  });
 
   // ---- theme ----
   var root = document.documentElement, themeBtn = document.getElementById('themeBtn');
