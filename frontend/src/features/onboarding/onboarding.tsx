@@ -72,12 +72,17 @@ export function Splash() {
   );
 }
 
+const OFFERED = ['en', 'pcm'];
+
 export function Language({ edit: asked }: { edit?: boolean }) {
   const nav = useNav();
   const { setLanguage, language, session } = useApp();
   // A phone that already has an account only ever edits it. Setup would register it again.
   const edit = asked || !!session;
   const [picked, setPicked] = useState<string | null>(edit ? languages[languageCodes.indexOf(language)] ?? null : null);
+  // Sign-up offers English and Nigerian Pidgin only. The other catalogues stay, so a phone already
+  // set to one of them still shows it when the language is changed later.
+  const shown = languageCodes.map((code, i) => i).filter(i => OFFERED.includes(languageCodes[i] as string) || (edit && languageCodes[i] === language));
   const choose = (i: number) => {
     setPicked(languages[i] as string);
     void setLanguage(languageCodes[i] as (typeof languageCodes)[number]);
@@ -86,10 +91,11 @@ export function Language({ edit: asked }: { edit?: boolean }) {
   return (
     <Screen head={<CurvedHeader back={edit} bell={false} title={t.chooseLanguage} />}>
       <View style={{ gap: space.sm }}>
-        {languages.map((name, i) => {
+        {shown.map(i => {
+          const name = languages[i] as string;
           const on = picked === name;
           return (
-            <Rise key={name} delay={i * motion.stagger} style={o.langRow}>
+            <Rise key={name} delay={shown.indexOf(i) * motion.stagger} style={o.langRow}>
               <Pressable accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={name} onPress={() => choose(i)} style={[o.lang, on && { backgroundColor: color.panelHigh }]}>
                 <T v="heading">{name}</T>
                 {on && <Check size={icon.md} color={color.blue} strokeWidth={2.4} />}
