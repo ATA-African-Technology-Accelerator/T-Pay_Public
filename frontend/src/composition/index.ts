@@ -31,11 +31,11 @@ export const connectivity = new NetInfoConnectivity();
 export const radio = loadRadio();
 export const nearby = new NearbyTransport(loadNearbyDriver(), radio);
 export const speechIn = new ExpoSpeechInput();
-// Replies are read by the phone's own voice, which starts at once. The server's natural voice is
-// used for a language the phone has no voice for, and for a sentence it has already made.
+// The assistant speaks in the server's natural voice (ElevenLabs), saved on the phone once made.
+// With no network, or a slow one, the phone's own voice reads it instead.
 export const speechOut = new ExpoSpeechOutput(async (text, language) => {
   if (!(await connectivity.isOnline())) return null;
-  return (await api.speak({ text, language })).audioBase64;
+  return api.speak({ text, language });
 });
 /** The offline assistant model. Nothing is downloaded unless the person asks in Settings. */
 export const localModel = loadOnDeviceModel();
