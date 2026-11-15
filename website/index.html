@@ -160,6 +160,7 @@ svg.i { width: 1em; height: 1em; }
 /* ---- chapters ---- */
 .chapters-intro { padding: 10vh 0 2vh; }
 .chapters-intro h2 { font-size: clamp(2.2rem, 4vw, 3.6rem); }
+.chapters-intro h2 em { color: var(--accent-text); }
 .chapters-intro p { color: var(--ink-soft); margin-top: 18px; max-width: 46ch; }
 .chapter { min-height: 88vh; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 6vh 0; position: relative; }
 .chapter .num { font-family: var(--display); font-weight: 300; font-size: clamp(4.5rem, 8vw, 7.5rem); line-height: 0.9; color: transparent;
@@ -259,6 +260,19 @@ svg.i { width: 1em; height: 1em; }
 .replay { border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
 .replay:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
 .sim-note { margin-top: 10px; font-size: 0.78rem; color: var(--ink-faint); max-width: 36ch; text-align: center; }
+
+/* ---- the story zone (phones): a pinned phone that plays the seven moments as you swipe ---- */
+.journey { display: none; }
+.peek-cta { display: none; }
+@property --jg { syntax: "<color>"; inherits: true; initial-value: #290000; }
+
+/* ---- phone-only pieces (hidden on desktop) ---- */
+.m-only { display: none; }
+.chapters { display: block; }
+.m-shot, .m-hero-shot, .m-peek, .m-dots, .m-hint { display: none; }
+.m-shot, .m-hero-shot { position: relative; aspect-ratio: 410 / 864; max-width: 100%; overflow: hidden; border-radius: 9% / 4.3%; }
+.m-scale { position: absolute; top: 0; left: 0; width: 410px; height: 864px; transform-origin: top left; }
+.m-scale .view { pointer-events: none; }
 
 /* ---- full-width sections ---- */
 .full { position: relative; z-index: 2; max-width: 1440px; margin: 0 auto; padding: 16vh clamp(16px, 4vw, 48px) 8vh;
@@ -395,14 +409,70 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
   .vid-grid { grid-template-columns: 1fr; }
   .bar-nav { display: none; }
   .story { grid-template-columns: 1fr; }
-  .col.after { order: -1; position: sticky; top: 0; z-index: 5; }
-  .stage { height: auto; min-height: 0; padding: 72px 0 0; align-items: center; pointer-events: none; }
-  .stage .device-fit, .stage .now-playing { pointer-events: auto; }
-  .stage::after { content: ""; position: absolute; inset: 0 0 -1px; z-index: -1; background: linear-gradient(180deg, var(--bg) 70%, transparent); }
-  .stage .now-playing, .stage .sim-note { display: none; }
-  .hero { min-height: auto; padding-top: 24px; padding-bottom: 40px; }
-  .chapter { min-height: 70vh; }
-  .chapter .progress { display: none; }
+  /* Phones: no phone that follows the scroll (it covered the text). The hero gets its own full
+     screen under the buttons, and the seven moments become cards you swipe through. */
+  .col.after { display: none; }
+  .d-only { display: none; } .m-only { display: inline; }
+  .scroll-cue { display: none; }
+  .hero { min-height: auto; padding-top: 104px; padding-bottom: 24px; }
+  /* From B: just the top of the phone peeks out under the buttons, and fades into the page. */
+  .m-peek { display: block; position: relative; height: 300px; margin: 36px 0 0; overflow: hidden;
+    -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
+  .m-hero-shot { display: block; width: min(76%, 300px); margin: 0 auto; }
+  .idea { padding-top: 4vh; }
+  .chapters-intro { padding: 8vh 0 0; }
+  /* From A: the moments scroll down the page, each with a small screen from the app beside it. */
+  .chapters { display: grid; gap: 0; margin-top: 18px; }
+  .chapter { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 112px; grid-template-rows: auto; column-gap: 16px; align-items: start;
+    padding: 26px 0; border-top: 1px solid var(--border-soft); }
+  .chapter > * { grid-column: 1; }
+  .chapter .m-shot { display: block; grid-column: 2; grid-row: 1 / span 5; width: 112px; margin-top: 6px; }
+  .chapter .num { font-size: 2.6rem; }
+  .chapter h3 { font-size: 1.45rem; max-width: none; margin-top: 6px; }
+  .chapter p { font-size: 0.96rem; margin-top: 8px; }
+  .chapter .detail { margin-top: 12px; }
+  .chapter .progress, .chapter .play { display: none; }
+  .m-dots, .m-hint { display: none; }
+  /* The story zone replaces the list: the articles stay for desktop and for screen readers. */
+  .chapters { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .m-peek { cursor: pointer; }
+  .peek-cta { display: flex; position: relative; z-index: 2; margin: -54px auto 0; width: max-content; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px;
+    font: 700 0.86rem/1 var(--sans); color: var(--ink); background: color-mix(in srgb, var(--bg) 55%, transparent); border: 1px solid var(--border); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); cursor: pointer; }
+  .peek-cta svg { width: 16px; height: 16px; animation: nudge 1.6s ease-in-out infinite; }
+  @keyframes nudge { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(3px) } }
+  .journey { display: block; position: relative; margin: 26px calc(-1 * max(clamp(16px, 4vw, 48px), env(safe-area-inset-left, 0px))) 0; }
+  .j-stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 18px;
+    padding: 76px max(16px, env(safe-area-inset-left, 0px)) 22px; isolation: isolate; }
+  .j-glow { position: absolute; inset: -10%; z-index: -1; pointer-events: none; transition: background 1s ease;
+    background: radial-gradient(60% 40% at 50% 34%, var(--jg), transparent 70%), radial-gradient(70% 50% at 50% 110%, rgba(0,15,37,.9), transparent 70%); }
+  .j-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .j-count { font: 500 0.78rem/1 var(--mono); letter-spacing: .08em; color: var(--ink-faint); }
+  .j-count b { color: var(--ink); font-weight: 500; }
+  .j-bars { display: flex; gap: 4px; flex: 1; max-width: 200px; }
+  .j-bars i { flex: 1; height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 18%, transparent); overflow: hidden; position: relative; }
+  .j-bars i::after { content: ""; position: absolute; inset: 0; background: var(--ink); transform: scaleX(var(--f, 0)); transform-origin: left; }
+  .j-phone { position: relative; margin: 0 auto; flex: none; }
+  .j-shot { position: absolute; inset: 0; border-radius: 9% / 4.3%; overflow: hidden; will-change: transform, opacity, filter;
+    transition: transform .8s cubic-bezier(.2,.8,.2,1), opacity .6s ease, filter .7s ease; transform-origin: 50% 60%; }
+  .j-shot.past { opacity: 0; transform: perspective(900px) translateY(-14%) rotateX(14deg) scale(.86); filter: blur(10px); }
+  .j-shot.next { opacity: 0; transform: translateY(22%) scale(.96); filter: blur(4px); }
+  .j-shot.now { opacity: 1; transform: none; filter: none; }
+  .j-caps { position: relative; min-height: 148px; }
+  .j-cap { position: absolute; inset: 0 0 auto; display: grid; grid-template-columns: auto 1fr; column-gap: 14px; align-items: start; }
+  .j-cap .n { font: 300 3rem/0.9 var(--display); color: var(--accent-text); grid-row: 1 / span 2; }
+  .j-cap h3 { font-size: 1.4rem; line-height: 1.12; }
+  .j-cap p { color: var(--ink-soft); font-size: 0.93rem; margin-top: 6px; grid-column: 2; }
+  .j-cap > * { transition: opacity .5s ease, transform .6s cubic-bezier(.2,.8,.2,1); }
+  .j-cap:not(.now) > * { opacity: 0; transform: translateY(18px); }
+  .j-cap.now h3 { transition-delay: .06s; } .j-cap.now p { transition-delay: .12s; }
+  .j-hint { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 0.78rem; color: var(--ink-faint); transition: opacity .4s; }
+  .journey.done .j-hint, .journey.moved .j-hint { opacity: 0; }
+  .j-end { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 0 28px; pointer-events: none; opacity: 0; transition: opacity .6s ease; }
+  .j-end p { font: 300 2.2rem/1.05 var(--display); letter-spacing: -0.02em; }
+  .j-end p em { color: var(--accent-text); }
+  .journey.done .j-end { opacity: 1; }
+  .journey.done .j-phone, .journey.done .j-caps, .journey.done .j-top { opacity: 0; transform: scale(.94); transition: opacity .6s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
+  .j-phone, .j-caps, .j-top { transition: opacity .6s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
   .motion-grid, .a11y, .dl-grid { grid-template-columns: 1fr; }
   .swatches { grid-template-columns: repeat(2, 1fr); }
   .spec-grid { grid-template-columns: 1fr; }
@@ -412,6 +482,8 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
   html { scroll-behavior: auto; }
   .orb, .pulse, .view.on .mic.live::before, .view.on .mic.live::after, .view.on .scan .beam, .fp.go, .blaze .ring, .pop, .glass.glass::after, .liquid i { animation: none; }
   .js .reveal { opacity: 1; transform: none; transition: none; }
+  .j-shot, .j-cap > *, .j-phone, .j-caps, .j-top, .j-glow { transition: opacity .2s linear !important; transform: none !important; filter: none !important; }
+  .peek-cta svg { animation: none; }
   .view, .chapter .num, .chapter .progress::after, .pill-btn, .play { transition: none; }
 }
 </style>
@@ -460,8 +532,10 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
         <p class="scroll-cue reveal"><span class="pulse" aria-hidden="true"></span>The phone on the right plays along as you scroll</p>
         <div class="hero-actions reveal">
           <a class="pill-btn primary" href="download/" target="_blank" rel="noopener"><span class="pi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg></span>Download for Android</a>
-          <a class="pill-btn" href="#moments"><span class="pi" aria-hidden="true"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>See the seven moments</a>
+          <a class="pill-btn" href="#moments" id="momentsBtn"><span class="pi" aria-hidden="true"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>See the seven moments</a>
         </div>
+        <div class="m-peek" id="mPeek" aria-hidden="true"><div class="m-hero-shot" id="mHeroShot"></div></div>
+        <button class="peek-cta" id="peekCta" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>See the whole payment</button>
       </section>
 
       <section class="idea" id="idea" aria-labelledby="ideaTitle">
@@ -478,10 +552,11 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
       <section id="moments" aria-labelledby="momentsTitle">
         <div class="chapters-intro">
           <p class="section-label mono reveal"><i>02</i> Seven moments</p>
-          <h2 id="momentsTitle" class="reveal">Scroll, and the phone plays along.</h2>
-          <p class="reveal">Each moment drives the phone on the right. Ada is buying; Bola is selling. Play any of them again whenever you like.</p>
+          <h2 id="momentsTitle" class="reveal"><span class="d-only">Scroll, and the phone plays along.</span><span class="m-only">From locking money to <em>getting paid.</em></span></h2>
+          <p class="reveal"><span class="d-only">Each moment drives the phone on the right. Ada is buying; Bola is selling. Play any of them again whenever you like.</span><span class="m-only">Seven screens from the real app. Ada is buying; Bola is selling.</span></p>
         </div>
 
+        <div class="chapters" id="chapters">
         <article class="chapter" data-view="lock" data-title="Lock money">
           <span class="progress" aria-hidden="true"></span>
           <span class="num" aria-hidden="true">01</span>
@@ -544,6 +619,19 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
           <div class="detail"><span class="tag">Wake word</span><span class="tag">Natural voice</span><span class="tag">Never enters a PIN</span></div>
           <button class="play" type="button"><span class="pi"><svg viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg></span>Play on the phone</button>
         </article>
+        </div>
+        <div class="journey" id="journey" aria-hidden="true">
+          <div class="j-stage">
+            <div class="j-glow"></div>
+            <div class="j-top"><span class="j-count"><b id="jNow">01</b> / 07</span><span class="j-bars" id="jBars"></span></div>
+            <div class="j-phone" id="jPhone"></div>
+            <div class="j-caps" id="jCaps"></div>
+            <div class="j-end"><p>That's the whole payment. <em>No signal needed.</em></p></div>
+            <div class="j-hint">Swipe up</div>
+          </div>
+        </div>
+        <div class="m-dots" id="mDots" aria-hidden="true"></div>
+        <p class="m-hint">Swipe sideways for the next moment</p>
       </section>
     </div>
 
@@ -935,6 +1023,123 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
   }
   window.addEventListener('resize', fitDevice); fitDevice();
 
+  // ---- phones: real app screens, still, in the hero and on each moment card ----
+  var screenOf = function (name) { return document.querySelector('.screen .view[data-view="' + name + '"]'); };
+  function shot(name, prepare) {
+    var src = screenOf(name); if (!src) return null;
+    var wrap = document.createElement('div'); wrap.className = 'm-shot-inner';
+    var scale = document.createElement('div'); scale.className = 'm-scale';
+    var dev = document.createElement('div'); dev.className = 'device';
+    var scr = document.createElement('div'); scr.className = 'screen';
+    scr.innerHTML = '<div class="island" aria-hidden="true"></div>';
+    var v = src.cloneNode(true);
+    v.classList.add('on'); v.removeAttribute('data-view');
+    v.querySelectorAll('[id]').forEach(function (el) { el.removeAttribute('id'); });
+    v.querySelectorAll('[style]').forEach(function (el) { if (el.hasAttribute('data-say')) { el.style.opacity = '1'; el.style.transform = 'none'; } });
+    if (prepare) prepare(v);
+    scr.appendChild(v); dev.appendChild(scr); scale.appendChild(dev);
+    return scale;
+  }
+  var stepTo = function (name) { return function (v) { v.querySelectorAll('[data-step]').forEach(function (st) { st.classList.toggle('show', st.getAttribute('data-step') === name); }); }; };
+  var SHOTS = {
+    lock: stepTo('b'), offline: null,
+    voice: stepTo('b'),
+    pay: stepTo('b'), arrive: null,
+    settle: function (v) {
+      var amt = v.querySelector('.v-money'); if (amt) amt.textContent = '₦1,000.00';
+      var chip = v.querySelector('.chip.wait'); if (chip) { chip.className = 'chip ok glass'; chip.innerHTML = '<svg class="ic" data-i="check"></svg>Paid'; icon(chip.querySelector('svg')); }
+      var po = v.querySelector('[data-step="payout"]'); if (po) po.classList.add('show');
+    },
+    assist: null
+  };
+  function placeShot(host, name, prepare) {
+    var sc = shot(name, prepare); if (!sc) return;
+    host.innerHTML = ''; host.appendChild(sc);
+  }
+  var heroShot = document.getElementById('mHeroShot');
+  placeShot(heroShot, 'offline');
+  document.querySelectorAll('.chapter').forEach(function (ch) {
+    var host = document.createElement('div'); host.className = 'm-shot'; host.setAttribute('aria-hidden', 'true');
+    ch.insertBefore(host, ch.firstChild);
+    placeShot(host, ch.getAttribute('data-view'), SHOTS[ch.getAttribute('data-view')]);
+  });
+  // each still screen is drawn at the app's real size, then scaled to fit its card
+  function fitShots() {
+    document.querySelectorAll('.m-shot, .m-hero-shot').forEach(function (host) {
+      var sc = host.querySelector('.m-scale'); if (!sc || !host.clientWidth) return;
+      sc.style.transform = 'scale(' + (host.clientWidth / 410) + ')';
+    });
+  }
+  window.addEventListener('resize', fitShots); fitShots();
+  // the dots under the deck follow the swipe
+  var deck = document.getElementById('chapters'), dotsEl = document.getElementById('mDots');
+  var cards = deck.querySelectorAll('.chapter');
+  dotsEl.innerHTML = Array.prototype.map.call(cards, function () { return '<i></i>'; }).join('');
+  var dots = dotsEl.querySelectorAll('i');
+  function onDeck() {
+    if (window.innerWidth > 900) return;
+    var mid = deck.scrollLeft + deck.clientWidth / 2, best = 0, gap = Infinity;
+    cards.forEach(function (c, i) { var d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (d < gap) { gap = d; best = i; } });
+    dots.forEach(function (d, i) { d.classList.toggle('on', i === best); });
+    cards.forEach(function (c, i) { c.classList.toggle('active', i === best); });
+  }
+  deck.addEventListener('scroll', function () { requestAnimationFrame(onDeck); }, { passive: true });
+  window.addEventListener('resize', onDeck); onDeck();
+
+  // ---- the story zone on phones: swipe up, and the phone plays the next moment ----
+  var journey = document.getElementById('journey');
+  var jPhone = document.getElementById('jPhone'), jCaps = document.getElementById('jCaps'), jBars = document.getElementById('jBars'), jNow = document.getElementById('jNow');
+  var GLOWS = ['#290000', '#001A3D', '#1E0B3A', '#290000', '#0B2A1A', '#001A3D', '#2A1500'];
+  var steps = Array.prototype.map.call(document.querySelectorAll('.chapter'), function (ch) {
+    return { view: ch.getAttribute('data-view'), num: ch.querySelector('.num').textContent, title: ch.querySelector('h3').textContent, text: ch.querySelector('p').textContent };
+  });
+  var jShots = [], jCapEls = [];
+  steps.forEach(function (st, i) {
+    var holder = document.createElement('div'); holder.className = 'j-shot ' + (i === 0 ? 'now' : 'next');
+    var sc = shot(st.view, SHOTS[st.view]); if (sc) holder.appendChild(sc);
+    jPhone.appendChild(holder); jShots.push(holder);
+    var cap = document.createElement('div'); cap.className = 'j-cap' + (i === 0 ? ' now' : '');
+    cap.innerHTML = '<span class="n">' + st.num + '</span><h3></h3><p></p>';
+    cap.querySelector('h3').textContent = st.title; cap.querySelector('p').textContent = st.text;
+    jCaps.appendChild(cap); jCapEls.push(cap);
+  });
+  jBars.innerHTML = steps.map(function () { return '<i></i>'; }).join('');
+  var barEls = jBars.querySelectorAll('i');
+  var PER = 0.8; // screens' worth of scrolling for each moment
+  function sizeJourney() {
+    if (window.innerWidth > 900) return;
+    var vh = window.innerHeight;
+    journey.style.height = Math.round(vh * (steps.length * PER + 1.4)) + 'px';
+    var h = Math.min(vh * 0.52, (window.innerWidth - 80) * 864 / 410), w = h * 410 / 864;
+    jPhone.style.width = w + 'px'; jPhone.style.height = h + 'px';
+    jShots.forEach(function (holder) { var sc = holder.querySelector('.m-scale'); if (sc) sc.style.transform = 'scale(' + (w / 410) + ')'; });
+  }
+  var jIndex = -1;
+  function onJourney() {
+    if (window.innerWidth > 900) return;
+    var r = journey.getBoundingClientRect(), vh = window.innerHeight;
+    var travelled = -r.top, span = vh * PER;
+    var raw = travelled / span;
+    var i = Math.max(0, Math.min(steps.length - 1, Math.floor(raw)));
+    var done = raw >= steps.length + 0.15;
+    journey.classList.toggle('done', done);
+    journey.classList.toggle('moved', raw > 0.35);
+    barEls.forEach(function (b, k) { b.style.setProperty('--f', k < i ? 1 : k > i ? 0 : Math.max(0, Math.min(1, raw - i))); });
+    if (i === jIndex) return;
+    jIndex = i;
+    jShots.forEach(function (h, k) { h.className = 'j-shot ' + (k < i ? 'past' : k > i ? 'next' : 'now'); });
+    jCapEls.forEach(function (c, k) { c.classList.toggle('now', k === i); });
+    jNow.textContent = steps[i].num;
+    journey.style.setProperty('--jg', GLOWS[i % GLOWS.length]);
+  }
+  window.addEventListener('scroll', function () { requestAnimationFrame(onJourney); }, { passive: true });
+  window.addEventListener('resize', function () { sizeJourney(); onJourney(); });
+  sizeJourney(); onJourney();
+  // tapping the little phone (or the button under it) takes you into the story
+  function enterStory() { var top = journey.getBoundingClientRect().top + window.scrollY; window.scrollTo({ top: top, behavior: reduce ? 'auto' : 'smooth' }); }
+  document.getElementById('mPeek').addEventListener('click', enterStory);
+  document.getElementById('peekCta').addEventListener('click', enterStory);
+
   // ---- phone: views and their small sequences ----
   var views = document.querySelectorAll('.view'), nowText = document.getElementById('nowText');
   var timers = [], token = 0;
@@ -994,6 +1199,7 @@ a.glass.glass:hover, button.glass.glass:hover { transform: translateY(-2px) scal
   // ---- chapters drive the phone ----
   var chapters = document.querySelectorAll('.chapter');
   var cio = new IntersectionObserver(function (entries) {
+    if (window.innerWidth <= 900) return;
     entries.forEach(function (e) {
       if (e.isIntersecting) {
         chapters.forEach(function (c) { c.classList.remove('active'); });
