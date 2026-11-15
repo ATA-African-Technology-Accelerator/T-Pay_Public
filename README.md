@@ -12,7 +12,7 @@
 
 Lock money while you are online, then pay or get paid phone to phone with no internet at all, by QR code, Bluetooth or voice.
 
-[Website](https://t-paypublic-website.vercel.app/) · [Download the app](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) · [Live API](https://t-pay-public.onrender.com/api/health) · [User guide](docs/T-Pay-User-Guide.md) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
+[Website](https://t-paypublic-website.vercel.app/) · [Download the app](https://t-paypublic-website.vercel.app/download/) · [Live API](https://t-pay-public.onrender.com/api/health) · [User guide](docs/T-Pay-User-Guide.md) · [Docs](docs/T-Pay-API-Contract.md) · [Quickstart](#quickstart) · [Architecture](#architecture) · [Contributing](CONTRIBUTING.md)
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/OlayiwolaSherrifSalawu/T-Pay_Public/ci.yml?branch=frontend&style=flat-square&label=tests)](https://github.com/OlayiwolaSherrifSalawu/T-Pay_Public/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -51,7 +51,7 @@ Lock money while you are online, then pay or get paid phone to phone with no int
 | | Link |
 | :--- | :--- |
 | **Website** | [t-paypublic-website.vercel.app](https://t-paypublic-website.vercel.app/) |
-| **Android app** | [Download the build from Expo](https://expo.dev/accounts/olayiwola206/projects/tpay-mobile/builds/9a8af0e5-d058-494f-8756-fb112fdac3d5) |
+| **Android app** | [t-paypublic-website.vercel.app/download](https://t-paypublic-website.vercel.app/download/) (always the latest build) |
 | **Live API** | [t-pay-public.onrender.com/api/health](https://t-pay-public.onrender.com/api/health) |
 | **User guide** | [docs/T-Pay-User-Guide.md](docs/T-Pay-User-Guide.md), with a ten-minute test script for judges |
 | **Explainer video** | [T-Pay explainer on YouTube](https://www.youtube.com/watch?v=xpTYEPPETxM) |
